@@ -48,6 +48,37 @@
         </label>
       </fieldset>
 
+      <section class="site-section" aria-labelledby="site-label">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">CURRENT SITE</p>
+            <h2 id="site-label">Checking page…</h2>
+          </div>
+          <label class="switch switch-small" title="Allow Lexend on this site">
+            <span class="visually-hidden">Allow Lexend on this site</span>
+            <input id="site-enabled" type="checkbox" disabled>
+            <span class="switch-track" aria-hidden="true">
+              <span class="switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+        <p id="site-message">Checking whether this page can be changed.</p>
+      </section>
+
+      <section class="transfer-section" aria-labelledby="transfer-label">
+        <div class="section-heading compact">
+          <div>
+            <p class="section-kicker">SETTINGS FILE</p>
+            <h2 id="transfer-label">Take your setup with you.</h2>
+          </div>
+        </div>
+        <div class="transfer-actions">
+          <button id="export-settings" type="button">EXPORT JSON</button>
+          <button id="import-settings" type="button">IMPORT JSON</button>
+          <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json">
+        </div>
+      </section>
+
       <footer>
         <span id="status" role="status" aria-live="polite">READY</span>
         <span>LEXEND 100—900</span>
@@ -56,4 +87,3 @@
     <script src="popup.js"></script>
   </body>
 </html>
-

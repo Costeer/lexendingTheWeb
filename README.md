@@ -8,12 +8,16 @@ plus headings, and toggle the effect without reloading the page.
 
 - Applies Lexend to every HTTP and HTTPS website
 - Switches between **body text** and **body + headers**
+- Pauses globally or on individual websites
 - Updates open tabs as soon as a setting changes
-- Handles content added later and open shadow roots
-- Preserves code, SVGs, common icon containers, and opt-out regions
+- Handles content added later, open shadow roots, and related iframe documents
+- Preserves code, SVGs, common icon-font systems, and opt-out regions
+- Imports and exports settings through a versioned JSON file
 - Syncs preferences through the browser's extension storage
+- Visually distinguishes active and paused toolbar states
 - Uses a deliberately light-only, square-cornered interface
 - Ships the font locally—no page data or external font request is involved
+- Includes Latin, Latin Extended, and Vietnamese Lexend subsets
 
 ## Develop
 
@@ -49,6 +53,13 @@ npm run package
 
 This creates Chrome and Firefox ZIP archives in `dist/releases`.
 
+Package filenames include the version from `package.json`. To bump a release,
+use `npm version patch`, `npm version minor`, or `npm version major`; the npm
+version lifecycle synchronizes both browser manifests automatically.
+
+Pushing a `v*` tag runs the release workflow and publishes both browser ZIPs
+to a GitHub release.
+
 ## Website opt-out
 
 Extension users can preserve a specific subtree by adding
@@ -61,6 +72,15 @@ alone.
 Lexend the Web does not collect, transmit, or sell data. The only stored data
 is the user's enabled state and text-scope preference, saved through the
 browser's synchronized extension storage.
+
+See the complete [privacy policy](PRIVACY.md). The publishable HTML copy lives
+at `docs/privacy.html` and is deployed through GitHub Pages.
+
+## Store submission
+
+Listing copy, permission explanations, screenshots, and promotional graphics
+live under `store/`. These assets cover the Chrome Web Store and Firefox
+Add-ons submission fields.
 
 ## License
 

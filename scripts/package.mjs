@@ -5,6 +5,7 @@ import { zipSync } from "fflate";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const releases = join(root, "dist", "releases");
+const { version } = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 
 const collectFiles = async (directory, prefix = "") => {
   const files = {};
@@ -26,7 +27,7 @@ const collectFiles = async (directory, prefix = "") => {
 await mkdir(releases, { recursive: true });
 
 for (const target of ["chrome", "firefox"]) {
-  const archive = join(releases, `lexend-the-web-${target}.zip`);
+  const archive = join(releases, `lexend-the-web-${target}-v${version}.zip`);
   await rm(archive, { force: true });
   const files = await collectFiles(join(root, "dist", target));
   await writeFile(archive, zipSync(files, { level: 9 }));

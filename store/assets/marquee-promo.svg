@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 560">
+  <rect width="1400" height="560" fill="#ffffff"/>
+  <rect x="78" y="78" width="404" height="404" fill="#c70000"/>
+  <rect x="54" y="54" width="404" height="404" fill="#ffffff" stroke="#000000" stroke-width="16"/>
+  <path d="M159 139h79v190h128v74H159z" fill="#000000"/>
+  <text x="560" y="250" font-family="Arial, sans-serif" font-size="96" font-weight="900" letter-spacing="-6" fill="#000000">LEXEND</text>
+  <text x="560" y="344" font-family="Arial, sans-serif" font-size="96" font-weight="900" letter-spacing="-6" fill="#000000">THE WEB</text>
+  <rect x="564" y="383" width="574" height="16" fill="#c70000"/>
+</svg>
+

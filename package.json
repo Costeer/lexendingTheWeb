@@ -1,6 +1,6 @@
 {
   "name": "lexending-the-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A Chrome and Firefox extension that makes the web easier to read with Lexend.",
   "type": "module",
@@ -8,7 +8,8 @@
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
     "test": "node --test",
-    "package": "npm run build && node scripts/package.mjs"
+    "package": "npm run build && node scripts/package.mjs",
+    "version": "node scripts/sync-version.mjs"
   },
   "engines": {
     "node": ">=20"

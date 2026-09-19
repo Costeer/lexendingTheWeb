@@ -1,9 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Lexend the Web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Make websites easier to read with Lexend.",
-  "permissions": ["storage"],
+  "homepage_url": "https://github.com/Costeer/lexendingTheWeb",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "action": {
     "default_title": "Lexend the Web",
     "default_popup": "popup.html",
@@ -26,17 +33,29 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/content.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/fonts/lexend-latin-wght-normal.woff2"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "assets/fonts/lexend-latin-wght-normal.woff2",
+        "assets/fonts/lexend-latin-ext-wght-normal.woff2",
+        "assets/fonts/lexend-vietnamese-wght-normal.woff2"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
-
