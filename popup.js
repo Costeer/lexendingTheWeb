@@ -180,8 +180,11 @@
   });
 
   spacingInputs.forEach((input) => {
-    input.addEventListener("change", () => {
-      if (input.checked) save({ ...settings, letterSpacing: Number(input.value) });
+    input.addEventListener("click", () => {
+      const letterSpacing = Number(input.value);
+      if (settings.letterSpacing !== letterSpacing) {
+        save({ ...settings, letterSpacing });
+      }
     });
   });
 
