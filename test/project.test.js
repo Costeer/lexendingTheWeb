@@ -50,3 +50,11 @@ test("the interface has square corners and a fixed light palette", async () => {
   assert.match(css, /scrollbar-width:\s*none/);
   assert.match(css, /:root::\-webkit-scrollbar/);
 });
+
+test("popup markup provides the status element required by its script", async () => {
+  const html = await readFile(join(root, "popup.html"), "utf8");
+
+  assert.match(html, /id="status"/);
+  assert.match(html, /aria-label="Settings file"/);
+  assert.doesNotMatch(html, /aria-labelledby="transfer-label"/);
+});
