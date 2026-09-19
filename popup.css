@@ -26,10 +26,11 @@
 }
 
 :root {
+  width: max-content;
   color-scheme: only light;
   font-family: "Lexend UI", Arial, sans-serif;
   color: #000;
-  background: #fff;
+  background: transparent;
   font-synthesis: none;
 }
 
@@ -38,12 +39,12 @@
 }
 
 body {
-  width: 360px;
-  min-width: 360px;
+  width: max-content;
+  min-width: 0;
   min-height: 520px;
   margin: 0;
   overflow-x: hidden;
-  background: #fff;
+  background: transparent;
 }
 
 button,
@@ -57,7 +58,7 @@ button {
 }
 
 .panel {
-  width: 100%;
+  width: 360px;
   min-height: 520px;
   border: 3px solid #000;
   background: #fff;
@@ -356,21 +357,6 @@ h2 {
 
 .transfer-actions button:focus-visible {
   box-shadow: 3px 3px 0 #000;
-}
-
-@media (min-width: 500px) {
-  body {
-    display: grid;
-    width: 100%;
-    min-width: 0;
-    min-height: 100vh;
-    place-items: center;
-    padding: 32px;
-  }
-
-  .panel {
-    width: 360px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
