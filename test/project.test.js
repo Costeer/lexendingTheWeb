@@ -102,6 +102,9 @@ test("popup and options markup expose their required controls", async () => {
   assert.match(options, /id="line-height"[^>]+type="range"[^>]+max="29"/);
   assert.match(options, /id="letter-spacing"[^>]+type="range"[^>]+max="0\.2"/);
   assert.match(options, /id="export-settings"/);
+  assert.match(options, /<footer class="page-attribution">/);
+  assert.match(options, /href="https:\/\/costeer\.dev"/);
+  assert.match(options, /made with <span class="attribution-mark">☭<\/span> by costeer/);
   assert.match(options, /id="retry-save"/);
   assert.match(options, /id="hostname-error"[^>]+role="alert"/);
   assert.match(options, /id="toast"[^>]+role="status"/);

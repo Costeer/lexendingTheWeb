@@ -23,6 +23,39 @@ main {
   box-shadow: var(--frame-shadow);
 }
 
+.page-attribution {
+  display: flex;
+  width: min(920px, 100%);
+  margin: 24px auto 0;
+  justify-content: center;
+}
+
+.page-attribution a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.page-attribution a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.page-attribution svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.page-attribution .attribution-mark {
+  color: var(--accent);
+}
+
 .masthead,
 section {
   padding: 22px 26px;
