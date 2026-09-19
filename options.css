@@ -181,6 +181,19 @@ section + section {
   gap: 14px;
 }
 
+.readability-control-stage {
+  display: grid;
+}
+
+.readability-control-stage.is-animating {
+  overflow: hidden;
+}
+
+.readability-control-stage > .control-grid {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
 .basic-controls,
 .slider-grid {
   grid-auto-rows: 84px;

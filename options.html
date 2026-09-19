@@ -42,7 +42,8 @@
           <p class="helper">Applies only while Lexend is on. Larger text and spacing can break tightly fitted layouts.</p>
         </div>
 
-        <div id="basic-readability" class="control-grid basic-controls">
+        <div id="readability-control-stage" class="readability-control-stage">
+          <div id="basic-readability" class="control-grid basic-controls">
           <fieldset class="setting-control">
             <legend>Text size</legend>
             <div class="segment-group">
@@ -69,9 +70,9 @@
               <label><input type="radio" name="basicLetterSpacing" value="0.08" /><span>Wider</span></label>
             </div>
           </fieldset>
-        </div>
+          </div>
 
-        <div id="advanced-readability" class="control-grid slider-grid" hidden>
+          <div id="advanced-readability" class="control-grid slider-grid" hidden>
           <label class="slider-control" for="text-scale">
             <span class="slider-heading">
               <strong>Text size</strong>
@@ -98,6 +99,7 @@
             <input id="letter-spacing" type="range" min="0" max="0.2" step="0.005" value="0" />
             <span class="slider-limits" aria-hidden="true"><span>Default</span><span>0.20em</span></span>
           </label>
+          </div>
         </div>
 
         <div class="readability-preview">

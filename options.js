@@ -7,6 +7,7 @@
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
   const advancedModeInput = document.querySelector("#advanced-mode");
+  const readabilityControlStage = document.querySelector("#readability-control-stage");
   const basicReadability = document.querySelector("#basic-readability");
   const advancedReadability = document.querySelector("#advanced-readability");
   const basicTextScaleInputs = [...document.querySelectorAll('input[name="basicTextScale"]')];
@@ -50,6 +51,7 @@
   let writeQueue = Promise.resolve();
   let saveRevision = 0;
   let toastTimer;
+  let readabilityAnimationToken = 0;
 
   const setSaveState = (state, message) => {
     saveStatus.className = `save-status is-${state}`;
@@ -114,9 +116,54 @@
     previewCopy.style.letterSpacing = `${readability.letterSpacing}em`;
   };
 
-  const renderReadabilityMode = () => {
-    basicReadability.hidden = advancedModeInput.checked;
-    advancedReadability.hidden = !advancedModeInput.checked;
+  const renderReadabilityMode = (animate = false) => {
+    const showAdvanced = advancedModeInput.checked;
+    const incoming = showAdvanced ? advancedReadability : basicReadability;
+    const outgoing = showAdvanced ? basicReadability : advancedReadability;
+    const token = ++readabilityAnimationToken;
+
+    basicReadability.getAnimations?.().forEach((animation) => animation.cancel());
+    advancedReadability.getAnimations?.().forEach((animation) => animation.cancel());
+    incoming.hidden = false;
+    incoming.inert = false;
+    incoming.removeAttribute("aria-hidden");
+    outgoing.inert = true;
+    outgoing.setAttribute("aria-hidden", "true");
+
+    const reduceMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (!animate || reduceMotion || typeof incoming.animate !== "function") {
+      outgoing.hidden = true;
+      readabilityControlStage.classList.remove("is-animating");
+      return;
+    }
+
+    outgoing.hidden = false;
+    readabilityControlStage.classList.add("is-animating");
+    const direction = showAdvanced ? 1 : -1;
+    const timing = {
+      duration: 190,
+      easing: "cubic-bezier(.22, 1, .36, 1)",
+      fill: "both"
+    };
+    const outgoingAnimation = outgoing.animate([
+      { opacity: 1, transform: "translateX(0) scale(1)" },
+      { opacity: 0, transform: `translateX(${-35 * direction}%) scale(.97)` }
+    ], timing);
+    const incomingAnimation = incoming.animate([
+      { opacity: 0, transform: `translateX(${35 * direction}%) scale(.97)` },
+      { opacity: 1, transform: "translateX(0) scale(1)" }
+    ], timing);
+
+    Promise.allSettled([
+      outgoingAnimation.finished,
+      incomingAnimation.finished
+    ]).then(() => {
+      if (token !== readabilityAnimationToken) return;
+      outgoing.hidden = true;
+      readabilityControlStage.classList.remove("is-animating");
+      outgoingAnimation.cancel();
+      incomingAnimation.cancel();
+    });
   };
 
   const renderSliderValues = (readability) => {
@@ -284,7 +331,7 @@
   };
 
   advancedModeInput.addEventListener("change", async () => {
-    renderReadabilityMode();
+    renderReadabilityMode(true);
     if (!preferenceStorage) return;
     try {
       await preferenceStorage.set({

@@ -131,6 +131,9 @@ test("advanced readability is a local UI preference with full-range sliders", as
   assert.match(options, /ADVANCED_PREFERENCE_KEY = "advancedReadability"/);
   assert.match(options, /lineHeightFromSlider/);
   assert.match(options, /letterSpacingSlider/);
+  assert.match(options, /duration:\s*190/);
+  assert.match(options, /prefers-reduced-motion:\s*reduce/);
+  assert.match(options, /translateX/);
   assert.match(options, /input\.addEventListener\("input"[\s\S]+renderPreview\(draft\)/);
   assert.match(options, /input\.addEventListener\("change"[\s\S]+save\(\{ \.\.\.settings/);
   assert.doesNotMatch(options, /sliderSaveTimer|scheduleSliderSave/);
