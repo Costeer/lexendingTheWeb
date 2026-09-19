@@ -4,41 +4,95 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const storage = extension?.storage?.sync;
-  const status = document.querySelector("#status");
-  const textScaleInput = document.querySelector("#text-scale");
-  const lineHeightInput = document.querySelector("#line-height");
-  const letterSpacingInput = document.querySelector("#letter-spacing");
+  const textScaleInputs = [...document.querySelectorAll('input[name="textScale"]')];
+  const lineHeightInputs = [...document.querySelectorAll('input[name="lineHeight"]')];
+  const letterSpacingInputs = [...document.querySelectorAll('input[name="letterSpacing"]')];
+  const previewCopy = document.querySelector("#preview-copy");
+  const resetReadabilityButton = document.querySelector("#reset-readability");
+  const saveStatus = document.querySelector("#save-status");
+  const saveStatusText = document.querySelector("#save-status-text");
+  const retrySaveButton = document.querySelector("#retry-save");
   const addRuleForm = document.querySelector("#add-rule");
   const hostnameInput = document.querySelector("#new-hostname");
+  const hostnameError = document.querySelector("#hostname-error");
   const subdomainsInput = document.querySelector("#new-subdomains");
+  const subdomainPreview = document.querySelector("#subdomain-preview");
+  const ruleToolbar = document.querySelector("#rule-toolbar");
   const searchInput = document.querySelector("#rule-search");
   const ruleList = document.querySelector("#rule-list");
+  const searchEmpty = document.querySelector("#search-empty");
   const emptyRules = document.querySelector("#empty-rules");
-  const clearPausedButton = document.querySelector("#clear-paused");
   const clearRulesButton = document.querySelector("#clear-rules");
   const exportButton = document.querySelector("#export-settings");
   const importButton = document.querySelector("#import-settings");
   const importFile = document.querySelector("#import-file");
+  const importError = document.querySelector("#import-error");
   const shortcutOutput = document.querySelector("#shortcut");
-  let settings = settingsApi.normalizeSettings();
-  let statusTimer;
+  const shortcutAction = document.querySelector("#shortcut-action");
+  const shortcutInstructions = document.querySelector("#shortcut-instructions");
+  const toast = document.querySelector("#toast");
+  const toastMessage = document.querySelector("#toast-message");
+  const toastAction = document.querySelector("#toast-action");
 
-  const showStatus = (message, reset = true) => {
-    status.textContent = message;
-    clearTimeout(statusTimer);
-    if (reset) {
-      statusTimer = setTimeout(() => {
-        status.textContent = "READY";
-      }, 1600);
+  let settings = settingsApi.normalizeSettings();
+  let failedSettings = null;
+  let writeQueue = Promise.resolve();
+  let saveRevision = 0;
+  let toastTimer;
+
+  const setSaveState = (state, message) => {
+    saveStatus.className = `save-status is-${state}`;
+    saveStatusText.textContent = message;
+    retrySaveButton.hidden = state !== "error";
+  };
+
+  const showToast = (message, actionLabel = "", action = null, timeout = 3000) => {
+    clearTimeout(toastTimer);
+    toastMessage.textContent = message;
+    toastAction.textContent = actionLabel;
+    toastAction.hidden = !actionLabel;
+    toastAction.onclick = action;
+    toast.hidden = false;
+    toastTimer = setTimeout(() => {
+      toast.hidden = true;
+      toastAction.onclick = null;
+    }, timeout);
+  };
+
+  const normalizeHostnameInput = (rawValue) => {
+    const value = rawValue.trim().toLowerCase();
+    if (!value) return "";
+    try {
+      const url = new URL(
+        /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `http://${value}`
+      );
+      if (url.username || url.password) return "";
+      return url.hostname.toLowerCase().replace(/\.$/, "");
+    } catch {
+      return "";
     }
   };
 
-  const makeOption = (value, label, selected) => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    option.selected = selected;
-    return option;
+  const setRadioValue = (inputs, value) => {
+    inputs.forEach((input) => {
+      input.checked = Number(input.value) === Number(value);
+    });
+  };
+
+  const renderPreview = () => {
+    previewCopy.style.fontSize = `${14 * settings.textScale / 100}px`;
+    previewCopy.style.lineHeight = settings.lineHeight || 1.5;
+    previewCopy.style.letterSpacing = `${settings.letterSpacing}em`;
+  };
+
+  const makeDeleteButton = (rule) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "delete-rule";
+    button.setAttribute("aria-label", `Delete rule for ${rule.hostname}`);
+    button.title = `Delete rule for ${rule.hostname}`;
+    button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3h8l1 2h4v2H3V5h4l1-2Zm-2 6h12l-1 12H7L6 9Zm3 2v8h2v-8H9Zm4 0v8h2v-8h-2Z" /></svg>';
+    return button;
   };
 
   const renderRules = () => {
@@ -52,6 +106,7 @@
     ruleList.replaceChildren();
 
     rules.forEach((rule) => {
+      const active = rule.enabled !== false;
       const row = document.createElement("div");
       row.className = "rule-row";
       row.dataset.hostname = rule.hostname;
@@ -59,96 +114,153 @@
 
       const domain = document.createElement("div");
       domain.className = "rule-domain";
-      const strong = document.createElement("strong");
-      strong.textContent = rule.hostname;
-      const small = document.createElement("small");
-      small.textContent = rule.includeSubdomains
-        ? "This hostname and its subdomains"
-        : "This hostname only";
-      domain.append(strong, small);
+      const hostname = document.createElement("strong");
+      hostname.textContent = rule.hostname;
+      domain.append(hostname);
+      if (rule.includeSubdomains) {
+        const tag = document.createElement("span");
+        tag.className = "rule-tag";
+        tag.textContent = "+ subdomains";
+        domain.append(tag);
+      }
 
-      const enabled = document.createElement("select");
-      enabled.className = "rule-enabled";
-      enabled.setAttribute("aria-label", `Enabled state for ${rule.hostname}`);
-      enabled.append(
-        makeOption("inherit", "Inherit enabled state", rule.enabled === null),
-        makeOption("on", "Allowed", rule.enabled === true),
-        makeOption("off", "Paused", rule.enabled === false)
+      const status = document.createElement("span");
+      status.className = "rule-status";
+      status.textContent = active ? "Active" : "Paused";
+
+      const switchLabel = document.createElement("label");
+      switchLabel.className = "rule-switch";
+      const switchInput = document.createElement("input");
+      switchInput.type = "checkbox";
+      switchInput.className = "rule-enabled";
+      switchInput.checked = active;
+      switchInput.setAttribute(
+        "aria-label",
+        `${active ? "Pause" : "Activate"} Lexend for ${rule.hostname}`
       );
+      const track = document.createElement("span");
+      track.className = "switch-track";
+      track.setAttribute("aria-hidden", "true");
+      const thumb = document.createElement("span");
+      thumb.className = "switch-thumb";
+      track.append(thumb);
+      switchLabel.append(switchInput, track);
 
-      const scope = document.createElement("select");
-      scope.className = "rule-scope";
-      scope.setAttribute("aria-label", `Typography scope for ${rule.hostname}`);
-      scope.append(
-        makeOption("inherit", "Inherit typography", rule.scope === null),
-        makeOption("body", "Only body text", rule.scope === "body"),
-        makeOption("all", "Body & headings", rule.scope === "all")
-      );
-
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "delete-rule";
-      remove.setAttribute("aria-label", `Delete rule for ${rule.hostname}`);
-      remove.title = "Delete rule";
-      remove.textContent = "×";
-      row.append(domain, enabled, scope, remove);
+      row.append(domain, status, switchLabel, makeDeleteButton(rule));
       ruleList.append(row);
     });
 
-    emptyRules.hidden = rules.length > 0;
-    emptyRules.textContent = settings.siteRules.length && !rules.length
-      ? "No site rules match this search."
-      : "No site rules saved.";
-    clearPausedButton.disabled = !settings.siteRules.some((rule) => rule.enabled === false);
-    clearRulesButton.disabled = settings.siteRules.length === 0;
+    const hasRules = settings.siteRules.length > 0;
+    emptyRules.hidden = hasRules;
+    ruleToolbar.hidden = !hasRules;
+    ruleToolbar.querySelector(".search-field").hidden = settings.siteRules.length <= 5;
+    clearRulesButton.hidden = !hasRules;
+    searchEmpty.hidden = !hasRules || !query || rules.length > 0;
   };
 
   const render = () => {
-    textScaleInput.value = String(settings.textScale);
-    lineHeightInput.value = String(settings.lineHeight);
-    letterSpacingInput.value = String(settings.letterSpacing);
+    setRadioValue(textScaleInputs, settings.textScale);
+    setRadioValue(lineHeightInputs, settings.lineHeight);
+    setRadioValue(letterSpacingInputs, settings.letterSpacing);
+    renderPreview();
     renderRules();
   };
 
-  const save = async (nextSettings, message = "SAVED") => {
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
-    if (!storage) {
-      showStatus("PREVIEW");
-      return;
-    }
-    try {
-      await storage.set(settings);
-      await storage.remove?.(["disabledSites", "spacing"]);
-      showStatus(message);
-    } catch (error) {
-      console.error("Lexend the Web could not save settings.", error);
-      showStatus("SAVE FAILED", false);
-    }
+  const persist = (snapshot) => {
+    const revision = ++saveRevision;
+    failedSettings = null;
+    setSaveState("saving", "Saving…");
+
+    const write = async () => {
+      if (!storage) {
+        if (revision === saveRevision) {
+          setSaveState("error", "Changes are preview-only");
+          failedSettings = snapshot;
+        }
+        return false;
+      }
+      try {
+        await storage.set(snapshot);
+        await storage.remove?.(["disabledSites", "spacing"]);
+        if (revision === saveRevision) {
+          failedSettings = null;
+          setSaveState("saved", "All changes saved");
+        }
+        return true;
+      } catch (error) {
+        console.error("Lexend the Web could not save settings.", error);
+        if (revision === saveRevision) {
+          failedSettings = snapshot;
+          setSaveState("error", "Changes could not be saved");
+        }
+        return false;
+      }
+    };
+
+    writeQueue = writeQueue.then(write, write);
+    return writeQueue;
   };
 
-  textScaleInput.addEventListener("change", () => {
-    save({ ...settings, textScale: Number(textScaleInput.value) });
+  const save = (nextSettings) => {
+    settings = settingsApi.normalizeSettings(nextSettings);
+    render();
+    return persist(settings);
+  };
+
+  const clearHostnameError = () => {
+    hostnameError.textContent = "";
+    hostnameInput.removeAttribute("aria-invalid");
+  };
+
+  const showHostnameError = (message) => {
+    hostnameError.textContent = message;
+    hostnameInput.setAttribute("aria-invalid", "true");
+    hostnameInput.focus();
+  };
+
+  const updateSubdomainPreview = () => {
+    const hostname = normalizeHostnameInput(hostnameInput.value);
+    subdomainPreview.textContent = `*.${settingsApi.validHostname(hostname) ? hostname : "example.com"}`;
+  };
+
+  [...textScaleInputs, ...lineHeightInputs, ...letterSpacingInputs].forEach((input) => {
+    input.addEventListener("change", () => {
+      if (!input.checked) return;
+      const key = input.name;
+      save({ ...settings, [key]: Number(input.value) });
+    });
   });
-  lineHeightInput.addEventListener("change", () => {
-    save({ ...settings, lineHeight: Number(lineHeightInput.value) });
+
+  resetReadabilityButton.addEventListener("click", () => {
+    save({
+      ...settings,
+      textScale: settingsApi.defaults.textScale,
+      lineHeight: settingsApi.defaults.lineHeight,
+      letterSpacing: settingsApi.defaults.letterSpacing
+    });
   });
-  letterSpacingInput.addEventListener("change", () => {
-    save({ ...settings, letterSpacing: Number(letterSpacingInput.value) });
+
+  retrySaveButton.addEventListener("click", () => {
+    persist(failedSettings ?? settings);
+  });
+
+  hostnameInput.addEventListener("input", () => {
+    clearHostnameError();
+    updateSubdomainPreview();
   });
 
   addRuleForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const hostname = hostnameInput.value.trim().toLowerCase().replace(/\.$/, "");
+    clearHostnameError();
+    const hostname = normalizeHostnameInput(hostnameInput.value);
     if (!settingsApi.validHostname(hostname)) {
-      showStatus("INVALID HOSTNAME", false);
-      hostnameInput.focus();
+      showHostnameError("Enter just the domain, like example.com");
       return;
     }
 
     const includeSubdomains = subdomainsInput.checked;
     if (settingsApi.getDirectRule(settings, hostname, includeSubdomains)) {
-      showStatus("RULE EXISTS", false);
+      showHostnameError("That site already has a rule");
       return;
     }
 
@@ -158,36 +270,27 @@
       enabled: false
     });
     if (!settingsApi.getDirectRule(nextSettings, hostname, includeSubdomains)) {
-      showStatus("RULE LIMIT REACHED", false);
+      showHostnameError("There isn't room for another site rule");
       return;
     }
+
     hostnameInput.value = "";
     subdomainsInput.checked = false;
-    save(nextSettings, "RULE ADDED");
+    updateSubdomainPreview();
+    save(nextSettings);
   });
 
   searchInput.addEventListener("input", renderRules);
 
   ruleList.addEventListener("change", (event) => {
+    if (!event.target.classList.contains("rule-enabled")) return;
     const row = event.target.closest(".rule-row");
     if (!row) return;
-    const identity = {
+    save(settingsApi.setSiteRule(settings, {
       hostname: row.dataset.hostname,
-      includeSubdomains: row.dataset.subdomains === "true"
-    };
-
-    if (event.target.classList.contains("rule-enabled")) {
-      const values = { inherit: null, on: true, off: false };
-      save(settingsApi.setSiteRule(settings, {
-        ...identity,
-        enabled: values[event.target.value]
-      }));
-    } else if (event.target.classList.contains("rule-scope")) {
-      save(settingsApi.setSiteRule(settings, {
-        ...identity,
-        scope: event.target.value === "inherit" ? null : event.target.value
-      }));
-    }
+      includeSubdomains: row.dataset.subdomains === "true",
+      enabled: event.target.checked
+    }));
   });
 
   ruleList.addEventListener("click", (event) => {
@@ -198,20 +301,18 @@
       settings,
       row.dataset.hostname,
       row.dataset.subdomains === "true"
-    ), "RULE REMOVED");
+    ));
   });
 
-  clearPausedButton.addEventListener("click", () => {
-    const siteRules = settings.siteRules
-      .map((rule) => rule.enabled === false ? { ...rule, enabled: null } : rule)
-      .filter((rule) => rule.enabled !== null || rule.scope !== null);
-    save({ ...settings, siteRules }, "PAUSED CLEARED");
-  });
-
-  clearRulesButton.addEventListener("click", () => {
-    if (globalThis.confirm("Remove every saved site rule?")) {
-      save({ ...settings, siteRules: [] }, "RULES CLEARED");
-    }
+  clearRulesButton.addEventListener("click", async () => {
+    const removedRules = settings.siteRules.map((rule) => ({ ...rule }));
+    const saved = await save({ ...settings, siteRules: [] });
+    if (!saved) return;
+    showToast("Site rules cleared", "Undo", () => {
+      toast.hidden = true;
+      clearTimeout(toastTimer);
+      save({ ...settings, siteRules: removedRules });
+    }, 8000);
   });
 
   exportButton.addEventListener("click", () => {
@@ -228,26 +329,66 @@
     link.href = url;
     link.download = "lexend-the-web-settings.json";
     link.click();
-    URL.revokeObjectURL(url);
-    showStatus("EXPORTED");
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast("Settings exported");
   });
 
   importButton.addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", async () => {
     const file = importFile.files?.[0];
     if (!file) return;
+    importError.textContent = "";
     try {
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
       const payload = JSON.parse(await file.text());
       if (![1, 2].includes(payload?.schemaVersion) || typeof payload.settings !== "object") {
         throw new Error("Unsupported settings file");
       }
-      await save(payload.settings, "IMPORTED");
+      if (await save(payload.settings)) showToast("Settings imported");
     } catch (error) {
       console.error("Lexend the Web could not import settings.", error);
-      showStatus("INVALID FILE", false);
+      importError.textContent = "Choose a valid Lexend settings file.";
     } finally {
       importFile.value = "";
+    }
+  });
+
+  const renderShortcut = (shortcut) => {
+    shortcutOutput.replaceChildren();
+    if (!shortcut) {
+      shortcutOutput.textContent = "Not assigned";
+      shortcutAction.textContent = "Set shortcut";
+      return;
+    }
+
+    shortcut.split("+").forEach((key, index) => {
+      if (index) shortcutOutput.append(document.createTextNode("+"));
+      const keycap = document.createElement("kbd");
+      keycap.textContent = key;
+      shortcutOutput.append(keycap);
+    });
+    shortcutAction.textContent = "Change";
+  };
+
+  shortcutAction.addEventListener("click", async () => {
+    shortcutInstructions.hidden = true;
+    try {
+      if (typeof extension?.commands?.openShortcutSettings === "function") {
+        await extension.commands.openShortcutSettings();
+        return;
+      }
+      const extensionUrl = extension?.runtime?.getURL?.("") ?? "";
+      if (extensionUrl.startsWith("chrome-extension://") && extension?.tabs?.create) {
+        const shortcutsUrl = navigator.userAgent.includes("Edg/")
+          ? "edge://extensions/shortcuts"
+          : "chrome://extensions/shortcuts";
+        await extension.tabs.create({ url: shortcutsUrl });
+        return;
+      }
+      shortcutInstructions.hidden = false;
+    } catch (error) {
+      console.error("Lexend the Web could not open shortcut settings.", error);
+      shortcutInstructions.hidden = false;
     }
   });
 
@@ -268,13 +409,21 @@
         storage ? await storage.get(null) : settingsApi.defaults
       );
       render();
-      const commands = await extension?.commands?.getAll?.();
-      const command = commands?.find((item) => item.name === "toggle-current-site");
-      shortcutOutput.textContent = command?.shortcut || "Not assigned";
+      setSaveState("saved", "All changes saved");
     } catch (error) {
       console.error("Lexend the Web could not load settings.", error);
       render();
-      showStatus("LOAD FAILED", false);
+      setSaveState("error", "Settings could not be loaded");
+    }
+
+    try {
+      const commands = await extension?.commands?.getAll?.();
+      const command = commands?.find((item) => item.name === "toggle-current-site");
+      renderShortcut(command?.shortcut ?? "");
+    } catch (error) {
+      console.error("Lexend the Web could not read the shortcut.", error);
+      renderShortcut("");
+      shortcutInstructions.hidden = false;
     }
   };
 
