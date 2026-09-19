@@ -9,6 +9,10 @@ plus headings, and toggle the effect without reloading the page.
 - Applies Lexend to every HTTP and HTTPS website
 - Switches between **body text** and **body + headers**
 - Pauses globally or on individual websites
+- Supports exact-host and subdomain-wide rules with per-site text scope
+- Adjusts base text size, line height, letter spacing, and word spacing when requested
+- Manages, searches, and clears saved site rules from a dedicated settings page
+- Toggles the current website with `Ctrl+Shift+L` (`Command+Shift+L` on macOS)
 - Updates open tabs as soon as a setting changes
 - Handles content added later, open shadow roots, and related iframe documents
 - Preserves code, SVGs, common icon-font systems, and opt-out regions
@@ -30,6 +34,8 @@ npm run build
 ```
 
 The browser-ready folders are written to `dist/chrome` and `dist/firefox`.
+The popup handles the active website; the browser's extension settings link
+opens the full site-rule, readability, and backup manager.
 
 ### Load in Chrome
 
@@ -70,8 +76,8 @@ alone.
 ## Privacy
 
 Lexend the Web does not collect, transmit, or sell data. The only stored data
-is the user's enabled state and text-scope preference, saved through the
-browser's synchronized extension storage.
+is the user's enabled state, typography preferences, and user-created site
+rules, saved through the browser's synchronized extension storage.
 
 See the complete [privacy policy](PRIVACY.md). A standalone HTML copy lives at
 `docs/privacy.html` and is ready for any static host.

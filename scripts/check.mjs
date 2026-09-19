@@ -46,13 +46,14 @@ for (const target of targets) {
   }
 }
 
-const popupCss = await readFile(join(root, "popup.css"), "utf8");
-if (!popupCss.includes("color-scheme: only light")) {
-  throw new Error("The popup must explicitly stay in light mode.");
-}
-
-if (/border-radius\s*:/.test(popupCss)) {
-  throw new Error("The visual system requires square corners.");
+for (const stylesheet of ["popup.css", "options.css"]) {
+  const css = await readFile(join(root, stylesheet), "utf8");
+  if (!css.includes("color-scheme: only light")) {
+    throw new Error(`${stylesheet} must explicitly stay in light mode.`);
+  }
+  if (/border-radius\s*:/.test(css)) {
+    throw new Error(`${stylesheet} must use square corners.`);
+  }
 }
 
 console.log("Static checks passed.");

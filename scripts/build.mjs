@@ -9,6 +9,9 @@ const sharedFiles = [
   "popup.html",
   "popup.css",
   "popup.js",
+  "options.html",
+  "options.css",
+  "options.js",
   "src",
   "assets"
 ];
@@ -31,4 +34,3 @@ for (const target of targets) {
 }
 
 console.log("Built Chrome and Firefox extensions in dist/.");
-

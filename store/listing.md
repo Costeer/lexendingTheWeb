@@ -18,6 +18,11 @@ Key features:
 
 - Apply Lexend to body text or to body text and headings
 - Pause the extension globally or on individual websites
+- Apply rules to one hostname or all of its subdomains
+- Override the text scope for individual websites
+- Optionally adjust base text size, line height, letter spacing, and word spacing
+- Search, edit, and clear saved rules from a dedicated settings page
+- Toggle Lexend on the current website with a keyboard shortcut
 - Import and export settings as a local JSON file
 - Preserve code, mathematical notation, SVG graphics, and common icon fonts
 - Cover dynamic content, open shadow roots, and related iframe documents
@@ -39,8 +44,8 @@ contents remain in the browser and are not stored or transmitted.
 
 ### Storage
 
-Stores the enabled state, selected text scope, and user-created disabled-site
-list using the browser's synchronized extension storage.
+Stores the enabled state, typography preferences, and user-created site rules
+using the browser's synchronized extension storage.
 
 ### Active tab
 
