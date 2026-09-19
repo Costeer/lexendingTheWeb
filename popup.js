@@ -21,39 +21,28 @@
   ]);
 
   const enabledInput = document.querySelector("#enabled");
-  const enabledState = document.querySelector("#enabled-state");
-  const scopeFieldset = document.querySelector("#scope-fieldset");
-  const spacingFieldset = document.querySelector("#spacing-fieldset");
+  const fieldset = document.querySelector("#scope-fieldset");
   const status = document.querySelector("#status");
   const scopeInputs = [...document.querySelectorAll('input[name="scope"]')];
-  const spacingInputs = [...document.querySelectorAll('input[name="spacing"]')];
-  const spacingPreview = document.querySelector("#spacing-preview");
-  const siteContainer = document.querySelector("#site-container");
-  const siteState = document.querySelector("#site-state");
+  const siteEnabledInput = document.querySelector("#site-enabled");
   const siteLabel = document.querySelector("#site-label");
-  const siteAction = document.querySelector("#site-action");
+  const siteMessage = document.querySelector("#site-message");
   const siteMatchInput = document.querySelector("#site-match");
   const siteScopeInput = document.querySelector("#site-scope");
   const optionsButton = document.querySelector("#open-options");
-  const exportButton = document.querySelector("#export-settings");
-  const importButton = document.querySelector("#import-settings");
-  const importFile = document.querySelector("#import-file");
-  const resetButton = document.querySelector("#reset-settings");
 
   let settings = settingsApi.normalizeSettings();
   let site = null;
-  let includeSubdomains = false;
   let statusTimer;
-
-  const getEffectiveSite = () => site?.supported
-    ? settingsApi.resolveSite(settings, site.hostname)
-    : null;
+  let includeSubdomains = false;
 
   const getBaseStatus = () => {
-    if (!settings.enabled) return "Paused";
-    if (site && !site.supported) return "Unavailable";
-    if (getEffectiveSite() && !getEffectiveSite().siteEnabled) return "Site paused";
-    return "Active";
+    if (!settings.enabled) return "PAUSED";
+    if (site && !site.supported) return "UNAVAILABLE";
+    if (site && !settingsApi.resolveSite(settings, site.hostname).active) {
+      return "SITE PAUSED";
+    }
+    return "ACTIVE";
   };
 
   const showStatus = (message) => {
@@ -66,76 +55,64 @@
 
   const renderSettings = () => {
     enabledInput.checked = settings.enabled;
-    enabledState.textContent = settings.enabled ? "On" : "Off";
-    scopeFieldset.disabled = !settings.enabled;
-    spacingFieldset.disabled = !settings.enabled;
-
+    fieldset.disabled = !settings.enabled;
     scopeInputs.forEach((input) => {
       input.checked = input.value === settings.scope;
       input.closest(".choice").classList.toggle("is-selected", input.checked);
     });
-
-    spacingInputs.forEach((input) => {
-      input.checked = input.value === settings.spacing;
-    });
-    spacingPreview.dataset.spacing = settings.spacing;
     status.textContent = getBaseStatus();
   };
 
   const renderSite = () => {
     if (!site) return;
 
-    siteContainer.hidden = !site.supported;
-    if (!site.supported) {
-      status.textContent = getBaseStatus();
-      return;
-    }
-
-    const effective = getEffectiveSite();
+    const effective = settingsApi.resolveSite(settings, site.hostname);
     const directRule = settingsApi.getDirectRule(
       settings,
       site.hostname,
       includeSubdomains
     );
-    const paused = !effective.siteEnabled;
-
     siteLabel.textContent = site.label;
-    siteAction.disabled = false;
-    siteAction.textContent = paused ? "Resume here" : "Pause here";
-    siteAction.setAttribute(
-      "aria-label",
-      `${paused ? "Resume" : "Pause"} Lexend on ${site.label}`
-    );
-    siteMatchInput.disabled = false;
+    siteEnabledInput.disabled = !site.supported;
+    siteMatchInput.disabled = !site.supported;
+    siteScopeInput.disabled = !site.supported;
+    siteEnabledInput.checked = site.supported && effective.siteEnabled;
     siteMatchInput.value = includeSubdomains ? "subdomains" : "exact";
-    siteScopeInput.disabled = false;
     siteScopeInput.value = directRule?.scope ?? "inherit";
 
-    if (paused) siteState.textContent = "Paused on";
-    else if (!settings.enabled) siteState.textContent = "Off on";
-    else if (!site.reachable) siteState.textContent = "Ready on";
-    else siteState.textContent = "Active on";
+    if (!site.supported) {
+      siteMessage.textContent = "Browser-protected pages cannot be changed by extensions.";
+    } else if (!settings.enabled) {
+      siteMessage.textContent = "Lexend is globally paused. This site rule is still editable.";
+    } else if (!site.reachable) {
+      siteMessage.textContent = "Refresh the page or allow extension access in the browser.";
+    } else if (effective.active) {
+      const label = effective.scope === "all" ? "body text and headings" : "body text";
+      siteMessage.textContent = `Lexend is active for ${label} on this website.`;
+    } else {
+      siteMessage.textContent = "This website keeps its original typography.";
+    }
 
     status.textContent = getBaseStatus();
   };
 
-  const save = async (nextSettings, confirmation = "Saved") => {
+  const save = async (nextSettings) => {
     settings = settingsApi.normalizeSettings(nextSettings);
     renderSettings();
     renderSite();
 
     if (!storage) {
-      showStatus("Preview");
+      showStatus("PREVIEW");
       return;
     }
 
     try {
       await storage.set(settings);
-      await storage.remove?.("disabledSites");
-      showStatus(confirmation);
+      await storage.remove?.(["disabledSites", "spacing"]);
+      showStatus("SAVED");
     } catch (error) {
       console.error("Lexend the Web could not save settings.", error);
-      status.textContent = "Save failed";
+      status.textContent = "SAVE FAILED";
     }
   };
 
@@ -173,47 +150,10 @@
 
     return {
       hostname: url.hostname.toLowerCase(),
-      label: url.hostname,
+      label: supported ? url.hostname : "Browser page",
       supported,
       reachable
     };
-  };
-
-  const exportSettings = () => {
-    const payload = {
-      schemaVersion: 2,
-      exportedAt: new Date().toISOString(),
-      settings
-    };
-    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
-      type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "lexend-the-web-settings.json";
-    link.click();
-    URL.revokeObjectURL(url);
-    showStatus("Exported");
-  };
-
-  const importSettings = async (file) => {
-    try {
-      if (file.size > 256 * 1024) throw new Error("Settings file is too large");
-
-      const payload = JSON.parse(await file.text());
-      if (![1, 2].includes(payload?.schemaVersion)
-        || typeof payload?.settings !== "object") {
-        throw new Error("Unsupported settings file");
-      }
-
-      await save(payload.settings, "Imported");
-    } catch (error) {
-      console.error("Lexend the Web could not import settings.", error);
-      status.textContent = "Invalid file";
-    } finally {
-      importFile.value = "";
-    }
   };
 
   enabledInput.addEventListener("change", () => {
@@ -226,27 +166,21 @@
     });
   });
 
-  spacingInputs.forEach((input) => {
-    input.addEventListener("change", () => {
-      if (input.checked) save({ ...settings, spacing: input.value });
-    });
-  });
-
-  siteAction.addEventListener("click", () => {
+  siteEnabledInput.addEventListener("change", () => {
     if (!site?.supported) return;
-
-    const effective = getEffectiveSite();
-    const desiredEnabled = !effective.siteEnabled;
     const withoutDirectRule = settingsApi.removeSiteRule(
       settings,
       site.hostname,
       includeSubdomains
     );
     const inherited = settingsApi.resolveSite(withoutDirectRule, site.hostname);
+    const enabled = siteEnabledInput.checked === inherited.siteEnabled
+      ? null
+      : siteEnabledInput.checked;
     save(settingsApi.setSiteRule(settings, {
       hostname: site.hostname,
       includeSubdomains,
-      enabled: desiredEnabled === inherited.siteEnabled ? null : desiredEnabled
+      enabled
     }));
   });
 
@@ -261,21 +195,33 @@
 
   siteMatchInput.addEventListener("change", () => {
     if (!site?.supported) return;
-    includeSubdomains = siteMatchInput.value === "subdomains";
-    renderSite();
+    const nextIncludeSubdomains = siteMatchInput.value === "subdomains";
+    const currentRule = settingsApi.getDirectRule(
+      settings,
+      site.hostname,
+      includeSubdomains
+    );
+    let nextSettings = settings;
+
+    if (currentRule) {
+      nextSettings = settingsApi.removeSiteRule(
+        nextSettings,
+        site.hostname,
+        includeSubdomains
+      );
+      nextSettings = settingsApi.setSiteRule(nextSettings, {
+        ...currentRule,
+        includeSubdomains: nextIncludeSubdomains
+      });
+    }
+
+    includeSubdomains = nextIncludeSubdomains;
+    save(nextSettings);
   });
 
   optionsButton.addEventListener("click", async () => {
     await extension?.runtime?.openOptionsPage?.();
     globalThis.close?.();
-  });
-  exportButton.addEventListener("click", exportSettings);
-  importButton.addEventListener("click", () => importFile.click());
-  importFile.addEventListener("change", () => {
-    if (importFile.files?.[0]) importSettings(importFile.files[0]);
-  });
-  resetButton.addEventListener("click", () => {
-    save(settingsApi.defaults, "Reset to defaults");
   });
 
   extension?.storage?.onChanged?.addListener((changes, areaName) => {
@@ -316,7 +262,7 @@
       };
       renderSettings();
       renderSite();
-      status.textContent = "Load failed";
+      status.textContent = "LOAD FAILED";
     }
   };
 

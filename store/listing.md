@@ -20,7 +20,7 @@ Key features:
 - Pause the extension globally or on individual websites
 - Apply rules to one hostname or all of its subdomains
 - Override the text scope for individual websites
-- Optionally adjust base text size, line height, letter spacing, and word spacing
+- Optionally adjust base text size, line height, and letter spacing
 - Search, edit, and clear saved rules from a dedicated settings page
 - Toggle Lexend on the current website with a keyboard shortcut
 - Import and export settings as a local JSON file

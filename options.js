@@ -7,8 +7,7 @@
   const status = document.querySelector("#status");
   const textScaleInput = document.querySelector("#text-scale");
   const lineHeightInput = document.querySelector("#line-height");
-  const spacingInputs = [...document.querySelectorAll('input[name="spacing"]')];
-  const readabilityPreview = document.querySelector("#readability-preview");
+  const letterSpacingInput = document.querySelector("#letter-spacing");
   const addRuleForm = document.querySelector("#add-rule");
   const hostnameInput = document.querySelector("#new-hostname");
   const subdomainsInput = document.querySelector("#new-subdomains");
@@ -29,7 +28,7 @@
     clearTimeout(statusTimer);
     if (reset) {
       statusTimer = setTimeout(() => {
-        status.textContent = "Ready";
+        status.textContent = "READY";
       }, 1600);
     }
   };
@@ -82,8 +81,8 @@
       scope.setAttribute("aria-label", `Typography scope for ${rule.hostname}`);
       scope.append(
         makeOption("inherit", "Inherit typography", rule.scope === null),
-        makeOption("body", "Body text", rule.scope === "body"),
-        makeOption("all", "Body and headings", rule.scope === "all")
+        makeOption("body", "Only body text", rule.scope === "body"),
+        makeOption("all", "Body & headings", rule.scope === "all")
       );
 
       const remove = document.createElement("button");
@@ -107,29 +106,24 @@
   const render = () => {
     textScaleInput.value = String(settings.textScale);
     lineHeightInput.value = String(settings.lineHeight);
-    spacingInputs.forEach((input) => {
-      input.checked = input.value === settings.spacing;
-    });
-    readabilityPreview.dataset.spacing = settings.spacing;
-    readabilityPreview.style.fontSize = `${settings.textScale / 100}em`;
-    readabilityPreview.style.lineHeight = settings.lineHeight || "1.45";
+    letterSpacingInput.value = String(settings.letterSpacing);
     renderRules();
   };
 
-  const save = async (nextSettings, message = "Saved") => {
+  const save = async (nextSettings, message = "SAVED") => {
     settings = settingsApi.normalizeSettings(nextSettings);
     render();
     if (!storage) {
-      showStatus("Preview");
+      showStatus("PREVIEW");
       return;
     }
     try {
       await storage.set(settings);
-      await storage.remove?.("disabledSites");
+      await storage.remove?.(["disabledSites", "spacing"]);
       showStatus(message);
     } catch (error) {
       console.error("Lexend the Web could not save settings.", error);
-      showStatus("Save failed", false);
+      showStatus("SAVE FAILED", false);
     }
   };
 
@@ -139,24 +133,22 @@
   lineHeightInput.addEventListener("change", () => {
     save({ ...settings, lineHeight: Number(lineHeightInput.value) });
   });
-  spacingInputs.forEach((input) => {
-    input.addEventListener("change", () => {
-      if (input.checked) save({ ...settings, spacing: input.value });
-    });
+  letterSpacingInput.addEventListener("change", () => {
+    save({ ...settings, letterSpacing: Number(letterSpacingInput.value) });
   });
 
   addRuleForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const hostname = hostnameInput.value.trim().toLowerCase().replace(/\.$/, "");
     if (!settingsApi.validHostname(hostname)) {
-      showStatus("Invalid hostname", false);
+      showStatus("INVALID HOSTNAME", false);
       hostnameInput.focus();
       return;
     }
 
     const includeSubdomains = subdomainsInput.checked;
     if (settingsApi.getDirectRule(settings, hostname, includeSubdomains)) {
-      showStatus("Rule already exists", false);
+      showStatus("RULE EXISTS", false);
       return;
     }
 
@@ -166,12 +158,12 @@
       enabled: false
     });
     if (!settingsApi.getDirectRule(nextSettings, hostname, includeSubdomains)) {
-      showStatus("Rule limit reached", false);
+      showStatus("RULE LIMIT REACHED", false);
       return;
     }
     hostnameInput.value = "";
     subdomainsInput.checked = false;
-    save(nextSettings, "Rule added");
+    save(nextSettings, "RULE ADDED");
   });
 
   searchInput.addEventListener("input", renderRules);
@@ -206,19 +198,19 @@
       settings,
       row.dataset.hostname,
       row.dataset.subdomains === "true"
-    ), "Rule removed");
+    ), "RULE REMOVED");
   });
 
   clearPausedButton.addEventListener("click", () => {
     const siteRules = settings.siteRules
       .map((rule) => rule.enabled === false ? { ...rule, enabled: null } : rule)
       .filter((rule) => rule.enabled !== null || rule.scope !== null);
-    save({ ...settings, siteRules }, "Paused rules cleared");
+    save({ ...settings, siteRules }, "PAUSED CLEARED");
   });
 
   clearRulesButton.addEventListener("click", () => {
     if (globalThis.confirm("Remove every saved site rule?")) {
-      save({ ...settings, siteRules: [] }, "Rules cleared");
+      save({ ...settings, siteRules: [] }, "RULES CLEARED");
     }
   });
 
@@ -237,7 +229,7 @@
     link.download = "lexend-the-web-settings.json";
     link.click();
     URL.revokeObjectURL(url);
-    showStatus("Exported");
+    showStatus("EXPORTED");
   });
 
   importButton.addEventListener("click", () => importFile.click());
@@ -247,14 +239,13 @@
     try {
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
       const payload = JSON.parse(await file.text());
-      if (![1, 2].includes(payload?.schemaVersion)
-        || typeof payload.settings !== "object") {
+      if (![1, 2].includes(payload?.schemaVersion) || typeof payload.settings !== "object") {
         throw new Error("Unsupported settings file");
       }
-      await save(payload.settings, "Imported");
+      await save(payload.settings, "IMPORTED");
     } catch (error) {
       console.error("Lexend the Web could not import settings.", error);
-      showStatus("Invalid file", false);
+      showStatus("INVALID FILE", false);
     } finally {
       importFile.value = "";
     }
@@ -283,7 +274,7 @@
     } catch (error) {
       console.error("Lexend the Web could not load settings.", error);
       render();
-      showStatus("Load failed", false);
+      showStatus("LOAD FAILED", false);
     }
   };
 

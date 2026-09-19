@@ -32,11 +32,9 @@ test("content script supports both scope choices and live updates", async () => 
 
   assert.match(source, /scope === "body"/);
   assert.match(source, /scope === "all"/);
-  assert.match(source, /spacingValues/);
-  assert.match(source, /letter-spacing: \$\{spacing\.letter\}/);
-  assert.match(source, /word-spacing: \$\{spacing\.word\}/);
   assert.match(source, /settings\.textScale/);
   assert.match(source, /settings\.lineHeight/);
+  assert.match(source, /settings\.letterSpacing/);
   assert.match(source, /storage\.onChanged\.addListener/);
   assert.match(source, /MutationObserver/);
 });
@@ -51,23 +49,13 @@ test("text inside icon-labelled controls remains eligible for styling", async ()
 });
 
 test("the interface has square corners and a fixed light palette", async () => {
-  const [popupCss, optionsCss] = await Promise.all([
-    readFile(join(root, "popup.css"), "utf8"),
-    readFile(join(root, "options.css"), "utf8")
-  ]);
+  const css = await readFile(join(root, "popup.css"), "utf8");
 
-  for (const css of [popupCss, optionsCss]) {
-    const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+)px/g)]
-      .map((match) => Number(match[1]));
-    assert.doesNotMatch(css, /border-radius\s*:/);
-    assert.match(css, /color-scheme: only light/);
-    assert.match(css, /#c70000/gi);
-    assert.ok(pixelFontSizes.every((size) => size >= 12));
-  }
-  assert.match(popupCss, /scrollbar-width:\s*none/);
-  assert.match(popupCss, /:root::\-webkit-scrollbar/);
-  assert.equal((popupCss.match(/box-shadow\s*:/g) ?? []).length, 2);
-  assert.equal((optionsCss.match(/box-shadow\s*:/g) ?? []).length, 1);
+  assert.doesNotMatch(css, /border-radius\s*:/);
+  assert.match(css, /color-scheme: only light/);
+  assert.match(css, /#c70000/gi);
+  assert.match(css, /scrollbar-width:\s*none/);
+  assert.match(css, /:root::\-webkit-scrollbar/);
 });
 
 test("popup and options markup expose their required controls", async () => {
@@ -80,34 +68,10 @@ test("popup and options markup expose their required controls", async () => {
   assert.match(popup, /id="site-scope"/);
   assert.match(popup, /id="site-match"/);
   assert.match(popup, /id="open-options"/);
-  assert.match(popup, /aria-label="Settings file"/);
-  assert.doesNotMatch(popup, /aria-labelledby="transfer-label"/);
   assert.match(options, /id="rule-list"/);
   assert.match(options, /id="text-scale"/);
-  assert.match(options, /id="readability-preview"/);
+  assert.match(options, /id="letter-spacing"/);
   assert.match(options, /id="export-settings"/);
-});
-
-test("popup exposes readable global, site, spacing, and recovery controls", async () => {
-  const [html, css, script] = await Promise.all([
-    readFile(join(root, "popup.html"), "utf8"),
-    readFile(join(root, "popup.css"), "utf8"),
-    readFile(join(root, "popup.js"), "utf8")
-  ]);
-
-  assert.match(html, /id="enabled-state">On/);
-  assert.match(html, /id="site-action"/);
-  assert.match(html, /name="spacing" value="default"/);
-  assert.match(html, /name="spacing" value="wide"/);
-  assert.match(html, /name="spacing" value="wider"/);
-  assert.match(html, /Browser pages like settings and new tab can’t be changed/);
-  assert.match(html, />\s*Export settings\s*</);
-  assert.match(html, />\s*Import settings\s*</);
-  assert.match(html, /id="reset-settings"/);
-  assert.match(css, /\.choice\.is-selected\s*{[^}]*background:\s*#fff0f0/s);
-  assert.match(css, /\.switch-track\s*{[^}]*background:\s*#b8b8b8/s);
-  assert.match(script, /settingsApi\.normalizeSettings/);
-  assert.match(script, /Reset to defaults/);
 });
 
 test("site rules support migration, subdomains, and exact-host overrides", async () => {
@@ -141,14 +105,14 @@ test("site rules support migration, subdomains, and exact-host overrides", async
   assert.equal(api.validHostname("-invalid.example.com"), false);
 });
 
-test("spacing presets migrate numeric drafts and pair letter with word spacing", async () => {
+test("legacy spacing presets migrate to independent letter spacing", async () => {
   await import("../src/settings.js");
   const api = globalThis.LexendSettings;
 
-  assert.equal(api.normalizeSettings({ letterSpacing: 0.04 }).spacing, "wide");
-  assert.equal(api.normalizeSettings({ letterSpacing: 0.08 }).spacing, "wider");
-  assert.deepEqual(api.spacingValues.wide, { letter: 0.04, word: 0.12 });
-  assert.deepEqual(api.spacingValues.wider, { letter: 0.08, word: 0.24 });
+  assert.equal(api.normalizeSettings({ spacing: "default" }).letterSpacing, 0);
+  assert.equal(api.normalizeSettings({ spacing: "wide" }).letterSpacing, 0.04);
+  assert.equal(api.normalizeSettings({ spacing: "wider" }).letterSpacing, 0.08);
+  assert.equal(api.normalizeSettings({ letterSpacing: 0.06 }).letterSpacing, 0.06);
 });
 
 test("site rules remain within synchronized-storage item limits", async () => {

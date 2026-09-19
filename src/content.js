@@ -136,16 +136,12 @@
   const createCss = (effective, isShadowRoot) => {
     if (!effective.active) return "";
 
-    const spacing = settingsApi.spacingValues[settings.spacing];
     const readability = [
       settings.lineHeight > 0
         ? `line-height: ${settings.lineHeight} !important;`
         : "",
-      spacing.letter > 0
-        ? `letter-spacing: ${spacing.letter}em !important;`
-        : "",
-      spacing.word > 0
-        ? `word-spacing: ${spacing.word}em !important;`
+      settings.letterSpacing > 0
+        ? `letter-spacing: ${settings.letterSpacing}em !important;`
         : ""
     ].filter(Boolean).join("\n");
     const scale = !isShadowRoot && settings.textScale !== 100

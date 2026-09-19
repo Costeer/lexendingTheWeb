@@ -4,17 +4,17 @@
   const defaults = Object.freeze({
     enabled: true,
     scope: "body",
-    spacing: "default",
     siteRules: [],
     textScale: 100,
-    lineHeight: 0
-  });
-  const spacingValues = Object.freeze({
-    default: Object.freeze({ letter: 0, word: 0 }),
-    wide: Object.freeze({ letter: 0.04, word: 0.12 }),
-    wider: Object.freeze({ letter: 0.08, word: 0.24 })
+    lineHeight: 0,
+    letterSpacing: 0
   });
   const MAX_SITE_RULE_BYTES = 7000;
+  const legacySpacingValues = Object.freeze({
+    default: 0,
+    wide: 0.04,
+    wider: 0.08
+  });
 
   const validHostname = (hostname) => {
     if (typeof hostname !== "string" || !hostname.length || hostname.length > 253) {
@@ -35,17 +35,17 @@
     return Number(clamped.toFixed(precision));
   };
 
-  const normalizeSpacing = (value) => {
-    if (Object.hasOwn(spacingValues, value?.spacing)) return value.spacing;
-
-    // Migrate the unreleased numeric letter/word-spacing settings model.
-    const letter = Number(value?.letterSpacing);
-    const word = Number(value?.wordSpacing);
-    if ((Number.isFinite(letter) && letter >= 0.07)
-      || (Number.isFinite(word) && word >= 0.18)) return "wider";
-    if ((Number.isFinite(letter) && letter > 0)
-      || (Number.isFinite(word) && word > 0)) return "wide";
-    return defaults.spacing;
+  const normalizeLetterSpacing = (value) => {
+    if (value.letterSpacing !== undefined) {
+      return clampNumber(
+        value.letterSpacing,
+        defaults.letterSpacing,
+        0,
+        0.2,
+        3
+      );
+    }
+    return legacySpacingValues[value.spacing] ?? defaults.letterSpacing;
   };
 
   const normalizeRule = (rule) => {
@@ -93,12 +93,12 @@
     return {
       enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
       scope: value.scope === "all" ? "all" : defaults.scope,
-      spacing: normalizeSpacing(value),
       siteRules,
       textScale: clampNumber(value.textScale, defaults.textScale, 80, 140),
       lineHeight: Number(value.lineHeight) === 0
         ? 0
-        : clampNumber(value.lineHeight, defaults.lineHeight, 1, 2.4, 2)
+        : clampNumber(value.lineHeight, defaults.lineHeight, 1, 2.4, 2),
+      letterSpacing: normalizeLetterSpacing(value)
     };
   };
 
@@ -182,7 +182,6 @@
     removeSiteRule,
     resolveSite,
     setSiteRule,
-    spacingValues,
     validHostname
   });
 })();

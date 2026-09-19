@@ -16,13 +16,13 @@
             <h1>Settings</h1>
           </div>
         </div>
-        <span id="status" role="status" aria-live="polite">Ready</span>
+        <span id="status" role="status" aria-live="polite">READY</span>
       </header>
 
       <section aria-labelledby="readability-title">
         <div class="section-heading">
           <div>
-            <p class="kicker">Global</p>
+            <p class="kicker">GLOBAL</p>
             <h2 id="readability-title">Readability</h2>
           </div>
           <p>Optional adjustments are applied only while Lexend is active.</p>
@@ -54,34 +54,25 @@
               <option value="2">2.0</option>
             </select>
           </label>
-          <fieldset class="spacing-control">
-            <legend>Text spacing</legend>
-            <div class="segment-control">
-              <label>
-                <input type="radio" name="spacing" value="default" />
-                <span>Default</span>
-              </label>
-              <label>
-                <input type="radio" name="spacing" value="wide" />
-                <span>Wide</span>
-              </label>
-              <label>
-                <input type="radio" name="spacing" value="wider" />
-                <span>Wider</span>
-              </label>
-            </div>
-          </fieldset>
+          <label>
+            <span>Letter spacing</span>
+            <select id="letter-spacing">
+              <option value="0">Website default</option>
+              <option value="0.02">0.02em</option>
+              <option value="0.04">0.04em</option>
+              <option value="0.06">0.06em</option>
+              <option value="0.08">0.08em</option>
+              <option value="0.1">0.10em</option>
+            </select>
+          </label>
         </div>
-        <p id="readability-preview" class="readability-preview">
-          The quick brown fox jumps over the lazy dog.
-        </p>
         <p class="note">Larger text and spacing can change tightly fitted website layouts.</p>
       </section>
 
       <section aria-labelledby="rules-title">
         <div class="section-heading">
           <div>
-            <p class="kicker">Websites</p>
+            <p class="kicker">WEBSITES</p>
             <h2 id="rules-title">Site rules</h2>
           </div>
           <p>Exact-host rules take priority over broader subdomain rules.</p>
@@ -96,7 +87,7 @@
             <input id="new-subdomains" type="checkbox" />
             <span>Include subdomains</span>
           </label>
-          <button type="submit">Add rule</button>
+          <button type="submit">ADD RULE</button>
         </form>
 
         <div class="rule-toolbar">
@@ -105,8 +96,8 @@
             <input id="rule-search" type="search" placeholder="Search saved sites" aria-label="Search site rules" />
           </label>
           <div>
-            <button id="clear-paused" type="button">Clear paused</button>
-            <button id="clear-rules" type="button">Clear all</button>
+            <button id="clear-paused" type="button">CLEAR PAUSED</button>
+            <button id="clear-rules" type="button">CLEAR ALL</button>
           </div>
         </div>
         <div id="rule-list" class="rule-list"></div>
@@ -116,8 +107,8 @@
       <section aria-labelledby="tools-title">
         <div class="section-heading">
           <div>
-            <p class="kicker">Tools</p>
-            <h2 id="tools-title">Backup and shortcut</h2>
+            <p class="kicker">TOOLS</p>
+            <h2 id="tools-title">Backup &amp; shortcut</h2>
           </div>
         </div>
         <div class="tools-grid">
@@ -125,8 +116,8 @@
             <h3>Settings file</h3>
             <p>Back up or move all preferences and site rules.</p>
             <div class="button-row">
-              <button id="export-settings" type="button">Export settings</button>
-              <button id="import-settings" type="button">Import settings</button>
+              <button id="export-settings" type="button">EXPORT JSON</button>
+              <button id="import-settings" type="button">IMPORT JSON</button>
               <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json" />
             </div>
           </div>

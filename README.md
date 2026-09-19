@@ -10,7 +10,7 @@ plus headings, and toggle the effect without reloading the page.
 - Switches between **body text** and **body + headers**
 - Pauses globally or on individual websites
 - Supports exact-host and subdomain-wide rules with per-site text scope
-- Adjusts base text size, line height, letter spacing, and word spacing when requested
+- Adjusts base text size, line height, and letter spacing when requested
 - Manages, searches, and clears saved site rules from a dedicated settings page
 - Toggles the current website with `Ctrl+Shift+L` (`Command+Shift+L` on macOS)
 - Updates open tabs as soon as a setting changes

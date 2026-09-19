@@ -10,7 +10,7 @@ The extension stores only the settings needed to provide its functionality:
 
 - Whether the extension is enabled
 - Whether Lexend applies to body text only or body text and headings
-- Optional text-size, line-height, letter-spacing, and word-spacing preferences
+- Optional text-size, line-height, and letter-spacing preferences
 - User-created hostname rules, including enabled state, subdomain coverage, and
   per-site text scope
 
