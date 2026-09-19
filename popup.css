@@ -308,9 +308,9 @@ fieldset:disabled {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 24px;
+  min-height: 28px;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   text-decoration: none;
 }
@@ -321,8 +321,8 @@ fieldset:disabled {
 }
 
 .attribution svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   fill: currentColor;
 }
 
