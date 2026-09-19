@@ -73,8 +73,8 @@ Lexend the Web does not collect, transmit, or sell data. The only stored data
 is the user's enabled state and text-scope preference, saved through the
 browser's synchronized extension storage.
 
-See the complete [privacy policy](PRIVACY.md). The publishable HTML copy lives
-at `docs/privacy.html` and is deployed through GitHub Pages.
+See the complete [privacy policy](PRIVACY.md). A standalone HTML copy lives at
+`docs/privacy.html` and is ready for any static host.
 
 ## Store submission
 

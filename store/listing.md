@@ -58,7 +58,4 @@ https://github.com/Costeer/lexendingTheWeb
 
 ## Privacy policy URL
 
-Publish `docs/privacy.html` with GitHub Pages, then use:
-
-https://costeer.github.io/lexendingTheWeb/privacy.html
-
+https://github.com/Costeer/lexendingTheWeb/blob/main/PRIVACY.md
