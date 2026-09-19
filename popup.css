@@ -32,6 +32,7 @@
   color: #000;
   background: transparent;
   font-synthesis: none;
+  scrollbar-width: none;
 }
 
 * {
@@ -45,6 +46,11 @@ body {
   margin: 0;
   overflow-x: hidden;
   background: transparent;
+}
+
+:root::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }
 
 button,

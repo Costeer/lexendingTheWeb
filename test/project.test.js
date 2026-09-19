@@ -47,4 +47,6 @@ test("the interface has square corners and a fixed light palette", async () => {
   assert.doesNotMatch(css, /border-radius\s*:/);
   assert.match(css, /color-scheme: only light/);
   assert.match(css, /#c70000/gi);
+  assert.match(css, /scrollbar-width:\s*none/);
+  assert.match(css, /:root::\-webkit-scrollbar/);
 });

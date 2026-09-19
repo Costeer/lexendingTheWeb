@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lexend the Web",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Make websites easier to read with Lexend.",
   "homepage_url": "https://github.com/Costeer/lexendingTheWeb",
   "permissions": [
