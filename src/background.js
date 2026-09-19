@@ -2,7 +2,10 @@
   "use strict";
 
   const extension = globalThis.browser ?? globalThis.chrome;
-  const defaults = { enabled: true, disabledSites: [] };
+  if (!globalThis.LexendSettings && typeof importScripts === "function") {
+    importScripts("settings.js");
+  }
+  const settingsApi = globalThis.LexendSettings;
   const iconSizes = [16, 32, 48, 128];
 
   const iconPaths = (active) => Object.fromEntries(
@@ -25,19 +28,21 @@
   };
 
   const updateAllTabs = async () => {
-    const { enabled } = await extension.storage.sync.get(defaults);
+    const settings = settingsApi.normalizeSettings(
+      await extension.storage.sync.get(null)
+    );
 
     await Promise.all([
-      extension.action.setIcon({ path: iconPaths(enabled) }),
+      extension.action.setIcon({ path: iconPaths(settings.enabled) }),
       extension.action.setTitle({
-        title: `Lexend the Web — ${enabled ? "active" : "paused"}`
+        title: `Lexend the Web — ${settings.enabled ? "active" : "paused"}`
       })
     ]);
 
     const tabs = await extension.tabs.query({});
     await Promise.all(tabs.map(async (tab) => {
       if (tab.id === undefined) return;
-      if (!enabled) {
+      if (!settings.enabled) {
         await setTabState(tab.id, false);
         return;
       }
@@ -53,6 +58,43 @@
     }));
   };
 
+  const toggleCurrentSite = async () => {
+    const [tab] = await extension.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id === undefined) return;
+
+    let url;
+    try {
+      url = new URL(tab.url ?? "");
+    } catch {
+      return;
+    }
+    if (!["http:", "https:"].includes(url.protocol)) return;
+
+    let settings = settingsApi.normalizeSettings(
+      await extension.storage.sync.get(null)
+    );
+    const hostname = url.hostname.toLowerCase();
+    const effective = settingsApi.resolveSite(settings, hostname);
+    if (!settings.enabled) {
+      settings = { ...settings, enabled: true };
+      if (!effective.siteEnabled) {
+        settings = settingsApi.setSiteRule(settings, {
+          hostname,
+          includeSubdomains: false,
+          enabled: true
+        });
+      }
+    } else {
+      settings = settingsApi.setSiteRule(settings, {
+        hostname,
+        includeSubdomains: false,
+        enabled: !effective.siteEnabled
+      });
+    }
+
+    await extension.storage.sync.set(settings);
+  };
+
   extension.runtime.onMessage.addListener((message, sender) => {
     if (message?.type === "LEXEND_STATE") {
       setTabState(sender.tab?.id, Boolean(message.active));
@@ -66,9 +108,13 @@
   });
 
   extension.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "sync" && (changes.enabled || changes.disabledSites)) {
+    if (areaName === "sync" && (changes.enabled || changes.siteRules)) {
       updateAllTabs().catch(() => {});
     }
+  });
+
+  extension.commands?.onCommand.addListener((command) => {
+    if (command === "toggle-current-site") toggleCurrentSite().catch(() => {});
   });
 
   extension.runtime.onInstalled.addListener(() => {

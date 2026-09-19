@@ -2,11 +2,11 @@
   "use strict";
 
   const extension = globalThis.browser ?? globalThis.chrome;
+  const settingsApi = globalThis.LexendSettings;
   const STYLE_ID = "lexend-the-web-styles";
   const FONT_FAMILY = '"Lexend the Web", sans-serif';
-  const defaults = { enabled: true, scope: "body", disabledSites: [] };
   const styledRoots = new Set();
-  let settings = defaults;
+  let settings = settingsApi.normalizeSettings();
 
   const iconAndContentExclusions = [
     "pre",
@@ -133,20 +133,39 @@
       .join("")}`;
   };
 
-  const createCss = ({ enabled, scope }, isShadowRoot) => {
-    if (!enabled) return "";
+  const createCss = (effective, isShadowRoot) => {
+    if (!effective.active) return "";
+
+    const readability = [
+      settings.lineHeight > 0
+        ? `line-height: ${settings.lineHeight} !important;`
+        : "",
+      settings.letterSpacing > 0
+        ? `letter-spacing: ${settings.letterSpacing}em !important;`
+        : ""
+    ].filter(Boolean).join("\n");
+    const scale = !isShadowRoot && settings.textScale !== 100
+      ? `:root { font-size: ${settings.textScale}% !important; }`
+      : "";
 
     return `
       ${getFontFaceCss()}
 
-      ${createSelector(scope, isShadowRoot)} {
+      ${scale}
+
+      ${createSelector(effective.scope, isShadowRoot)} {
         font-family: ${FONT_FAMILY} !important;
+        ${readability}
       }
     `;
   };
 
-  const isActive = () => settings.enabled
-    && !settings.disabledSites.includes(getEffectiveHostname());
+  const getEffectiveSettings = () => settingsApi.resolveSite(
+    settings,
+    getEffectiveHostname()
+  );
+
+  const isActive = () => getEffectiveSettings().active;
 
   const applyToRoot = (root) => {
     let style = root.getElementById?.(STYLE_ID)
@@ -158,10 +177,7 @@
       root.append(style);
     }
 
-    style.textContent = createCss(
-      { ...settings, enabled: isActive() },
-      root instanceof ShadowRoot
-    );
+    style.textContent = createCss(getEffectiveSettings(), root instanceof ShadowRoot);
     styledRoots.add(root);
   };
 
@@ -190,17 +206,7 @@
   };
 
   const applySettings = (nextSettings) => {
-    settings = {
-      enabled: typeof nextSettings.enabled === "boolean"
-        ? nextSettings.enabled
-        : defaults.enabled,
-      scope: nextSettings.scope === "all" ? "all" : defaults.scope,
-      disabledSites: Array.isArray(nextSettings.disabledSites)
-        ? nextSettings.disabledSites
-          .filter((hostname) => typeof hostname === "string")
-          .map((hostname) => hostname.toLowerCase())
-        : defaults.disabledSites
-    };
+    settings = settingsApi.normalizeSettings(nextSettings);
 
     styledRoots.forEach(applyToRoot);
 
@@ -224,10 +230,10 @@
 
   const start = async () => {
     try {
-      applySettings(await extension.storage.sync.get(defaults));
+      applySettings(await extension.storage.sync.get(null));
     } catch (error) {
       console.warn("Lexend the Web could not load settings; using defaults.", error);
-      applySettings(defaults);
+      applySettings(settingsApi.defaults);
     }
 
     observer.observe(document, { childList: true, subtree: true });
@@ -236,11 +242,12 @@
   extension.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") return;
 
-    applySettings({
-      enabled: changes.enabled?.newValue ?? settings.enabled,
-      scope: changes.scope?.newValue ?? settings.scope,
-      disabledSites: changes.disabledSites?.newValue ?? settings.disabledSites
+    const nextSettings = { ...settings };
+    Object.entries(changes).forEach(([key, change]) => {
+      if (change.newValue === undefined) delete nextSettings[key];
+      else nextSettings[key] = change.newValue;
     });
+    applySettings(nextSettings);
   });
 
   extension.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -248,7 +255,8 @@
     sendResponse({
       ready: true,
       active: isActive(),
-      hostname: getEffectiveHostname()
+      hostname: getEffectiveHostname(),
+      scope: getEffectiveSettings().scope
     });
     return undefined;
   });

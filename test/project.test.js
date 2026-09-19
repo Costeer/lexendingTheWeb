@@ -21,6 +21,10 @@ test("both manifests expose the same user-facing capability", async () => {
 
   assert.equal(firefox.browser_specific_settings.gecko.id,
     "lexend-the-web@costeer.dev");
+  assert.equal(chrome.options_ui.page, "options.html");
+  assert.equal(chrome.commands["toggle-current-site"].suggested_key.default,
+    "Ctrl+Shift+L");
+  assert.equal(chrome.content_scripts[0].js[0], "src/settings.js");
 });
 
 test("content script supports both scope choices and live updates", async () => {
@@ -51,10 +55,62 @@ test("the interface has square corners and a fixed light palette", async () => {
   assert.match(css, /:root::\-webkit-scrollbar/);
 });
 
-test("popup markup provides the status element required by its script", async () => {
-  const html = await readFile(join(root, "popup.html"), "utf8");
+test("popup and options markup expose their required controls", async () => {
+  const [popup, options] = await Promise.all([
+    readFile(join(root, "popup.html"), "utf8"),
+    readFile(join(root, "options.html"), "utf8")
+  ]);
 
-  assert.match(html, /id="status"/);
-  assert.match(html, /aria-label="Settings file"/);
-  assert.doesNotMatch(html, /aria-labelledby="transfer-label"/);
+  assert.match(popup, /id="status"/);
+  assert.match(popup, /id="site-scope"/);
+  assert.match(popup, /id="site-match"/);
+  assert.match(options, /id="rule-list"/);
+  assert.match(options, /id="text-scale"/);
+  assert.match(options, /id="export-settings"/);
+});
+
+test("site rules support migration, subdomains, and exact-host overrides", async () => {
+  await import("../src/settings.js");
+  const api = globalThis.LexendSettings;
+  let settings = api.normalizeSettings({
+    disabledSites: ["example.com"]
+  });
+
+  assert.equal(api.resolveSite(settings, "example.com").siteEnabled, false);
+  assert.equal(api.resolveSite(settings, "www.example.com").siteEnabled, true);
+
+  settings = api.setSiteRule(settings, {
+    hostname: "example.com",
+    includeSubdomains: true,
+    enabled: false,
+    scope: "body"
+  });
+  settings = api.setSiteRule(settings, {
+    hostname: "docs.example.com",
+    includeSubdomains: false,
+    enabled: true,
+    scope: "all"
+  });
+
+  assert.equal(api.resolveSite(settings, "shop.example.com").siteEnabled, false);
+  assert.equal(api.resolveSite(settings, "docs.example.com").siteEnabled, true);
+  assert.equal(api.resolveSite(settings, "docs.example.com").scope, "all");
+  assert.equal(api.resolveSite(settings, "unrelated.test").siteEnabled, true);
+  assert.equal(api.validHostname("valid-subdomain.example.com"), true);
+  assert.equal(api.validHostname("-invalid.example.com"), false);
+});
+
+test("site rules remain within synchronized-storage item limits", async () => {
+  await import("../src/settings.js");
+  const api = globalThis.LexendSettings;
+  const siteRules = Array.from({ length: 250 }, (_, index) => ({
+    hostname: `site-${index}.${"a".repeat(48)}.example`,
+    includeSubdomains: index % 2 === 0,
+    enabled: false,
+    scope: index % 2 === 0 ? "all" : "body"
+  }));
+  const settings = api.normalizeSettings({ siteRules });
+
+  assert.ok(JSON.stringify(settings.siteRules).length <= 7000);
+  assert.ok(settings.siteRules.length < siteRules.length);
 });

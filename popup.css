@@ -54,7 +54,8 @@ body::-webkit-scrollbar {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -247,12 +248,29 @@ legend {
 
 footer {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
   border-top: 3px solid #000;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .08em;
+}
+
+footer button {
+  padding: 5px 7px;
+  border: 2px solid #000;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+footer button:hover,
+footer button:focus-visible {
+  color: #fff;
+  background: #c70000;
+  outline: 0;
 }
 
 #status {
@@ -275,8 +293,7 @@ fieldset[disabled] {
   opacity: .42;
 }
 
-.site-section,
-.transfer-section {
+.site-section {
   padding: 16px 20px;
   border-top: 3px solid #000;
 }
@@ -318,6 +335,43 @@ h2 {
   line-height: 1.45;
 }
 
+.site-rule-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.site-rule-controls label {
+  display: grid;
+  grid-template-columns: 1fr 172px;
+  gap: 10px;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.site-rule-controls select {
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 22px 4px 7px;
+  border: 2px solid #000;
+  color: #000;
+  background: #fff;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.site-rule-controls select:focus-visible {
+  outline: 3px solid #c70000;
+  outline-offset: 2px;
+}
+
+.site-rule-controls select:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
 .switch-small .switch-track {
   width: 46px;
   height: 26px;
@@ -335,34 +389,6 @@ h2 {
 .switch input:disabled + .switch-track {
   cursor: not-allowed;
   opacity: .35;
-}
-
-.transfer-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.transfer-actions button {
-  min-height: 34px;
-  padding: 8px 10px;
-  border: 2px solid #000;
-  cursor: pointer;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .06em;
-}
-
-.transfer-actions button:hover,
-.transfer-actions button:focus-visible {
-  color: #fff;
-  background: #c70000;
-  outline: 0;
-}
-
-.transfer-actions button:focus-visible {
-  box-shadow: 3px 3px 0 #000;
 }
 
 @media (prefers-reduced-motion: reduce) {

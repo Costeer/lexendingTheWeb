@@ -63,32 +63,30 @@
                 <p id="site-message">
                     Checking whether this page can be changed.
                 </p>
-            </section>
-
-            <section class="transfer-section" aria-label="Settings file">
-                <div class="transfer-actions">
-                    <button id="export-settings" type="button">
-                        EXPORT JSON
-                    </button>
-                    <button id="import-settings" type="button">
-                        IMPORT JSON
-                    </button>
-                    <input
-                        id="import-file"
-                        class="visually-hidden"
-                        type="file"
-                        accept="application/json,.json"
-                    />
+                <div class="site-rule-controls">
+                    <label>
+                        <span>Apply site rule to</span>
+                        <select id="site-match">
+                            <option value="exact">This hostname only</option>
+                            <option value="subdomains">Hostname + subdomains</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Typography on this site</span>
+                        <select id="site-scope">
+                            <option value="inherit">Inherit setting</option>
+                            <option value="body">Only body text</option>
+                            <option value="all">Body &amp; Headers</option>
+                        </select>
+                    </label>
                 </div>
             </section>
-            <span
-                id="status"
-                class="visually-hidden"
-                role="status"
-                aria-live="polite"
-                >READY</span
-            >
+            <footer>
+                <button id="open-options" type="button">MANAGE SETTINGS</button>
+                <span id="status" role="status" aria-live="polite">READY</span>
+            </footer>
         </main>
+        <script src="src/settings.js"></script>
         <script src="popup.js"></script>
     </body>
 </html>

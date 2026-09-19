@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lexend the Web — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <div>
+            <p>LEXEND THE WEB</p>
+            <h1>Settings</h1>
+          </div>
+        </div>
+        <span id="status" role="status" aria-live="polite">READY</span>
+      </header>
+
+      <section aria-labelledby="readability-title">
+        <div class="section-heading">
+          <div>
+            <p class="kicker">GLOBAL</p>
+            <h2 id="readability-title">Readability</h2>
+          </div>
+          <p>Optional adjustments are applied only while Lexend is active.</p>
+        </div>
+        <div class="control-grid">
+          <label>
+            <span>Base text size</span>
+            <select id="text-scale">
+              <option value="100">Website default</option>
+              <option value="80">80%</option>
+              <option value="90">90%</option>
+              <option value="95">95%</option>
+              <option value="105">105%</option>
+              <option value="110">110%</option>
+              <option value="115">115%</option>
+              <option value="120">120%</option>
+              <option value="130">130%</option>
+              <option value="140">140%</option>
+            </select>
+          </label>
+          <label>
+            <span>Line height</span>
+            <select id="line-height">
+              <option value="0">Website default</option>
+              <option value="1.4">1.4</option>
+              <option value="1.5">1.5</option>
+              <option value="1.6">1.6</option>
+              <option value="1.75">1.75</option>
+              <option value="2">2.0</option>
+            </select>
+          </label>
+          <label>
+            <span>Letter spacing</span>
+            <select id="letter-spacing">
+              <option value="0">Website default</option>
+              <option value="0.02">0.02em</option>
+              <option value="0.04">0.04em</option>
+              <option value="0.06">0.06em</option>
+              <option value="0.08">0.08em</option>
+              <option value="0.1">0.10em</option>
+            </select>
+          </label>
+        </div>
+        <p class="note">Larger text and spacing can change tightly fitted website layouts.</p>
+      </section>
+
+      <section aria-labelledby="rules-title">
+        <div class="section-heading">
+          <div>
+            <p class="kicker">WEBSITES</p>
+            <h2 id="rules-title">Site rules</h2>
+          </div>
+          <p>Exact-host rules take priority over broader subdomain rules.</p>
+        </div>
+
+        <form id="add-rule" class="add-rule">
+          <label>
+            <span class="visually-hidden">Hostname</span>
+            <input id="new-hostname" type="text" placeholder="example.com" autocomplete="off" aria-label="Hostname" />
+          </label>
+          <label class="check-label">
+            <input id="new-subdomains" type="checkbox" />
+            <span>Include subdomains</span>
+          </label>
+          <button type="submit">ADD RULE</button>
+        </form>
+
+        <div class="rule-toolbar">
+          <label>
+            <span class="visually-hidden">Search site rules</span>
+            <input id="rule-search" type="search" placeholder="Search saved sites" aria-label="Search site rules" />
+          </label>
+          <div>
+            <button id="clear-paused" type="button">CLEAR PAUSED</button>
+            <button id="clear-rules" type="button">CLEAR ALL</button>
+          </div>
+        </div>
+        <div id="rule-list" class="rule-list"></div>
+        <p id="empty-rules" class="empty">No site rules saved.</p>
+      </section>
+
+      <section aria-labelledby="tools-title">
+        <div class="section-heading">
+          <div>
+            <p class="kicker">TOOLS</p>
+            <h2 id="tools-title">Backup &amp; shortcut</h2>
+          </div>
+        </div>
+        <div class="tools-grid">
+          <div>
+            <h3>Settings file</h3>
+            <p>Back up or move all preferences and site rules.</p>
+            <div class="button-row">
+              <button id="export-settings" type="button">EXPORT JSON</button>
+              <button id="import-settings" type="button">IMPORT JSON</button>
+              <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json" />
+            </div>
+          </div>
+          <div>
+            <h3>Toggle current site</h3>
+            <p>Use the browser shortcut without opening the popup.</p>
+            <output id="shortcut">Ctrl+Shift+L</output>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="src/settings.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

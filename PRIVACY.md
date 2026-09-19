@@ -10,7 +10,9 @@ The extension stores only the settings needed to provide its functionality:
 
 - Whether the extension is enabled
 - Whether Lexend applies to body text only or body text and headings
-- The hostnames of websites on which the user has disabled the extension
+- Optional text-size, line-height, and letter-spacing preferences
+- User-created hostname rules, including enabled state, subdomain coverage, and
+  per-site text scope
 
 These settings are saved with the browser's synchronized extension storage.
 Depending on the user's browser configuration, the browser vendor may sync the
@@ -45,4 +47,3 @@ notes and reflected in the date above.
 
 Questions and privacy requests may be filed through the project's
 [GitHub issue tracker](https://github.com/Costeer/lexendingTheWeb/issues).
-
