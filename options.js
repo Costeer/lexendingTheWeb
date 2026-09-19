@@ -50,7 +50,6 @@
   let writeQueue = Promise.resolve();
   let saveRevision = 0;
   let toastTimer;
-  let sliderSaveTimer;
 
   const setSaveState = (state, message) => {
     saveStatus.className = `save-status is-${state}`;
@@ -109,15 +108,31 @@
     .toFixed(precision)
     .replace(/\.?0+$/, "");
 
-  const renderPreview = () => {
-    previewCopy.style.fontSize = `${14 * settings.textScale / 100}px`;
-    previewCopy.style.lineHeight = settings.lineHeight || 1.5;
-    previewCopy.style.letterSpacing = `${settings.letterSpacing}em`;
+  const renderPreview = (readability = settings) => {
+    previewCopy.style.fontSize = `${14 * readability.textScale / 100}px`;
+    previewCopy.style.lineHeight = readability.lineHeight || 1.5;
+    previewCopy.style.letterSpacing = `${readability.letterSpacing}em`;
   };
 
   const renderReadabilityMode = () => {
     basicReadability.hidden = advancedModeInput.checked;
     advancedReadability.hidden = !advancedModeInput.checked;
+  };
+
+  const renderSliderValues = (readability) => {
+    textScaleOutput.textContent = readability.textScale === 100
+      ? "Default"
+      : `${readability.textScale}%`;
+    lineHeightOutput.textContent = readability.lineHeight === 0
+      ? "Default"
+      : formatNumber(readability.lineHeight, 2);
+    letterSpacingOutput.textContent = readability.letterSpacing === 0
+      ? "Default"
+      : `${formatNumber(readability.letterSpacing, 3)}em`;
+
+    textScaleSlider.setAttribute("aria-valuetext", textScaleOutput.textContent);
+    lineHeightSlider.setAttribute("aria-valuetext", lineHeightOutput.textContent);
+    letterSpacingSlider.setAttribute("aria-valuetext", letterSpacingOutput.textContent);
   };
 
   const renderReadability = () => {
@@ -129,19 +144,7 @@
     lineHeightSlider.value = String(lineHeightToSlider(settings.lineHeight));
     letterSpacingSlider.value = String(settings.letterSpacing);
 
-    textScaleOutput.textContent = settings.textScale === 100
-      ? "Default"
-      : `${settings.textScale}%`;
-    lineHeightOutput.textContent = settings.lineHeight === 0
-      ? "Default"
-      : formatNumber(settings.lineHeight, 2);
-    letterSpacingOutput.textContent = settings.letterSpacing === 0
-      ? "Default"
-      : `${formatNumber(settings.letterSpacing, 3)}em`;
-
-    textScaleSlider.setAttribute("aria-valuetext", textScaleOutput.textContent);
-    lineHeightSlider.setAttribute("aria-valuetext", lineHeightOutput.textContent);
-    letterSpacingSlider.setAttribute("aria-valuetext", letterSpacingOutput.textContent);
+    renderSliderValues(settings);
     renderPreview();
   };
 
@@ -259,8 +262,6 @@
   };
 
   const save = (nextSettings) => {
-    clearTimeout(sliderSaveTimer);
-    sliderSaveTimer = null;
     settings = settingsApi.normalizeSettings(nextSettings);
     render();
     return persist(settings);
@@ -309,15 +310,6 @@
     });
   });
 
-  const scheduleSliderSave = () => {
-    clearTimeout(sliderSaveTimer);
-    setSaveState("saving", "Saving…");
-    sliderSaveTimer = setTimeout(() => {
-      sliderSaveTimer = null;
-      persist(settings);
-    }, 180);
-  };
-
   const sliderControls = [
     {
       input: textScaleSlider,
@@ -336,20 +328,20 @@
     }
   ];
 
+  const getSliderReadability = () => ({
+    textScale: Number(textScaleSlider.value),
+    lineHeight: lineHeightFromSlider(lineHeightSlider.value),
+    letterSpacing: Number(letterSpacingSlider.value)
+  });
+
   sliderControls.forEach(({ input, key, getValue }) => {
     input.addEventListener("input", () => {
-      settings = settingsApi.normalizeSettings({
-        ...settings,
-        [key]: getValue(input.value)
-      });
-      renderReadability();
-      scheduleSliderSave();
+      const draft = getSliderReadability();
+      renderSliderValues(draft);
+      renderPreview(draft);
     });
     input.addEventListener("change", () => {
-      if (!sliderSaveTimer) return;
-      clearTimeout(sliderSaveTimer);
-      sliderSaveTimer = null;
-      persist(settings);
+      save({ ...settings, [key]: getValue(input.value) });
     });
   });
 
