@@ -95,11 +95,13 @@ test("popup and options markup expose their required controls", async () => {
   assert.match(popup, /id="open-options"/);
   assert.doesNotMatch(popup, /<select/);
   assert.match(options, /id="rule-list"/);
-  assert.match(options, /id="text-scale"/);
-  assert.match(options, /name="textScale"[^>]+value="140"/);
-  assert.match(options, /name="lineHeight"[^>]+value="1\.75"/);
-  assert.match(options, /id="letter-spacing"/);
-  assert.match(options, /name="letterSpacing"[^>]+value="0\.1"/);
+  assert.match(options, /id="advanced-mode"[^>]+type="checkbox"/);
+  assert.equal((options.match(/name="basicTextScale"/g) ?? []).length, 3);
+  assert.equal((options.match(/name="basicLineHeight"/g) ?? []).length, 3);
+  assert.equal((options.match(/name="basicLetterSpacing"/g) ?? []).length, 3);
+  assert.match(options, /id="text-scale"[^>]+type="range"[^>]+min="80"[^>]+max="140"/);
+  assert.match(options, /id="line-height"[^>]+type="range"[^>]+max="29"/);
+  assert.match(options, /id="letter-spacing"[^>]+type="range"[^>]+max="0\.2"/);
   assert.match(options, /id="export-settings"/);
   assert.match(options, /id="retry-save"/);
   assert.match(options, /id="hostname-error"[^>]+role="alert"/);
@@ -120,6 +122,16 @@ test("popup and options mutate the same site-rule model", async () => {
   }
   assert.match(popup, /includeSubdomains:\s*false/);
   assert.match(options, /enabled:\s*event\.target\.checked/);
+});
+
+test("advanced readability is a local UI preference with full-range sliders", async () => {
+  const options = await readFile(join(root, "options.js"), "utf8");
+
+  assert.match(options, /storage\?\.local/);
+  assert.match(options, /ADVANCED_PREFERENCE_KEY = "advancedReadability"/);
+  assert.match(options, /lineHeightFromSlider/);
+  assert.match(options, /letterSpacingSlider/);
+  assert.doesNotMatch(options, /advancedReadability.*storage\.set\(settings\)/s);
 });
 
 test("site rules support migration, subdomains, and exact-host overrides", async () => {

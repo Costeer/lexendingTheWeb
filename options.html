@@ -27,52 +27,79 @@
       </header>
 
       <section aria-labelledby="readability-title">
-        <div class="section-heading">
-          <p class="eyebrow">GLOBAL</p>
-          <h2 id="readability-title">Readability</h2>
+        <div class="section-heading readability-heading">
+          <div class="readability-title-row">
+            <div>
+              <p class="eyebrow">GLOBAL</p>
+              <h2 id="readability-title">Readability</h2>
+            </div>
+            <label class="advanced-control">
+              <span>Advanced</span>
+              <input id="advanced-mode" type="checkbox" />
+              <span class="mode-switch-track" aria-hidden="true">
+                <span class="mode-switch-thumb"></span>
+              </span>
+            </label>
+          </div>
           <p class="helper">Applies only while Lexend is on. Larger text and spacing can break tightly fitted layouts.</p>
         </div>
 
-        <div class="control-grid">
-          <fieldset id="text-scale" class="setting-control">
+        <div id="basic-readability" class="control-grid basic-controls">
+          <fieldset class="setting-control">
             <legend>Text size</legend>
             <div class="segment-group">
-              <label><input type="radio" name="textScale" value="80" /><span>80%</span></label>
-              <label><input type="radio" name="textScale" value="90" /><span>90%</span></label>
-              <label><input type="radio" name="textScale" value="95" /><span>95%</span></label>
-              <label><input type="radio" name="textScale" value="100" /><span>Default</span></label>
-              <label><input type="radio" name="textScale" value="105" /><span>105%</span></label>
-              <label><input type="radio" name="textScale" value="110" /><span>Large</span></label>
-              <label><input type="radio" name="textScale" value="115" /><span>115%</span></label>
-              <label><input type="radio" name="textScale" value="120" /><span>Larger</span></label>
-              <label><input type="radio" name="textScale" value="130" /><span>130%</span></label>
-              <label><input type="radio" name="textScale" value="140" /><span>140%</span></label>
+              <label><input type="radio" name="basicTextScale" value="100" /><span>Default</span></label>
+              <label><input type="radio" name="basicTextScale" value="110" /><span>Large</span></label>
+              <label><input type="radio" name="basicTextScale" value="120" /><span>Larger</span></label>
             </div>
           </fieldset>
 
-          <fieldset id="line-height" class="setting-control">
+          <fieldset class="setting-control">
             <legend>Line height</legend>
             <div class="segment-group">
-              <label><input type="radio" name="lineHeight" value="0" /><span>Default</span></label>
-              <label><input type="radio" name="lineHeight" value="1.4" /><span>1.4</span></label>
-              <label><input type="radio" name="lineHeight" value="1.5" /><span>Relaxed</span></label>
-              <label><input type="radio" name="lineHeight" value="1.6" /><span>1.6</span></label>
-              <label><input type="radio" name="lineHeight" value="1.75" /><span>1.75</span></label>
-              <label><input type="radio" name="lineHeight" value="2" /><span>Loose</span></label>
+              <label><input type="radio" name="basicLineHeight" value="0" /><span>Default</span></label>
+              <label><input type="radio" name="basicLineHeight" value="1.5" /><span>Relaxed</span></label>
+              <label><input type="radio" name="basicLineHeight" value="2" /><span>Loose</span></label>
             </div>
           </fieldset>
 
-          <fieldset id="letter-spacing" class="setting-control">
+          <fieldset class="setting-control">
             <legend>Letter spacing</legend>
             <div class="segment-group">
-              <label><input type="radio" name="letterSpacing" value="0" /><span>Default</span></label>
-              <label><input type="radio" name="letterSpacing" value="0.02" /><span>0.02em</span></label>
-              <label><input type="radio" name="letterSpacing" value="0.04" /><span>Wide</span></label>
-              <label><input type="radio" name="letterSpacing" value="0.06" /><span>0.06em</span></label>
-              <label><input type="radio" name="letterSpacing" value="0.08" /><span>Wider</span></label>
-              <label><input type="radio" name="letterSpacing" value="0.1" /><span>0.10em</span></label>
+              <label><input type="radio" name="basicLetterSpacing" value="0" /><span>Default</span></label>
+              <label><input type="radio" name="basicLetterSpacing" value="0.04" /><span>Wide</span></label>
+              <label><input type="radio" name="basicLetterSpacing" value="0.08" /><span>Wider</span></label>
             </div>
           </fieldset>
+        </div>
+
+        <div id="advanced-readability" class="control-grid slider-grid" hidden>
+          <label class="slider-control" for="text-scale">
+            <span class="slider-heading">
+              <strong>Text size</strong>
+              <output id="text-scale-output" for="text-scale">Default</output>
+            </span>
+            <input id="text-scale" type="range" min="80" max="140" step="1" value="100" />
+            <span class="slider-limits" aria-hidden="true"><span>80%</span><span>140%</span></span>
+          </label>
+
+          <label class="slider-control" for="line-height">
+            <span class="slider-heading">
+              <strong>Line height</strong>
+              <output id="line-height-output" for="line-height">Default</output>
+            </span>
+            <input id="line-height" type="range" min="0" max="29" step="1" value="0" />
+            <span class="slider-limits" aria-hidden="true"><span>Default</span><span>2.4</span></span>
+          </label>
+
+          <label class="slider-control" for="letter-spacing">
+            <span class="slider-heading">
+              <strong>Letter spacing</strong>
+              <output id="letter-spacing-output" for="letter-spacing">Default</output>
+            </span>
+            <input id="letter-spacing" type="range" min="0" max="0.2" step="0.005" value="0" />
+            <span class="slider-limits" aria-hidden="true"><span>Default</span><span>0.20em</span></span>
+          </label>
         </div>
 
         <div class="readability-preview">

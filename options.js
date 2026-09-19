@@ -4,9 +4,20 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const storage = extension?.storage?.sync;
-  const textScaleInputs = [...document.querySelectorAll('input[name="textScale"]')];
-  const lineHeightInputs = [...document.querySelectorAll('input[name="lineHeight"]')];
-  const letterSpacingInputs = [...document.querySelectorAll('input[name="letterSpacing"]')];
+  const preferenceStorage = extension?.storage?.local;
+  const ADVANCED_PREFERENCE_KEY = "advancedReadability";
+  const advancedModeInput = document.querySelector("#advanced-mode");
+  const basicReadability = document.querySelector("#basic-readability");
+  const advancedReadability = document.querySelector("#advanced-readability");
+  const basicTextScaleInputs = [...document.querySelectorAll('input[name="basicTextScale"]')];
+  const basicLineHeightInputs = [...document.querySelectorAll('input[name="basicLineHeight"]')];
+  const basicLetterSpacingInputs = [...document.querySelectorAll('input[name="basicLetterSpacing"]')];
+  const textScaleSlider = document.querySelector("#text-scale");
+  const lineHeightSlider = document.querySelector("#line-height");
+  const letterSpacingSlider = document.querySelector("#letter-spacing");
+  const textScaleOutput = document.querySelector("#text-scale-output");
+  const lineHeightOutput = document.querySelector("#line-height-output");
+  const letterSpacingOutput = document.querySelector("#letter-spacing-output");
   const previewCopy = document.querySelector("#preview-copy");
   const resetReadabilityButton = document.querySelector("#reset-readability");
   const saveStatus = document.querySelector("#save-status");
@@ -39,6 +50,7 @@
   let writeQueue = Promise.resolve();
   let saveRevision = 0;
   let toastTimer;
+  let sliderSaveTimer;
 
   const setSaveState = (state, message) => {
     saveStatus.className = `save-status is-${state}`;
@@ -73,16 +85,64 @@
     }
   };
 
-  const setRadioValue = (inputs, value) => {
+  const setNearestRadioValue = (inputs, value) => {
+    const nearest = inputs.reduce((closest, input) => (
+      Math.abs(Number(input.value) - value) < Math.abs(Number(closest.value) - value)
+        ? input
+        : closest
+    ));
     inputs.forEach((input) => {
-      input.checked = Number(input.value) === Number(value);
+      input.checked = input === nearest;
     });
   };
+
+  const lineHeightFromSlider = (value) => {
+    const step = Number(value);
+    return step === 0 ? 0 : Number((0.95 + step * 0.05).toFixed(2));
+  };
+
+  const lineHeightToSlider = (value) => (
+    value === 0 ? 0 : Math.min(29, Math.max(1, Math.round((value - 0.95) / 0.05)))
+  );
+
+  const formatNumber = (value, precision) => Number(value)
+    .toFixed(precision)
+    .replace(/\.?0+$/, "");
 
   const renderPreview = () => {
     previewCopy.style.fontSize = `${14 * settings.textScale / 100}px`;
     previewCopy.style.lineHeight = settings.lineHeight || 1.5;
     previewCopy.style.letterSpacing = `${settings.letterSpacing}em`;
+  };
+
+  const renderReadabilityMode = () => {
+    basicReadability.hidden = advancedModeInput.checked;
+    advancedReadability.hidden = !advancedModeInput.checked;
+  };
+
+  const renderReadability = () => {
+    setNearestRadioValue(basicTextScaleInputs, settings.textScale);
+    setNearestRadioValue(basicLineHeightInputs, settings.lineHeight);
+    setNearestRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
+
+    textScaleSlider.value = String(settings.textScale);
+    lineHeightSlider.value = String(lineHeightToSlider(settings.lineHeight));
+    letterSpacingSlider.value = String(settings.letterSpacing);
+
+    textScaleOutput.textContent = settings.textScale === 100
+      ? "Default"
+      : `${settings.textScale}%`;
+    lineHeightOutput.textContent = settings.lineHeight === 0
+      ? "Default"
+      : formatNumber(settings.lineHeight, 2);
+    letterSpacingOutput.textContent = settings.letterSpacing === 0
+      ? "Default"
+      : `${formatNumber(settings.letterSpacing, 3)}em`;
+
+    textScaleSlider.setAttribute("aria-valuetext", textScaleOutput.textContent);
+    lineHeightSlider.setAttribute("aria-valuetext", lineHeightOutput.textContent);
+    letterSpacingSlider.setAttribute("aria-valuetext", letterSpacingOutput.textContent);
+    renderPreview();
   };
 
   const makeDeleteButton = (rule) => {
@@ -159,10 +219,7 @@
   };
 
   const render = () => {
-    setRadioValue(textScaleInputs, settings.textScale);
-    setRadioValue(lineHeightInputs, settings.lineHeight);
-    setRadioValue(letterSpacingInputs, settings.letterSpacing);
-    renderPreview();
+    renderReadability();
     renderRules();
   };
 
@@ -202,6 +259,8 @@
   };
 
   const save = (nextSettings) => {
+    clearTimeout(sliderSaveTimer);
+    sliderSaveTimer = null;
     settings = settingsApi.normalizeSettings(nextSettings);
     render();
     return persist(settings);
@@ -223,11 +282,74 @@
     subdomainPreview.textContent = `*.${settingsApi.validHostname(hostname) ? hostname : "example.com"}`;
   };
 
-  [...textScaleInputs, ...lineHeightInputs, ...letterSpacingInputs].forEach((input) => {
+  advancedModeInput.addEventListener("change", async () => {
+    renderReadabilityMode();
+    if (!preferenceStorage) return;
+    try {
+      await preferenceStorage.set({
+        [ADVANCED_PREFERENCE_KEY]: advancedModeInput.checked
+      });
+    } catch {
+      showToast("The advanced view preference could not be saved");
+    }
+  });
+
+  const basicControlGroups = [
+    { inputs: basicTextScaleInputs, key: "textScale" },
+    { inputs: basicLineHeightInputs, key: "lineHeight" },
+    { inputs: basicLetterSpacingInputs, key: "letterSpacing" }
+  ];
+
+  basicControlGroups.forEach(({ inputs, key }) => {
+    inputs.forEach((input) => {
+      input.addEventListener("click", () => {
+        const value = Number(input.value);
+        if (settings[key] !== value) save({ ...settings, [key]: value });
+      });
+    });
+  });
+
+  const scheduleSliderSave = () => {
+    clearTimeout(sliderSaveTimer);
+    setSaveState("saving", "Saving…");
+    sliderSaveTimer = setTimeout(() => {
+      sliderSaveTimer = null;
+      persist(settings);
+    }, 180);
+  };
+
+  const sliderControls = [
+    {
+      input: textScaleSlider,
+      key: "textScale",
+      getValue: (value) => Number(value)
+    },
+    {
+      input: lineHeightSlider,
+      key: "lineHeight",
+      getValue: lineHeightFromSlider
+    },
+    {
+      input: letterSpacingSlider,
+      key: "letterSpacing",
+      getValue: (value) => Number(value)
+    }
+  ];
+
+  sliderControls.forEach(({ input, key, getValue }) => {
+    input.addEventListener("input", () => {
+      settings = settingsApi.normalizeSettings({
+        ...settings,
+        [key]: getValue(input.value)
+      });
+      renderReadability();
+      scheduleSliderSave();
+    });
     input.addEventListener("change", () => {
-      if (!input.checked) return;
-      const key = input.name;
-      save({ ...settings, [key]: Number(input.value) });
+      if (!sliderSaveTimer) return;
+      clearTimeout(sliderSaveTimer);
+      sliderSaveTimer = null;
+      persist(settings);
     });
   });
 
@@ -406,10 +528,20 @@
       settings = settingsApi.normalizeSettings(
         storage ? await storage.get(null) : settingsApi.defaults
       );
+      if (preferenceStorage) {
+        try {
+          const preferences = await preferenceStorage.get(ADVANCED_PREFERENCE_KEY);
+          advancedModeInput.checked = Boolean(preferences[ADVANCED_PREFERENCE_KEY]);
+        } catch {
+          advancedModeInput.checked = false;
+        }
+      }
+      renderReadabilityMode();
       render();
       setSaveState("saved", "All changes saved");
     } catch (error) {
       console.error("Lexend the Web could not load settings.", error);
+      renderReadabilityMode();
       render();
       setSaveState("error", "Settings could not be loaded");
     }
