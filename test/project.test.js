@@ -89,10 +89,9 @@ test("popup and options markup expose their required controls", async () => {
   assert.match(popup, /name="scope"[^>]+type="radio"|type="radio"[^>]+name="scope"/);
   assert.match(popup, /name="spacing"[^>]+value="0\.08"/);
   assert.match(popup, /id="restricted-note"[^>]+hidden/);
-  assert.match(popup, /id="export-settings"/);
-  assert.match(popup, /id="import-settings"/);
-  assert.match(popup, /id="reset-settings"/);
-  assert.match(popup, /id="open-options"/);
+  assert.match(popup, /href="https:\/\/costeer\.dev"/);
+  assert.match(popup, /made with <span class="attribution-mark">☭<\/span> by costeer/);
+  assert.doesNotMatch(popup, /<footer|id="export-settings"|id="reset-settings"/);
   assert.doesNotMatch(popup, /<select/);
   assert.match(options, /id="rule-list"/);
   assert.match(options, /id="advanced-mode"[^>]+type="checkbox"/);

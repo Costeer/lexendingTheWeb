@@ -32,19 +32,11 @@
   const siteStatusText = document.querySelector("#site-status-text");
   const toggleSiteButton = document.querySelector("#toggle-site");
   const restrictedNote = document.querySelector("#restricted-note");
-  const exportButton = document.querySelector("#export-settings");
-  const importButton = document.querySelector("#import-settings");
-  const importFile = document.querySelector("#import-file");
-  const resetButton = document.querySelector("#reset-settings");
-  const resetLabel = resetButton.querySelector("span");
-  const optionsButton = document.querySelector("#open-options");
   const feedback = document.querySelector("#popup-feedback");
 
   let settings = settingsApi.normalizeSettings();
   let site = null;
   let feedbackTimer;
-  let resetTimer;
-  let resetArmed = false;
 
   const showFeedback = (message, isError = false, timeout = 2200) => {
     feedback.textContent = message;
@@ -108,7 +100,7 @@
     renderSite();
   };
 
-  const save = async (nextSettings, successMessage = "") => {
+  const save = async (nextSettings) => {
     settings = settingsApi.normalizeSettings(nextSettings);
     render();
     if (!storage) {
@@ -119,7 +111,6 @@
     try {
       await storage.set(settings);
       await storage.remove?.(["disabledSites", "spacing"]);
-      if (successMessage) showFeedback(successMessage);
       return true;
     } catch (error) {
       console.error("Lexend the Web could not save settings.", error);
@@ -149,24 +140,6 @@
       supported,
       restricted: !supported
     };
-  };
-
-  const exportSettings = () => {
-    const payload = {
-      schemaVersion: 2,
-      exportedAt: new Date().toISOString(),
-      settings
-    };
-    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
-      type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "lexend-the-web-settings.json";
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-    showFeedback("Settings exported");
   };
 
   enabledInput.addEventListener("change", () => {
@@ -199,55 +172,6 @@
       includeSubdomains: false,
       enabled: desiredEnabled === inherited.siteEnabled ? null : desiredEnabled
     }));
-  });
-
-  exportButton.addEventListener("click", exportSettings);
-
-  importButton.addEventListener("click", () => importFile.click());
-  importFile.addEventListener("change", async () => {
-    const file = importFile.files?.[0];
-    if (!file) return;
-    try {
-      if (file.size > 256 * 1024) throw new Error("Settings file is too large");
-      const payload = JSON.parse(await file.text());
-      if (![1, 2].includes(payload?.schemaVersion) || typeof payload.settings !== "object") {
-        throw new Error("Unsupported settings file");
-      }
-      await save(payload.settings, "Settings imported");
-    } catch {
-      showFeedback("Choose a valid Lexend settings file.", true, 0);
-    } finally {
-      importFile.value = "";
-    }
-  });
-
-  resetButton.addEventListener("click", async () => {
-    if (!resetArmed) {
-      resetArmed = true;
-      resetLabel.textContent = "Confirm reset";
-      showFeedback("Click Confirm reset to restore every setting.", false, 4000);
-      clearTimeout(resetTimer);
-      resetTimer = setTimeout(() => {
-        resetArmed = false;
-        resetLabel.textContent = "Reset";
-      }, 4000);
-      return;
-    }
-
-    clearTimeout(resetTimer);
-    resetArmed = false;
-    resetLabel.textContent = "Reset";
-    await save(settingsApi.defaults, "Settings reset");
-  });
-
-  optionsButton.addEventListener("click", async () => {
-    try {
-      await extension?.runtime?.openOptionsPage?.();
-      globalThis.close?.();
-    } catch (error) {
-      console.error("Lexend the Web could not open settings.", error);
-      showFeedback("Settings could not be opened.", true, 0);
-    }
   });
 
   extension?.storage?.onChanged?.addListener((changes, areaName) => {

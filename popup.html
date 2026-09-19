@@ -76,29 +76,14 @@
         <p>Browser pages like settings and new tab can't be changed by extensions.</p>
       </aside>
 
-      <footer>
-        <div class="footer-links">
-          <button id="export-settings" class="footer-link" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M11 3h2v10.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3ZM5 19h14v2H5v-2Z" /></svg>
-            Export settings
-          </button>
-          <button id="import-settings" class="footer-link" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M11 21h2V10.8l3.6 3.6L18 13l-6-6-6 6 1.4 1.4 3.6-3.6V21ZM5 3h14v2H5V3Z" /></svg>
-            Import settings
-          </button>
-          <button id="reset-settings" class="footer-link danger-link" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-7.4 4.9l1.9.8A6 6 0 1 0 8.2 7L11 9.8V3H4.2l2.5 2.5A8 8 0 0 1 12 4Z" /></svg>
-            <span>Reset</span>
-          </button>
-          <button id="open-options" class="footer-link" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h6v2H7v10h10v-4h2v6H5V5Zm8-2h8v8h-2V6.4l-6.3 6.3-1.4-1.4L17.6 5H13V3Z" /></svg>
-            Open all settings
-          </button>
-        </div>
+      <div class="attribution">
+        <a href="https://costeer.dev" target="_blank" rel="noopener noreferrer">
+          <span>made with <span class="attribution-mark">☭</span> by costeer</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h6v2H7v10h10v-4h2v6H5V5Zm8-2h8v8h-2V6.4l-6.3 6.3-1.4-1.4L17.6 5H13V3Z" /></svg>
+        </a>
         <p id="popup-feedback" class="popup-feedback" role="status" aria-live="polite"></p>
-      </footer>
+      </div>
     </main>
-    <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json" />
     <script src="src/settings.js"></script>
     <script src="popup.js"></script>
   </body>
