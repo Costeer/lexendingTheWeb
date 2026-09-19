@@ -43,7 +43,7 @@ button {
   align-items: center;
   min-width: 0;
   gap: 12px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: .06em;
   white-space: nowrap;
@@ -57,7 +57,7 @@ button {
   place-items: center;
   border: var(--frame-border);
   box-shadow: var(--active-shadow);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
 }
@@ -67,7 +67,7 @@ button {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -125,7 +125,7 @@ button {
   padding: 8px 13px;
   border-bottom: var(--section-divider);
   background: var(--popup-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .site-strip p {
@@ -145,7 +145,7 @@ button {
   padding: 0;
   border: 0;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -171,7 +171,7 @@ button {
   width: 100%;
   margin: 0 0 10px;
   padding: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -222,7 +222,7 @@ button {
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 4px;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.35;
 }
 
@@ -260,7 +260,7 @@ fieldset:disabled {
   padding: 5px 3px;
   place-items: center;
   background: var(--surface);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -274,7 +274,7 @@ fieldset:disabled {
   padding: 9px;
   border: 1px dashed var(--ink);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.65;
 }
 
@@ -295,7 +295,7 @@ fieldset:disabled {
 
 .restricted-note p {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
 }
 
@@ -334,7 +334,7 @@ fieldset:disabled {
   min-height: 0;
   margin: 0;
   color: var(--secondary-text);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.35;
 }
 
