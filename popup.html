@@ -1,89 +1,87 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Lexend the Web</title>
-    <link rel="stylesheet" href="popup.css">
-  </head>
-  <body>
-    <main class="panel">
-      <header class="masthead">
-        <div class="wordmark" aria-label="Lexend the Web">
-          <span class="wordmark-mark" aria-hidden="true">L</span>
-          <span>LEXEND<br>THE WEB</span>
-        </div>
-        <label class="switch" title="Turn Lexend on or off">
-          <span class="visually-hidden">Enable Lexend</span>
-          <input id="enabled" type="checkbox">
-          <span class="switch-track" aria-hidden="true">
-            <span class="switch-thumb"></span>
-          </span>
-        </label>
-      </header>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Lexend the Web</title>
+        <link rel="stylesheet" href="popup.css" />
+    </head>
+    <body>
+        <main class="panel">
+            <header class="masthead">
+                <div class="wordmark" aria-label="Lexend the Web">
+                    <span class="wordmark-mark" aria-hidden="true">L</span>
+                    <span>LEXEND<br />THE WEB</span>
+                </div>
+                <label class="switch" title="Turn Lexend on or off">
+                    <span class="visually-hidden">Enable Lexend</span>
+                    <input id="enabled" type="checkbox" />
+                    <span class="switch-track" aria-hidden="true">
+                        <span class="switch-thumb"></span>
+                    </span>
+                </label>
+            </header>
 
-      <section class="intro" aria-labelledby="intro-title">
-        <p class="eyebrow">READ YOUR WAY</p>
-        <h1 id="intro-title">A clearer web,<br>one page at a time.</h1>
-        <p>Choose where Lexend should take over. Your setting applies to every open website.</p>
-      </section>
+            <fieldset id="scope-fieldset">
+                <legend>Apply Lexend to</legend>
+                <label class="choice">
+                    <input type="radio" name="scope" value="body" />
+                    <span class="choice-control" aria-hidden="true"></span>
+                    <span class="choice-copy">
+                        <strong>Only body text</strong>
+                        <small>Paragraphs, links, labels and controls</small>
+                    </span>
+                </label>
+                <label class="choice">
+                    <input type="radio" name="scope" value="all" />
+                    <span class="choice-control" aria-hidden="true"></span>
+                    <span class="choice-copy">
+                        <strong>Body & Headers</strong>
+                        <small>Everything above, plus H1–H6</small>
+                    </span>
+                </label>
+            </fieldset>
 
-      <fieldset id="scope-fieldset">
-        <legend>APPLY LEXEND TO</legend>
-        <label class="choice">
-          <input type="radio" name="scope" value="body">
-          <span class="choice-control" aria-hidden="true"></span>
-          <span class="choice-copy">
-            <strong>BODY TEXT</strong>
-            <small>Paragraphs, links, labels and controls</small>
-          </span>
-        </label>
-        <label class="choice">
-          <input type="radio" name="scope" value="all">
-          <span class="choice-control" aria-hidden="true"></span>
-          <span class="choice-copy">
-            <strong>BODY + HEADERS</strong>
-            <small>Everything above, plus H1–H6</small>
-          </span>
-        </label>
-      </fieldset>
+            <section class="site-section" aria-labelledby="site-label">
+                <div class="section-heading">
+                    <div>
+                        <h2 id="site-label">Checking page…</h2>
+                    </div>
+                    <label
+                        class="switch switch-small"
+                        title="Allow Lexend on this site"
+                    >
+                        <span class="visually-hidden"
+                            >Allow Lexend on this site</span
+                        >
+                        <input id="site-enabled" type="checkbox" disabled />
+                        <span class="switch-track" aria-hidden="true">
+                            <span class="switch-thumb"></span>
+                        </span>
+                    </label>
+                </div>
+                <p id="site-message">
+                    Checking whether this page can be changed.
+                </p>
+            </section>
 
-      <section class="site-section" aria-labelledby="site-label">
-        <div class="section-heading">
-          <div>
-            <p class="section-kicker">CURRENT SITE</p>
-            <h2 id="site-label">Checking page…</h2>
-          </div>
-          <label class="switch switch-small" title="Allow Lexend on this site">
-            <span class="visually-hidden">Allow Lexend on this site</span>
-            <input id="site-enabled" type="checkbox" disabled>
-            <span class="switch-track" aria-hidden="true">
-              <span class="switch-thumb"></span>
-            </span>
-          </label>
-        </div>
-        <p id="site-message">Checking whether this page can be changed.</p>
-      </section>
-
-      <section class="transfer-section" aria-labelledby="transfer-label">
-        <div class="section-heading compact">
-          <div>
-            <p class="section-kicker">SETTINGS FILE</p>
-            <h2 id="transfer-label">Take your setup with you.</h2>
-          </div>
-        </div>
-        <div class="transfer-actions">
-          <button id="export-settings" type="button">EXPORT JSON</button>
-          <button id="import-settings" type="button">IMPORT JSON</button>
-          <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json">
-        </div>
-      </section>
-
-      <footer>
-        <span id="status" role="status" aria-live="polite">READY</span>
-        <span>LEXEND 100—900</span>
-      </footer>
-    </main>
-    <script src="popup.js"></script>
-  </body>
+            <section class="transfer-section" aria-labelledby="transfer-label">
+                <div class="transfer-actions">
+                    <button id="export-settings" type="button">
+                        EXPORT JSON
+                    </button>
+                    <button id="import-settings" type="button">
+                        IMPORT JSON
+                    </button>
+                    <input
+                        id="import-file"
+                        class="visually-hidden"
+                        type="file"
+                        accept="application/json,.json"
+                    />
+                </div>
+            </section>
+        </main>
+        <script src="popup.js"></script>
+    </body>
 </html>
