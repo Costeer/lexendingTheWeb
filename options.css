@@ -190,6 +190,11 @@ section + section {
   gap: 14px;
 }
 
+.basic-controls,
+.slider-grid {
+  grid-auto-rows: 84px;
+}
+
 .setting-control {
   min-width: 0;
   margin: 0;
