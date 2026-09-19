@@ -48,14 +48,33 @@ test("text inside icon-labelled controls remains eligible for styling", async ()
   assert.doesNotMatch(source, /\[class\*='symbol' i\] \*/);
 });
 
-test("the interface has square corners and a fixed light palette", async () => {
-  const css = await readFile(join(root, "popup.css"), "utf8");
+test("both surfaces share the required tokens, font, and minimum type size", async () => {
+  const [shared, popupCss, optionsCss, popupHtml, optionsHtml] = await Promise.all([
+    readFile(join(root, "shared.css"), "utf8"),
+    readFile(join(root, "popup.css"), "utf8"),
+    readFile(join(root, "options.css"), "utf8"),
+    readFile(join(root, "popup.html"), "utf8"),
+    readFile(join(root, "options.html"), "utf8")
+  ]);
 
-  assert.doesNotMatch(css, /border-radius\s*:/);
-  assert.match(css, /color-scheme: only light/);
-  assert.match(css, /#c70000/gi);
-  assert.match(css, /scrollbar-width:\s*none/);
-  assert.match(css, /:root::\-webkit-scrollbar/);
+  for (const token of ["#C40000", "#111111", "#FFFFFF", "#F4F4F4", "#FAF8F4", "#444444"]) {
+    assert.match(shared, new RegExp(token, "i"));
+  }
+  assert.match(shared, /color-scheme:\s*only light/);
+  assert.match(shared, /system-ui, sans-serif/);
+  assert.match(popupHtml, /href="shared\.css"/);
+  assert.match(optionsHtml, /href="shared\.css"/);
+  assert.match(popupCss, /scrollbar-width:\s*none/);
+  assert.match(popupCss, /:root::\-webkit-scrollbar/);
+  assert.equal((popupCss.match(/border-radius\s*:/g) ?? []).length, 2);
+  assert.doesNotMatch(optionsCss, /border-radius\s*:/);
+
+  for (const css of [popupCss, optionsCss]) {
+    const sizes = [...css.matchAll(/font-size:\s*([\d.]+)px/g)]
+      .map((match) => Number(match[1]));
+    assert.ok(sizes.length > 0);
+    assert.ok(sizes.every((size) => size >= 12));
+  }
 });
 
 test("popup and options markup expose their required controls", async () => {
@@ -64,14 +83,43 @@ test("popup and options markup expose their required controls", async () => {
     readFile(join(root, "options.html"), "utf8")
   ]);
 
-  assert.match(popup, /id="status"/);
-  assert.match(popup, /id="site-scope"/);
-  assert.match(popup, /id="site-match"/);
+  assert.match(popup, /id="enabled"[^>]+type="checkbox"/);
+  assert.match(popup, /id="site-strip"/);
+  assert.match(popup, /id="toggle-site"/);
+  assert.match(popup, /name="scope"[^>]+type="radio"|type="radio"[^>]+name="scope"/);
+  assert.match(popup, /name="spacing"[^>]+value="0\.08"/);
+  assert.match(popup, /id="restricted-note"[^>]+hidden/);
+  assert.match(popup, /id="export-settings"/);
+  assert.match(popup, /id="import-settings"/);
+  assert.match(popup, /id="reset-settings"/);
   assert.match(popup, /id="open-options"/);
+  assert.doesNotMatch(popup, /<select/);
   assert.match(options, /id="rule-list"/);
   assert.match(options, /id="text-scale"/);
+  assert.match(options, /name="textScale"[^>]+value="140"/);
+  assert.match(options, /name="lineHeight"[^>]+value="1\.75"/);
   assert.match(options, /id="letter-spacing"/);
+  assert.match(options, /name="letterSpacing"[^>]+value="0\.1"/);
   assert.match(options, /id="export-settings"/);
+  assert.match(options, /id="retry-save"/);
+  assert.match(options, /id="hostname-error"[^>]+role="alert"/);
+  assert.match(options, /id="toast"[^>]+role="status"/);
+  assert.doesNotMatch(options, /<select/);
+});
+
+test("popup and options mutate the same site-rule model", async () => {
+  const [popup, options] = await Promise.all([
+    readFile(join(root, "popup.js"), "utf8"),
+    readFile(join(root, "options.js"), "utf8")
+  ]);
+
+  for (const source of [popup, options]) {
+    assert.match(source, /settingsApi\.setSiteRule/);
+    assert.match(source, /settingsApi\.removeSiteRule/);
+    assert.match(source, /storage\?\.onChanged/);
+  }
+  assert.match(popup, /includeSubdomains:\s*false/);
+  assert.match(options, /enabled:\s*event\.target\.checked/);
 });
 
 test("site rules support migration, subdomains, and exact-host overrides", async () => {
@@ -113,6 +161,85 @@ test("legacy spacing presets migrate to independent letter spacing", async () =>
   assert.equal(api.normalizeSettings({ spacing: "wide" }).letterSpacing, 0.04);
   assert.equal(api.normalizeSettings({ spacing: "wider" }).letterSpacing, 0.08);
   assert.equal(api.normalizeSettings({ letterSpacing: 0.06 }).letterSpacing, 0.06);
+});
+
+test("legacy data and schema-2 exports round-trip without loss", async () => {
+  await import("../src/settings.js");
+  const api = globalThis.LexendSettings;
+  const legacy = api.normalizeSettings({
+    enabled: false,
+    scope: "all",
+    disabledSites: ["Example.com"],
+    spacing: "wide",
+    textScale: 115,
+    lineHeight: 1.75
+  });
+
+  assert.deepEqual(legacy, {
+    enabled: false,
+    scope: "all",
+    siteRules: [{
+      hostname: "example.com",
+      includeSubdomains: false,
+      enabled: false,
+      scope: null
+    }],
+    textScale: 115,
+    lineHeight: 1.75,
+    letterSpacing: 0.04
+  });
+
+  const original = api.normalizeSettings({
+    ...legacy,
+    enabled: true,
+    siteRules: [
+      ...legacy.siteRules,
+      {
+        hostname: "docs.example.com",
+        includeSubdomains: true,
+        enabled: null,
+        scope: "all"
+      }
+    ],
+    letterSpacing: 0.06
+  });
+  const file = JSON.stringify({
+    schemaVersion: 2,
+    exportedAt: "2026-01-01T00:00:00.000Z",
+    settings: original
+  });
+  const imported = api.normalizeSettings(JSON.parse(file).settings);
+  assert.deepEqual(imported, original);
+});
+
+test("an exact popup override and an options toggle preserve rule data", async () => {
+  await import("../src/settings.js");
+  const api = globalThis.LexendSettings;
+  let settings = api.normalizeSettings({
+    siteRules: [{
+      hostname: "example.com",
+      includeSubdomains: true,
+      enabled: false,
+      scope: "body"
+    }]
+  });
+
+  settings = api.setSiteRule(settings, {
+    hostname: "docs.example.com",
+    includeSubdomains: false,
+    enabled: true
+  });
+  assert.equal(api.resolveSite(settings, "docs.example.com").siteEnabled, true);
+  assert.equal(api.resolveSite(settings, "shop.example.com").siteEnabled, false);
+
+  settings = api.setSiteRule(settings, {
+    hostname: "example.com",
+    includeSubdomains: true,
+    enabled: true
+  });
+  const updated = api.getDirectRule(settings, "example.com", true);
+  assert.equal(updated.enabled, true);
+  assert.equal(updated.scope, "body");
 });
 
 test("site rules remain within synchronized-storage item limits", async () => {
