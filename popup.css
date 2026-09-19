@@ -327,7 +327,12 @@ fieldset:disabled {
 }
 
 .attribution-mark {
+  display: inline-block;
   color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: -1px;
 }
 
 .popup-feedback {
