@@ -345,8 +345,7 @@
         throw new Error("Unsupported settings file");
       }
       if (await save(payload.settings)) showToast("Settings imported");
-    } catch (error) {
-      console.error("Lexend the Web could not import settings.", error);
+    } catch {
       importError.textContent = "Choose a valid Lexend settings file.";
     } finally {
       importFile.value = "";
@@ -386,8 +385,7 @@
         return;
       }
       shortcutInstructions.hidden = false;
-    } catch (error) {
-      console.error("Lexend the Web could not open shortcut settings.", error);
+    } catch {
       shortcutInstructions.hidden = false;
     }
   });
@@ -420,8 +418,7 @@
       const commands = await extension?.commands?.getAll?.();
       const command = commands?.find((item) => item.name === "toggle-current-site");
       renderShortcut(command?.shortcut ?? "");
-    } catch (error) {
-      console.error("Lexend the Web could not read the shortcut.", error);
+    } catch {
       renderShortcut("");
       shortcutInstructions.hidden = false;
     }

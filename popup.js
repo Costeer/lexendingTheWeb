@@ -211,8 +211,7 @@
         throw new Error("Unsupported settings file");
       }
       await save(payload.settings, "Settings imported");
-    } catch (error) {
-      console.error("Lexend the Web could not import settings.", error);
+    } catch {
       showFeedback("Choose a valid Lexend settings file.", true, 0);
     } finally {
       importFile.value = "";
