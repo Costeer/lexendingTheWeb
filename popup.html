@@ -13,82 +13,138 @@
                     <span class="wordmark-mark" aria-hidden="true">L</span>
                     <span>LEXEND<br />THE WEB</span>
                 </div>
-                <label class="switch" title="Turn Lexend on or off">
-                    <span class="visually-hidden">Enable Lexend</span>
-                    <input id="enabled" type="checkbox" />
-                    <span class="switch-track" aria-hidden="true">
-                        <span class="switch-thumb"></span>
-                    </span>
-                </label>
+                <div class="master-control">
+                    <span id="enabled-state">On</span>
+                    <label class="switch" title="Turn Lexend on or off">
+                        <span class="visually-hidden">Enable Lexend</span>
+                        <input id="enabled" type="checkbox" />
+                        <span class="switch-track" aria-hidden="true">
+                            <span class="switch-thumb"></span>
+                        </span>
+                    </label>
+                </div>
             </header>
 
-            <fieldset id="scope-fieldset">
+            <section id="site-container" class="current-site" aria-label="Current site">
+                <div class="site-section">
+                    <p class="site-status">
+                        <svg aria-hidden="true" viewBox="0 0 16 16">
+                            <circle cx="8" cy="8" r="5.5"></circle>
+                            <path d="M2.5 8h11M8 2.5c1.5 1.5 2.25 3.33 2.25 5.5S9.5 12 8 13.5C6.5 12 5.75 10.17 5.75 8S6.5 4 8 2.5Z"></path>
+                        </svg>
+                        <span id="site-state">Active on</span>
+                        <strong id="site-label">checking…</strong>
+                    </p>
+                    <div class="site-actions">
+                        <button id="site-action" class="text-action" type="button" disabled>
+                            Pause here
+                        </button>
+                        <details class="site-options">
+                            <summary>Options</summary>
+                            <div class="site-rule-controls">
+                                <label>
+                                    <span>Apply rule to</span>
+                                    <select id="site-match">
+                                        <option value="exact">This hostname</option>
+                                        <option value="subdomains">Hostname + subdomains</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    <span>Typography</span>
+                                    <select id="site-scope">
+                                        <option value="inherit">Inherit setting</option>
+                                        <option value="body">Body text</option>
+                                        <option value="all">Body and headings</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </section>
+
+            <fieldset id="scope-fieldset" class="settings-section scope-section">
                 <legend>Apply Lexend to</legend>
                 <label class="choice">
                     <input type="radio" name="scope" value="body" />
                     <span class="choice-control" aria-hidden="true"></span>
                     <span class="choice-copy">
-                        <strong>Only body text</strong>
-                        <small>Paragraphs, links, labels and controls</small>
+                        <strong>Body text</strong>
+                        <small>Paragraphs, links, labels, controls</small>
                     </span>
                 </label>
                 <label class="choice">
                     <input type="radio" name="scope" value="all" />
                     <span class="choice-control" aria-hidden="true"></span>
                     <span class="choice-copy">
-                        <strong>Body & Headers</strong>
-                        <small>Everything above, plus H1–H6</small>
+                        <strong>Body and headings</strong>
+                        <small>Everything above, plus H1 to H6</small>
                     </span>
                 </label>
             </fieldset>
 
-            <section class="site-section" aria-labelledby="site-label">
-                <div class="section-heading">
-                    <div>
-                        <h2 id="site-label">Checking page…</h2>
-                    </div>
-                    <label
-                        class="switch switch-small"
-                        title="Allow Lexend on this site"
-                    >
-                        <span class="visually-hidden"
-                            >Allow Lexend on this site</span
-                        >
-                        <input id="site-enabled" type="checkbox" disabled />
-                        <span class="switch-track" aria-hidden="true">
-                            <span class="switch-thumb"></span>
-                        </span>
+            <fieldset id="spacing-fieldset" class="settings-section spacing-section">
+                <legend>Spacing</legend>
+                <div class="segment-control">
+                    <label>
+                        <input type="radio" name="spacing" value="default" />
+                        <span>Default</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="spacing" value="wide" />
+                        <span>Wide</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="spacing" value="wider" />
+                        <span>Wider</span>
                     </label>
                 </div>
-                <p id="site-message">
-                    Checking whether this page can be changed.
+                <p id="spacing-preview" class="spacing-preview">
+                    The quick brown fox jumps over<br />the lazy dog.
                 </p>
-            </section>
+                <button id="open-options" class="more-settings text-action" type="button">
+                    More readability settings
+                </button>
+            </fieldset>
 
-            <section class="transfer-section" aria-label="Settings file">
-                <div class="transfer-actions">
-                    <button id="export-settings" type="button">
-                        EXPORT JSON
-                    </button>
-                    <button id="import-settings" type="button">
-                        IMPORT JSON
-                    </button>
-                    <input
-                        id="import-file"
-                        class="visually-hidden"
-                        type="file"
-                        accept="application/json,.json"
-                    />
-                </div>
-            </section>
-            <span
-                id="status"
-                class="visually-hidden"
-                role="status"
-                aria-live="polite"
-                >READY</span
-            >
+            <aside class="browser-note">
+                <svg aria-hidden="true" viewBox="0 0 16 16">
+                    <rect x="4" y="7" width="8" height="6"></rect>
+                    <path d="M6 7V5a2 2 0 0 1 4 0v2"></path>
+                    <circle cx="8" cy="10" r=".5" fill="currentColor" stroke="none"></circle>
+                </svg>
+                <p>Browser pages like settings and new tab can’t be changed by extensions.</p>
+            </aside>
+
+            <footer class="transfer-section" aria-label="Settings file">
+                <button id="export-settings" class="footer-action" type="button">
+                    <svg aria-hidden="true" viewBox="0 0 16 16">
+                        <path d="M8 2v7m0 0 3-3M8 9 5 6M3 11v2h10v-2"></path>
+                    </svg>
+                    Export settings
+                </button>
+                <button id="import-settings" class="footer-action" type="button">
+                    <svg aria-hidden="true" viewBox="0 0 16 16">
+                        <path d="M8 10V3m0 0L5 6m3-3 3 3M3 11v2h10v-2"></path>
+                    </svg>
+                    Import settings
+                </button>
+                <button id="reset-settings" class="footer-action reset-action" type="button">
+                    <svg aria-hidden="true" viewBox="0 0 16 16">
+                        <path d="M4.25 4.25A5 5 0 1 1 3 9M3 4v3h3"></path>
+                    </svg>
+                    Reset
+                </button>
+                <input
+                    id="import-file"
+                    class="visually-hidden"
+                    type="file"
+                    accept="application/json,.json"
+                />
+            </footer>
+            <span id="status" class="visually-hidden" role="status" aria-live="polite">Ready</span>
         </main>
+        <script src="src/settings.js"></script>
         <script src="popup.js"></script>
     </body>
 </html>

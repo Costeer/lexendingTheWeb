@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lexend the Web",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Make websites easier to read with Lexend.",
   "homepage_url": "https://github.com/Costeer/lexendingTheWeb",
   "permissions": [
@@ -28,8 +28,17 @@
     "128": "assets/icons/icon-128.png"
   },
   "options_ui": {
-    "page": "popup.html",
+    "page": "options.html",
     "open_in_tab": true
+  },
+  "commands": {
+    "toggle-current-site": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Toggle Lexend on the current website"
+    }
   },
   "content_scripts": [
     {
@@ -38,6 +47,7 @@
         "https://*/*"
       ],
       "js": [
+        "src/settings.js",
         "src/content.js"
       ],
       "run_at": "document_start",

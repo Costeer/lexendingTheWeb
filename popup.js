@@ -2,9 +2,9 @@
   "use strict";
 
   const extension = globalThis.browser ?? globalThis.chrome;
+  const settingsApi = globalThis.LexendSettings;
   const storage = extension?.storage?.sync;
   const tabs = extension?.tabs;
-  const defaults = { enabled: true, scope: "body", disabledSites: [] };
   const protectedHosts = new Set([
     "chrome.google.com",
     "chromewebstore.google.com",
@@ -21,42 +21,39 @@
   ]);
 
   const enabledInput = document.querySelector("#enabled");
-  const fieldset = document.querySelector("#scope-fieldset");
+  const enabledState = document.querySelector("#enabled-state");
+  const scopeFieldset = document.querySelector("#scope-fieldset");
+  const spacingFieldset = document.querySelector("#spacing-fieldset");
   const status = document.querySelector("#status");
   const scopeInputs = [...document.querySelectorAll('input[name="scope"]')];
-  const siteEnabledInput = document.querySelector("#site-enabled");
+  const spacingInputs = [...document.querySelectorAll('input[name="spacing"]')];
+  const spacingPreview = document.querySelector("#spacing-preview");
+  const siteContainer = document.querySelector("#site-container");
+  const siteState = document.querySelector("#site-state");
   const siteLabel = document.querySelector("#site-label");
-  const siteMessage = document.querySelector("#site-message");
+  const siteAction = document.querySelector("#site-action");
+  const siteMatchInput = document.querySelector("#site-match");
+  const siteScopeInput = document.querySelector("#site-scope");
+  const optionsButton = document.querySelector("#open-options");
   const exportButton = document.querySelector("#export-settings");
   const importButton = document.querySelector("#import-settings");
   const importFile = document.querySelector("#import-file");
+  const resetButton = document.querySelector("#reset-settings");
 
-  let settings = defaults;
+  let settings = settingsApi.normalizeSettings();
   let site = null;
+  let includeSubdomains = false;
   let statusTimer;
 
-  const normalizeSettings = (value) => ({
-    enabled: typeof value?.enabled === "boolean" ? value.enabled : defaults.enabled,
-    scope: value?.scope === "all" ? "all" : defaults.scope,
-    disabledSites: [...new Set(
-      (Array.isArray(value?.disabledSites) ? value.disabledSites : [])
-        .filter((hostname) => typeof hostname === "string")
-        .map((hostname) => hostname.trim().toLowerCase())
-        .filter((hostname) => (
-          hostname.length > 0
-          && hostname.length <= 253
-          && !hostname.includes("/")
-          && (/^[a-z0-9.-]+$/.test(hostname) || /^\[[0-9a-f:]+\]$/.test(hostname))
-        ))
-        .slice(0, 250)
-    )].sort()
-  });
+  const getEffectiveSite = () => site?.supported
+    ? settingsApi.resolveSite(settings, site.hostname)
+    : null;
 
   const getBaseStatus = () => {
-    if (!settings.enabled) return "PAUSED";
-    if (site && !site.supported) return "UNAVAILABLE";
-    if (site && settings.disabledSites.includes(site.hostname)) return "SITE PAUSED";
-    return "ACTIVE";
+    if (!settings.enabled) return "Paused";
+    if (site && !site.supported) return "Unavailable";
+    if (getEffectiveSite() && !getEffectiveSite().siteEnabled) return "Site paused";
+    return "Active";
   };
 
   const showStatus = (message) => {
@@ -69,51 +66,76 @@
 
   const renderSettings = () => {
     enabledInput.checked = settings.enabled;
-    fieldset.disabled = !settings.enabled;
+    enabledState.textContent = settings.enabled ? "On" : "Off";
+    scopeFieldset.disabled = !settings.enabled;
+    spacingFieldset.disabled = !settings.enabled;
+
     scopeInputs.forEach((input) => {
       input.checked = input.value === settings.scope;
       input.closest(".choice").classList.toggle("is-selected", input.checked);
     });
+
+    spacingInputs.forEach((input) => {
+      input.checked = input.value === settings.spacing;
+    });
+    spacingPreview.dataset.spacing = settings.spacing;
     status.textContent = getBaseStatus();
   };
 
   const renderSite = () => {
     if (!site) return;
 
-    siteLabel.textContent = site.label;
-    siteEnabledInput.disabled = !site.supported;
-    siteEnabledInput.checked = site.supported
-      && !settings.disabledSites.includes(site.hostname);
-
+    siteContainer.hidden = !site.supported;
     if (!site.supported) {
-      siteMessage.textContent = "Browser-protected pages cannot be changed by extensions.";
-    } else if (!site.reachable) {
-      siteMessage.textContent = "Refresh the page or allow extension access in the browser.";
-    } else if (siteEnabledInput.checked) {
-      siteMessage.textContent = "Lexend is allowed on this website.";
-    } else {
-      siteMessage.textContent = "This website keeps its original typography.";
+      status.textContent = getBaseStatus();
+      return;
     }
+
+    const effective = getEffectiveSite();
+    const directRule = settingsApi.getDirectRule(
+      settings,
+      site.hostname,
+      includeSubdomains
+    );
+    const paused = !effective.siteEnabled;
+
+    siteLabel.textContent = site.label;
+    siteAction.disabled = false;
+    siteAction.textContent = paused ? "Resume here" : "Pause here";
+    siteAction.setAttribute(
+      "aria-label",
+      `${paused ? "Resume" : "Pause"} Lexend on ${site.label}`
+    );
+    siteMatchInput.disabled = false;
+    siteMatchInput.value = includeSubdomains ? "subdomains" : "exact";
+    siteScopeInput.disabled = false;
+    siteScopeInput.value = directRule?.scope ?? "inherit";
+
+    if (paused) siteState.textContent = "Paused on";
+    else if (!settings.enabled) siteState.textContent = "Off on";
+    else if (!site.reachable) siteState.textContent = "Ready on";
+    else siteState.textContent = "Active on";
 
     status.textContent = getBaseStatus();
   };
 
-  const save = async (nextSettings) => {
-    settings = normalizeSettings({ ...settings, ...nextSettings });
+  const save = async (nextSettings, confirmation = "Saved") => {
+    settings = settingsApi.normalizeSettings(nextSettings);
     renderSettings();
     renderSite();
 
     if (!storage) {
-      showStatus("PREVIEW");
+      showStatus("Preview");
       return;
     }
 
     try {
-      await storage.set(nextSettings);
-      showStatus("SAVED");
+      await storage.set(settings);
+      await storage.remove?.("disabledSites");
+      showStatus(confirmation);
     } catch (error) {
       console.error("Lexend the Web could not save settings.", error);
-      status.textContent = "SAVE FAILED";
+      status.textContent = "Save failed";
     }
   };
 
@@ -151,7 +173,7 @@
 
     return {
       hostname: url.hostname.toLowerCase(),
-      label: supported ? url.hostname : "Browser page",
+      label: url.hostname,
       supported,
       reachable
     };
@@ -159,7 +181,7 @@
 
   const exportSettings = () => {
     const payload = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: new Date().toISOString(),
       settings
     };
@@ -172,7 +194,7 @@
     link.download = "lexend-the-web-settings.json";
     link.click();
     URL.revokeObjectURL(url);
-    showStatus("EXPORTED");
+    showStatus("Exported");
   };
 
   const importSettings = async (file) => {
@@ -180,64 +202,112 @@
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
 
       const payload = JSON.parse(await file.text());
-      if (payload?.schemaVersion !== 1 || typeof payload?.settings !== "object") {
+      if (![1, 2].includes(payload?.schemaVersion)
+        || typeof payload?.settings !== "object") {
         throw new Error("Unsupported settings file");
       }
 
-      const imported = normalizeSettings(payload.settings);
-      settings = imported;
-
-      if (storage) await storage.set(imported);
-
-      renderSettings();
-      renderSite();
-      showStatus("IMPORTED");
+      await save(payload.settings, "Imported");
     } catch (error) {
       console.error("Lexend the Web could not import settings.", error);
-      status.textContent = "INVALID FILE";
+      status.textContent = "Invalid file";
     } finally {
       importFile.value = "";
     }
   };
 
   enabledInput.addEventListener("change", () => {
-    save({ enabled: enabledInput.checked });
+    save({ ...settings, enabled: enabledInput.checked });
   });
 
   scopeInputs.forEach((input) => {
     input.addEventListener("change", () => {
-      if (input.checked) save({ scope: input.value });
+      if (input.checked) save({ ...settings, scope: input.value });
     });
   });
 
-  siteEnabledInput.addEventListener("change", () => {
-    if (!site?.supported) return;
-
-    const disabledSites = new Set(settings.disabledSites);
-    if (siteEnabledInput.checked) disabledSites.delete(site.hostname);
-    else disabledSites.add(site.hostname);
-    save({ disabledSites: [...disabledSites].sort() });
+  spacingInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      if (input.checked) save({ ...settings, spacing: input.value });
+    });
   });
 
+  siteAction.addEventListener("click", () => {
+    if (!site?.supported) return;
+
+    const effective = getEffectiveSite();
+    const desiredEnabled = !effective.siteEnabled;
+    const withoutDirectRule = settingsApi.removeSiteRule(
+      settings,
+      site.hostname,
+      includeSubdomains
+    );
+    const inherited = settingsApi.resolveSite(withoutDirectRule, site.hostname);
+    save(settingsApi.setSiteRule(settings, {
+      hostname: site.hostname,
+      includeSubdomains,
+      enabled: desiredEnabled === inherited.siteEnabled ? null : desiredEnabled
+    }));
+  });
+
+  siteScopeInput.addEventListener("change", () => {
+    if (!site?.supported) return;
+    save(settingsApi.setSiteRule(settings, {
+      hostname: site.hostname,
+      includeSubdomains,
+      scope: siteScopeInput.value === "inherit" ? null : siteScopeInput.value
+    }));
+  });
+
+  siteMatchInput.addEventListener("change", () => {
+    if (!site?.supported) return;
+    includeSubdomains = siteMatchInput.value === "subdomains";
+    renderSite();
+  });
+
+  optionsButton.addEventListener("click", async () => {
+    await extension?.runtime?.openOptionsPage?.();
+    globalThis.close?.();
+  });
   exportButton.addEventListener("click", exportSettings);
   importButton.addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", () => {
     if (importFile.files?.[0]) importSettings(importFile.files[0]);
   });
+  resetButton.addEventListener("click", () => {
+    save(settingsApi.defaults, "Reset to defaults");
+  });
+
+  extension?.storage?.onChanged?.addListener((changes, areaName) => {
+    if (areaName !== "sync") return;
+    const nextSettings = { ...settings };
+    Object.entries(changes).forEach(([key, change]) => {
+      if (change.newValue === undefined) delete nextSettings[key];
+      else nextSettings[key] = change.newValue;
+    });
+    settings = settingsApi.normalizeSettings(nextSettings);
+    renderSettings();
+    renderSite();
+  });
 
   const start = async () => {
     try {
       const [storedSettings, siteContext] = await Promise.all([
-        storage ? storage.get(defaults) : defaults,
+        storage ? storage.get(null) : settingsApi.defaults,
         getSiteContext()
       ]);
-      settings = normalizeSettings(storedSettings);
+      settings = settingsApi.normalizeSettings(storedSettings);
       site = siteContext;
+      includeSubdomains = Boolean(
+        site.supported
+        && !settingsApi.getDirectRule(settings, site.hostname, false)
+        && settingsApi.getDirectRule(settings, site.hostname, true)
+      );
       renderSettings();
       renderSite();
     } catch (error) {
       console.error("Lexend the Web could not load settings.", error);
-      settings = defaults;
+      settings = settingsApi.normalizeSettings();
       site = {
         hostname: "",
         label: "Browser page",
@@ -246,7 +316,7 @@
       };
       renderSettings();
       renderSite();
-      status.textContent = "LOAD FAILED";
+      status.textContent = "Load failed";
     }
   };
 
