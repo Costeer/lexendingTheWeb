@@ -198,13 +198,8 @@ button {
 }
 
 .choice-card:has(input:checked) {
-  margin-bottom: 4px;
   background: var(--accent-tint);
   box-shadow: var(--active-shadow);
-}
-
-.choice-card:has(input:checked) + .choice-card {
-  margin-top: 5px;
 }
 
 .radio-mark {
