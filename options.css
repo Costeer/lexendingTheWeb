@@ -356,6 +356,10 @@ section + section {
   margin: 8px 0 0;
   overflow-wrap: anywhere;
   font-family: var(--font-ui);
+  transition:
+    font-size 120ms ease-out,
+    line-height 120ms ease-out,
+    letter-spacing 120ms ease-out;
 }
 
 .inline-link {
@@ -819,6 +823,10 @@ input::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .switch-thumb,
   .mode-switch-thumb {
+    transition: none;
+  }
+
+  #preview-copy {
     transition: none;
   }
 }
