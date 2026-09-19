@@ -108,7 +108,7 @@
 
     try {
       await storage.set(settings);
-      await storage.remove?.("disabledSites");
+      await storage.remove?.(["disabledSites", "spacing"]);
       showStatus("SAVED");
     } catch (error) {
       console.error("Lexend the Web could not save settings.", error);
@@ -219,9 +219,21 @@
     save(nextSettings);
   });
 
-  optionsButton.addEventListener("click", () => {
-    extension.runtime.openOptionsPage();
-    window.close();
+  optionsButton.addEventListener("click", async () => {
+    await extension?.runtime?.openOptionsPage?.();
+    globalThis.close?.();
+  });
+
+  extension?.storage?.onChanged?.addListener((changes, areaName) => {
+    if (areaName !== "sync") return;
+    const nextSettings = { ...settings };
+    Object.entries(changes).forEach(([key, change]) => {
+      if (change.newValue === undefined) delete nextSettings[key];
+      else nextSettings[key] = change.newValue;
+    });
+    settings = settingsApi.normalizeSettings(nextSettings);
+    renderSettings();
+    renderSite();
   });
 
   const start = async () => {

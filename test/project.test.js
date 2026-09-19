@@ -32,6 +32,9 @@ test("content script supports both scope choices and live updates", async () => 
 
   assert.match(source, /scope === "body"/);
   assert.match(source, /scope === "all"/);
+  assert.match(source, /settings\.textScale/);
+  assert.match(source, /settings\.lineHeight/);
+  assert.match(source, /settings\.letterSpacing/);
   assert.match(source, /storage\.onChanged\.addListener/);
   assert.match(source, /MutationObserver/);
 });
@@ -64,8 +67,10 @@ test("popup and options markup expose their required controls", async () => {
   assert.match(popup, /id="status"/);
   assert.match(popup, /id="site-scope"/);
   assert.match(popup, /id="site-match"/);
+  assert.match(popup, /id="open-options"/);
   assert.match(options, /id="rule-list"/);
   assert.match(options, /id="text-scale"/);
+  assert.match(options, /id="letter-spacing"/);
   assert.match(options, /id="export-settings"/);
 });
 
@@ -98,6 +103,16 @@ test("site rules support migration, subdomains, and exact-host overrides", async
   assert.equal(api.resolveSite(settings, "unrelated.test").siteEnabled, true);
   assert.equal(api.validHostname("valid-subdomain.example.com"), true);
   assert.equal(api.validHostname("-invalid.example.com"), false);
+});
+
+test("legacy spacing presets migrate to independent letter spacing", async () => {
+  await import("../src/settings.js");
+  const api = globalThis.LexendSettings;
+
+  assert.equal(api.normalizeSettings({ spacing: "default" }).letterSpacing, 0);
+  assert.equal(api.normalizeSettings({ spacing: "wide" }).letterSpacing, 0.04);
+  assert.equal(api.normalizeSettings({ spacing: "wider" }).letterSpacing, 0.08);
+  assert.equal(api.normalizeSettings({ letterSpacing: 0.06 }).letterSpacing, 0.06);
 });
 
 test("site rules remain within synchronized-storage item limits", async () => {

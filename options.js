@@ -119,7 +119,7 @@
     }
     try {
       await storage.set(settings);
-      await storage.remove?.("disabledSites");
+      await storage.remove?.(["disabledSites", "spacing"]);
       showStatus(message);
     } catch (error) {
       console.error("Lexend the Web could not save settings.", error);

@@ -10,6 +10,11 @@
     letterSpacing: 0
   });
   const MAX_SITE_RULE_BYTES = 7000;
+  const legacySpacingValues = Object.freeze({
+    default: 0,
+    wide: 0.04,
+    wider: 0.08
+  });
 
   const validHostname = (hostname) => {
     if (typeof hostname !== "string" || !hostname.length || hostname.length > 253) {
@@ -30,14 +35,27 @@
     return Number(clamped.toFixed(precision));
   };
 
+  const normalizeLetterSpacing = (value) => {
+    if (value.letterSpacing !== undefined) {
+      return clampNumber(
+        value.letterSpacing,
+        defaults.letterSpacing,
+        0,
+        0.2,
+        3
+      );
+    }
+    return legacySpacingValues[value.spacing] ?? defaults.letterSpacing;
+  };
+
   const normalizeRule = (rule) => {
     const hostname = typeof rule?.hostname === "string"
       ? rule.hostname.trim().toLowerCase().replace(/\.$/, "")
       : "";
     if (!validHostname(hostname)) return null;
 
-    const enabled = typeof rule.enabled === "boolean" ? rule.enabled : null;
-    const scope = ["body", "all"].includes(rule.scope) ? rule.scope : null;
+    const enabled = typeof rule?.enabled === "boolean" ? rule.enabled : null;
+    const scope = ["body", "all"].includes(rule?.scope) ? rule.scope : null;
     if (enabled === null && scope === null) return null;
 
     return {
@@ -80,9 +98,7 @@
       lineHeight: Number(value.lineHeight) === 0
         ? 0
         : clampNumber(value.lineHeight, defaults.lineHeight, 1, 2.4, 2),
-      letterSpacing: Number(value.letterSpacing) === 0
-        ? 0
-        : clampNumber(value.letterSpacing, defaults.letterSpacing, 0, 0.2, 3)
+      letterSpacing: normalizeLetterSpacing(value)
     };
   };
 

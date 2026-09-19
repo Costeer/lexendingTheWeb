@@ -93,6 +93,7 @@
     }
 
     await extension.storage.sync.set(settings);
+    await extension.storage.sync.remove?.(["disabledSites", "spacing"]);
   };
 
   extension.runtime.onMessage.addListener((message, sender) => {
