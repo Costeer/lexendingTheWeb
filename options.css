@@ -53,15 +53,6 @@ section {
   font-weight: 700;
 }
 
-.brand p,
-.eyebrow {
-  margin: 0 0 3px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .12em;
-}
-
 h1,
 h2,
 h3,
