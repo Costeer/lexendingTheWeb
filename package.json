@@ -1,6 +1,6 @@
 {
   "name": "lexending-the-web",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "A Chrome and Firefox extension that makes the web easier to read with Lexend.",
   "type": "module",
