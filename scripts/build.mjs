@@ -6,6 +6,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
 const targets = ["chrome", "firefox"];
 const sharedFiles = [
+  "shared.css",
   "popup.html",
   "popup.css",
   "popup.js",

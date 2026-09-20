@@ -1,4 +1,4 @@
-# Lexend the Web
+# Lexend for the Web
 
 A small Chrome and Firefox extension that replaces website typography with
 [Lexend](https://www.lexend.com/). Choose between body text only or body text
@@ -75,7 +75,7 @@ alone.
 
 ## Privacy
 
-Lexend the Web does not collect, transmit, or sell data. The only stored data
+Lexend for the Web does not collect, transmit, or sell data. The only stored data
 is the user's enabled state, typography preferences, and user-created site
 rules, saved through the browser's synchronized extension storage.
 

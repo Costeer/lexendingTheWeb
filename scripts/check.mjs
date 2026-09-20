@@ -46,14 +46,36 @@ for (const target of targets) {
   }
 }
 
-for (const stylesheet of ["popup.css", "options.css"]) {
-  const css = await readFile(join(root, stylesheet), "utf8");
-  if (!css.includes("color-scheme: only light")) {
-    throw new Error(`${stylesheet} must explicitly stay in light mode.`);
+const sharedCss = await readFile(join(root, "shared.css"), "utf8");
+for (const token of ["#C40000", "#111111", "#FFFFFF", "#F4F4F4", "#FAF8F4", "#444444"]) {
+  if (!sharedCss.includes(token)) {
+    throw new Error(`shared.css is missing the ${token} design token.`);
   }
-  if (/border-radius\s*:/.test(css)) {
-    throw new Error(`${stylesheet} must use square corners.`);
+}
+if (!sharedCss.includes("color-scheme: only light")) {
+  throw new Error("The interface must explicitly stay in light mode.");
+}
+
+for (const page of ["popup", "options"]) {
+  const html = await readFile(join(root, `${page}.html`), "utf8");
+  const css = await readFile(join(root, `${page}.css`), "utf8");
+  if (!html.includes('href="shared.css"')) {
+    throw new Error(`${page}.html must load the shared design tokens.`);
   }
+  const undersizedText = [...css.matchAll(/font-size:\s*([\d.]+)px/g)]
+    .map((match) => Number(match[1]))
+    .filter((size) => size < 12);
+  if (undersizedText.length) {
+    throw new Error(`${page}.css contains text smaller than 12px.`);
+  }
+}
+
+const popupCss = await readFile(join(root, "popup.css"), "utf8");
+const optionsCss = await readFile(join(root, "options.css"), "utf8");
+if ((popupCss.match(/border-radius\s*:/g) ?? []).length !== 2
+    || !popupCss.includes(".radio-mark")
+    || /border-radius\s*:/.test(optionsCss)) {
+  throw new Error("Only the popup's radio indicators may be round.");
 }
 
 console.log("Static checks passed.");

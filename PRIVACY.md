@@ -1,8 +1,8 @@
-# Privacy Policy for Lexend the Web
+# Privacy Policy for Lexend for the Web
 
 Last updated: September 19, 2026
 
-Lexend the Web does not collect, transmit, sell, or share personal data.
+Lexend for the Web does not collect, transmit, sell, or share personal data.
 
 ## Data stored by the extension
 
@@ -16,12 +16,12 @@ The extension stores only the settings needed to provide its functionality:
 
 These settings are saved with the browser's synchronized extension storage.
 Depending on the user's browser configuration, the browser vendor may sync the
-settings between signed-in browser profiles. Lexend the Web does not operate a
+settings between signed-in browser profiles. Lexend for the Web does not operate a
 server and cannot access the user's browser-sync account.
 
 ## Website access
 
-Lexend the Web runs on HTTP and HTTPS pages to replace visible typography with
+Lexend for the Web runs on HTTP and HTTPS pages to replace visible typography with
 the locally bundled Lexend font. Page contents are processed only inside the
 browser and are never recorded or transmitted. Browser-protected pages cannot
 be accessed or modified by the extension.
