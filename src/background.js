@@ -22,7 +22,7 @@
       extension.action.setIcon({ tabId, path: iconPaths(active) }),
       extension.action.setTitle({
         tabId,
-        title: `Lexend the Web — ${active ? "active" : "paused"}`
+        title: `Lexend for the Web — ${active ? "active" : "paused"}`
       })
     ]).catch(() => {});
   };
@@ -35,7 +35,7 @@
     await Promise.all([
       extension.action.setIcon({ path: iconPaths(settings.enabled) }),
       extension.action.setTitle({
-        title: `Lexend the Web — ${settings.enabled ? "active" : "paused"}`
+        title: `Lexend for the Web — ${settings.enabled ? "active" : "paused"}`
       })
     ]);
 

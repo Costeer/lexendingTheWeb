@@ -3,9 +3,11 @@
 
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
+  const quotesApi = globalThis.LexendQuotes;
   const storage = extension?.storage?.sync;
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
+  const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
   const advancedModeInput = document.querySelector("#advanced-mode");
   const readabilityControlStage = document.querySelector("#readability-control-stage");
   const basicReadability = document.querySelector("#basic-readability");
@@ -20,6 +22,7 @@
   const lineHeightOutput = document.querySelector("#line-height-output");
   const letterSpacingOutput = document.querySelector("#letter-spacing-output");
   const previewCopy = document.querySelector("#preview-copy");
+  const previewAuthor = document.querySelector("#preview-author");
   const resetReadabilityButton = document.querySelector("#reset-readability");
   const saveStatus = document.querySelector("#save-status");
   const saveStatusText = document.querySelector("#save-status-text");
@@ -52,6 +55,7 @@
   let saveRevision = 0;
   let toastTimer;
   let readabilityAnimationToken = 0;
+  const quote = quotesApi.random();
 
   const setSaveState = (state, message) => {
     saveStatus.className = `save-status is-${state}`;
@@ -110,9 +114,16 @@
     .toFixed(precision)
     .replace(/\.?0+$/, "");
 
+  const renderQuote = () => {
+    previewCopy.textContent = `“${quote.text}”`;
+    previewCopy.lang = quote.lang;
+    previewAuthor.textContent = quote.author;
+    previewAuthor.href = quote.url;
+  };
+
   const renderPreview = (readability = settings) => {
     previewCopy.style.fontSize = `${14 * readability.textScale / 100}px`;
-    previewCopy.style.lineHeight = readability.lineHeight || 1.5;
+    previewCopy.style.lineHeight = readability.lineHeight || PREVIEW_DEFAULT_LINE_HEIGHT;
     previewCopy.style.letterSpacing = `${readability.letterSpacing}em`;
   };
 
@@ -146,12 +157,12 @@
       fill: "both"
     };
     const outgoingAnimation = outgoing.animate([
-      { opacity: 1, transform: "translateX(0) scale(1)" },
-      { opacity: 0, transform: `translateX(${-35 * direction}%) scale(.97)` }
+      { opacity: 1, transform: "translateX(0)" },
+      { opacity: 0, transform: `translateX(${-35 * direction}%)` }
     ], timing);
     const incomingAnimation = incoming.animate([
-      { opacity: 0, transform: `translateX(${35 * direction}%) scale(.97)` },
-      { opacity: 1, transform: "translateX(0) scale(1)" }
+      { opacity: 0, transform: `translateX(${35 * direction}%)` },
+      { opacity: 1, transform: "translateX(0)" }
     ], timing);
 
     Promise.allSettled([
@@ -295,7 +306,7 @@
         }
         return true;
       } catch (error) {
-        console.error("Lexend the Web could not save settings.", error);
+        console.error("Lexend for the Web could not save settings.", error);
         if (revision === saveRevision) {
           failedSettings = snapshot;
           setSaveState("error", "Changes could not be saved");
@@ -579,7 +590,7 @@
       render();
       setSaveState("saved", "All changes saved");
     } catch (error) {
-      console.error("Lexend the Web could not load settings.", error);
+      console.error("Lexend for the Web could not load settings.", error);
       renderReadabilityMode();
       render();
       setSaveState("error", "Settings could not be loaded");
@@ -595,5 +606,6 @@
     }
   };
 
+  renderQuote();
   start();
 })();

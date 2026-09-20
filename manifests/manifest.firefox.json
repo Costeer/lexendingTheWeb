@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Lexend the Web",
+  "name": "Lexend for the Web",
   "version": "0.3.0",
   "description": "Make websites easier to read with Lexend.",
   "homepage_url": "https://github.com/Costeer/lexendingTheWeb",
@@ -15,7 +15,7 @@
     ]
   },
   "action": {
-    "default_title": "Lexend the Web",
+    "default_title": "Lexend for the Web",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "assets/icons/icon-16.png",

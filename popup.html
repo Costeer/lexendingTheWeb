@@ -3,24 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lexend the Web</title>
+    <title>Lexend for the Web</title>
     <link rel="stylesheet" href="shared.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="panel">
       <header class="masthead">
-        <div class="wordmark" aria-label="Lexend the Web">
+        <div class="wordmark" aria-label="Lexend for the Web">
           <span class="wordmark-mark" aria-hidden="true">L</span>
-          <span>LEXEND THE WEB</span>
+          <span>Lexend for the Web</span>
         </div>
-        <label class="master-control">
-          <span id="master-state">On</span>
-          <input id="enabled" type="checkbox" aria-label="Turn Lexend off" />
-          <span class="switch-track" aria-hidden="true">
-            <span class="switch-thumb"></span>
-          </span>
-        </label>
+        <div class="masthead-actions">
+          <button id="settings-button" class="settings-button" type="button" aria-label="Open settings" title="Settings">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a8 8 0 0 0-1.7-1L15 3.3h-4L10.7 6a8 8 0 0 0-1.7 1L6.5 6l-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4L9 17a8 8 0 0 0 1.7 1l.3 2.7h4l.3-2.7a8 8 0 0 0 1.7-1l2.5 1 2-3.4-2.1-1.6ZM13 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+            </svg>
+          </button>
+          <label class="master-control">
+            <span id="master-state">On</span>
+            <input id="enabled" type="checkbox" aria-label="Turn Lexend off" />
+            <span class="switch-track" aria-hidden="true">
+              <span class="switch-thumb"></span>
+            </span>
+          </label>
+        </div>
       </header>
 
       <section id="site-strip" class="site-strip" aria-label="Current site" hidden>
@@ -53,20 +60,23 @@
         <div class="segments" aria-label="Letter spacing">
           <label>
             <input type="radio" name="spacing" value="0" />
-            <span>Default</span>
+            <span>Compact</span>
           </label>
           <label>
             <input type="radio" name="spacing" value="0.04" />
-            <span>Wide</span>
+            <span>Comfortable</span>
           </label>
           <label>
             <input type="radio" name="spacing" value="0.08" />
-            <span>Wider</span>
+            <span>Spacious</span>
           </label>
         </div>
-        <p id="spacing-preview" class="spacing-preview">
-          The quick brown fox jumps over the lazy dog.
-        </p>
+        <figure id="quote-preview" class="spacing-preview">
+          <blockquote id="spacing-preview-text" lang="de" tabindex="0">“Zu sagen, was ist, bleibt die revolutionärste Tat.”</blockquote>
+          <figcaption class="quote-footer">
+            <span>— <a id="quote-author" href="https://en.wikipedia.org/wiki/Rosa_Luxemburg" target="_blank" rel="noopener noreferrer">Rosa Luxemburg</a></span>
+          </figcaption>
+        </figure>
       </fieldset>
 
       <aside id="restricted-note" class="restricted-note" hidden>
@@ -85,6 +95,7 @@
       </div>
     </main>
     <script src="src/settings.js"></script>
+    <script src="src/quotes.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

@@ -39,6 +39,14 @@ test("content script supports both scope choices and live updates", async () => 
   assert.match(source, /MutationObserver/);
 });
 
+test("content font faces clamp thin text while preserving heavier weights", async () => {
+  const source = await readFile(join(root, "src/content.js"), "utf8");
+
+  assert.match(source, /fontWeightRanges = \["400", "401 900"\]/);
+  assert.match(source, /font-weight: \$\{weight\}/);
+  assert.doesNotMatch(source, /font-weight:\s*100 900/);
+});
+
 test("text inside icon-labelled controls remains eligible for styling", async () => {
   const source = await readFile(join(root, "src/content.js"), "utf8");
 
@@ -84,13 +92,19 @@ test("popup and options markup expose their required controls", async () => {
   ]);
 
   assert.match(popup, /id="enabled"[^>]+type="checkbox"/);
+  assert.match(popup, /id="settings-button"[^>]+aria-label="Open settings"/);
   assert.match(popup, /id="site-strip"/);
   assert.match(popup, /id="toggle-site"/);
   assert.match(popup, /name="scope"[^>]+type="radio"|type="radio"[^>]+name="scope"/);
   assert.match(popup, /name="spacing"[^>]+value="0\.08"/);
+  assert.match(popup, /id="quote-preview"/);
+  assert.match(popup, /id="spacing-preview-text"[^>]+tabindex="0"/);
+  assert.match(popup, /id="quote-author"[^>]+href="https:\/\/en\.wikipedia\.org\/wiki\/Rosa_Luxemburg"/);
+  assert.match(popup, /src="src\/quotes\.js"/);
+  assert.doesNotMatch(popup, /id="next-quote"/);
   assert.match(popup, /id="restricted-note"[^>]+hidden/);
   assert.match(popup, /href="https:\/\/costeer\.dev"/);
-  assert.match(popup, /made with <span class="attribution-mark">☭<\/span> by costeer/);
+  assert.match(popup, /made with\s*<span class="attribution-mark">☭<\/span>\s*by\s+costeer/s);
   assert.doesNotMatch(popup, /<footer|id="export-settings"|id="reset-settings"/);
   assert.doesNotMatch(popup, /<select/);
   assert.match(options, /id="rule-list"/);
@@ -98,13 +112,22 @@ test("popup and options markup expose their required controls", async () => {
   assert.equal((options.match(/name="basicTextScale"/g) ?? []).length, 3);
   assert.equal((options.match(/name="basicLineHeight"/g) ?? []).length, 3);
   assert.equal((options.match(/name="basicLetterSpacing"/g) ?? []).length, 3);
+  assert.match(options, /name="basicLetterSpacing"[\s\S]+?<span>Compact<\/span>/);
+  assert.match(options, /name="basicLetterSpacing"[\s\S]+?<span>Comfortable<\/span>/);
+  assert.match(options, /name="basicLetterSpacing"[\s\S]+?<span>Spacious<\/span>/);
+  assert.match(popup, /name="spacing"[\s\S]+?<span>Compact<\/span>/);
+  assert.match(popup, /name="spacing"[\s\S]+?<span>Comfortable<\/span>/);
+  assert.match(popup, /name="spacing"[\s\S]+?<span>Spacious<\/span>/);
   assert.match(options, /id="text-scale"[^>]+type="range"[^>]+min="80"[^>]+max="140"/);
   assert.match(options, /id="line-height"[^>]+type="range"[^>]+max="29"/);
   assert.match(options, /id="letter-spacing"[^>]+type="range"[^>]+max="0\.2"/);
+  assert.match(options, /id="preview-copy"[^>]+tabindex="0"/);
+  assert.match(options, /id="preview-author"[^>]+href="https:\/\/en\.wikipedia\.org\/wiki\/Rosa_Luxemburg"/);
+  assert.match(options, /src="src\/quotes\.js"/);
   assert.match(options, /id="export-settings"/);
   assert.match(options, /<footer class="page-attribution">/);
   assert.match(options, /href="https:\/\/costeer\.dev"/);
-  assert.match(options, /made with <span class="attribution-mark">☭<\/span> by costeer/);
+  assert.match(options, /made with\s*<span class="attribution-mark">☭<\/span>\s*by\s+costeer/s);
   assert.match(options, /id="retry-save"/);
   assert.match(options, /id="hostname-error"[^>]+role="alert"/);
   assert.match(options, /id="toast"[^>]+role="status"/);
@@ -126,16 +149,57 @@ test("popup and options mutate the same site-rule model", async () => {
   assert.match(options, /enabled:\s*event\.target\.checked/);
 });
 
+test("popup settings button opens the options page", async () => {
+  const popup = await readFile(join(root, "popup.js"), "utf8");
+
+  assert.match(popup, /settingsButton\.addEventListener\("click"/);
+  assert.match(popup, /runtime\?\.openOptionsPage/);
+  assert.match(popup, /runtime\.getURL\("options\.html"\)/);
+});
+
+test("popup and options choose from one shared random quote collection", async () => {
+  const [quotes, popup, options] = await Promise.all([
+    readFile(join(root, "src/quotes.js"), "utf8"),
+    readFile(join(root, "popup.js"), "utf8"),
+    readFile(join(root, "options.js"), "utf8")
+  ]);
+
+  for (const author of [
+    "Rosa Luxemburg",
+    "Karl Marx",
+    "Friedrich Engels",
+    "Vladimir Lenin",
+    "Clara Zetkin",
+    "Thomas Sankara",
+    "Bertrand Russell",
+    "Malcolm X",
+    "Sergei Eisenstein",
+    "Eugene V. Debs"
+  ]) {
+    assert.match(quotes, new RegExp(author.replace(".", "\\.")));
+  }
+  assert.match(quotes, /Math\.random\(\) \* quotes\.length/);
+  assert.match(quotes, /lexendLastQuoteIndex/);
+  assert.match(quotes, /globalThis\.LexendQuotes/);
+  for (const source of [popup, options]) {
+    assert.match(source, /quotesApi\.random\(\)/);
+    assert.doesNotMatch(source, /setInterval|setTimeout\(showNextQuote|nextQuoteButton/);
+  }
+});
+
 test("advanced readability is a local UI preference with full-range sliders", async () => {
   const options = await readFile(join(root, "options.js"), "utf8");
 
   assert.match(options, /storage\?\.local/);
   assert.match(options, /ADVANCED_PREFERENCE_KEY = "advancedReadability"/);
   assert.match(options, /lineHeightFromSlider/);
+  assert.match(options, /PREVIEW_DEFAULT_LINE_HEIGHT = 1\.25/);
+  assert.match(options, /readability\.lineHeight \|\| PREVIEW_DEFAULT_LINE_HEIGHT/);
   assert.match(options, /letterSpacingSlider/);
   assert.match(options, /duration:\s*190/);
   assert.match(options, /prefers-reduced-motion:\s*reduce/);
   assert.match(options, /translateX/);
+  assert.doesNotMatch(options, /scale\(/);
   assert.match(options, /input\.addEventListener\("input"[\s\S]+renderPreview\(draft\)/);
   assert.match(options, /input\.addEventListener\("change"[\s\S]+save\(\{ \.\.\.settings/);
   assert.doesNotMatch(options, /sliderSaveTimer|scheduleSliderSave/);

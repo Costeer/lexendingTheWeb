@@ -11,7 +11,7 @@ plus headings, with per-site controls and no tracking.
 
 ## Detailed description
 
-Lexend the Web gives websites a clearer, more comfortable typeface without
+Lexend for the Web gives websites a clearer, more comfortable typeface without
 sending page data anywhere.
 
 Key features:
@@ -33,7 +33,7 @@ Key features:
 Some browser pages and extension stores are protected by the browser and cannot
 be changed. The popup clearly identifies these pages.
 
-Lexend the Web contains no analytics, advertising, remote code, or trackers.
+Lexend for the Web contains no analytics, advertising, remote code, or trackers.
 
 ## Permission justifications
 

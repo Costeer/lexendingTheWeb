@@ -4,7 +4,7 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const STYLE_ID = "lexend-the-web-styles";
-  const FONT_FAMILY = '"Lexend the Web", sans-serif';
+  const FONT_FAMILY = '"Lexend for the Web", sans-serif';
   const styledRoots = new Set();
   let settings = settingsApi.normalizeSettings();
 
@@ -87,6 +87,9 @@
       range: "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD"
     }
   ];
+  // A standalone 400 face makes lighter requests resolve to regular Lexend,
+  // while the variable range keeps the page's medium and bold hierarchy.
+  const fontWeightRanges = ["400", "401 900"];
 
   const getEffectiveHostname = () => {
     for (const candidate of [location.href, location.origin, document.referrer]) {
@@ -100,16 +103,18 @@
     return "";
   };
 
-  const getFontFaceCss = () => fontFaces.map(({ file, range }) => `
+  const getFontFaceCss = () => fontFaces.flatMap(({ file, range }) =>
+    fontWeightRanges.map((weight) => `
     @font-face {
-      font-family: "Lexend the Web";
+      font-family: "Lexend for the Web";
       src: url("${extension.runtime.getURL(`assets/fonts/${file}`)}") format("woff2-variations");
       font-style: normal;
-      font-weight: 100 900;
+      font-weight: ${weight};
       font-display: swap;
       unicode-range: ${range};
     }
-  `).join("\n");
+  `)
+  ).join("\n");
 
   const createSelector = (scope, isShadowRoot) => {
     const exclusions = [...iconAndContentExclusions];
@@ -232,7 +237,7 @@
     try {
       applySettings(await extension.storage.sync.get(null));
     } catch (error) {
-      console.warn("Lexend the Web could not load settings; using defaults.", error);
+      console.warn("Lexend for the Web could not load settings; using defaults.", error);
       applySettings(settingsApi.defaults);
     }
 

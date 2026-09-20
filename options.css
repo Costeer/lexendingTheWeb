@@ -401,12 +401,32 @@ section + section {
 
 #preview-copy {
   margin: 8px 0 0;
+  max-height: 180px;
+  overflow-y: auto;
   overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   font-family: var(--font-ui);
   transition:
     font-size 120ms ease-out,
     line-height 120ms ease-out,
     letter-spacing 120ms ease-out;
+}
+
+.preview-attribution {
+  margin: 7px 0 0;
+  color: var(--secondary-text);
+  font-size: 12px;
+}
+
+.preview-attribution a {
+  color: inherit;
+  font-weight: 600;
+  text-underline-offset: 2px;
+}
+
+.preview-attribution a:hover {
+  color: var(--accent);
 }
 
 .inline-link {

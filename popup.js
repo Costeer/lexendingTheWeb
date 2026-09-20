@@ -3,6 +3,7 @@
 
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
+  const quotesApi = globalThis.LexendQuotes;
   const storage = extension?.storage?.sync;
   const tabs = extension?.tabs;
   const protectedHosts = new Set([
@@ -22,12 +23,14 @@
   const spacingValues = [0, 0.04, 0.08];
 
   const enabledInput = document.querySelector("#enabled");
+  const settingsButton = document.querySelector("#settings-button");
   const masterState = document.querySelector("#master-state");
   const scopeFieldset = document.querySelector("#scope-fieldset");
   const spacingFieldset = document.querySelector("#spacing-fieldset");
   const scopeInputs = [...document.querySelectorAll('input[name="scope"]')];
   const spacingInputs = [...document.querySelectorAll('input[name="spacing"]')];
-  const spacingPreview = document.querySelector("#spacing-preview");
+  const spacingPreviewText = document.querySelector("#spacing-preview-text");
+  const quoteAuthor = document.querySelector("#quote-author");
   const siteStrip = document.querySelector("#site-strip");
   const siteStatusText = document.querySelector("#site-status-text");
   const toggleSiteButton = document.querySelector("#toggle-site");
@@ -37,6 +40,14 @@
   let settings = settingsApi.normalizeSettings();
   let site = null;
   let feedbackTimer;
+  const quote = quotesApi.random();
+
+  const renderQuote = () => {
+    spacingPreviewText.textContent = `“${quote.text}”`;
+    spacingPreviewText.lang = quote.lang;
+    quoteAuthor.textContent = quote.author;
+    quoteAuthor.href = quote.url;
+  };
 
   const showFeedback = (message, isError = false, timeout = 2200) => {
     feedback.textContent = message;
@@ -70,7 +81,7 @@
     spacingInputs.forEach((input) => {
       input.checked = Number(input.value) === selectedSpacing;
     });
-    spacingPreview.style.letterSpacing = `${settings.letterSpacing}em`;
+    spacingPreviewText.style.letterSpacing = `${settings.letterSpacing}em`;
   };
 
   const renderSite = () => {
@@ -113,7 +124,7 @@
       await storage.remove?.(["disabledSites", "spacing"]);
       return true;
     } catch (error) {
-      console.error("Lexend the Web could not save settings.", error);
+      console.error("Lexend for the Web could not save settings.", error);
       showFeedback("Changes could not be saved.", true, 0);
       return false;
     }
@@ -141,6 +152,22 @@
       restricted: !supported
     };
   };
+
+  settingsButton.addEventListener("click", async () => {
+    try {
+      if (extension?.runtime?.openOptionsPage) {
+        await extension.runtime.openOptionsPage();
+      } else if (tabs?.create && extension?.runtime?.getURL) {
+        await tabs.create({ url: extension.runtime.getURL("options.html") });
+      } else {
+        window.open("options.html", "_blank");
+      }
+      window.close();
+    } catch (error) {
+      console.error("Lexend for the Web could not open settings.", error);
+      showFeedback("Settings could not be opened.", true, 0);
+    }
+  });
 
   enabledInput.addEventListener("change", () => {
     save({ ...settings, enabled: enabledInput.checked });
@@ -195,7 +222,7 @@
       site = siteContext;
       render();
     } catch (error) {
-      console.error("Lexend the Web could not load settings.", error);
+      console.error("Lexend for the Web could not load settings.", error);
       settings = settingsApi.normalizeSettings();
       site = { hostname: "", supported: false, restricted: true };
       render();
@@ -203,5 +230,6 @@
     }
   };
 
+  renderQuote();
   start();
 })();
