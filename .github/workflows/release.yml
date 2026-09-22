@@ -23,6 +23,7 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run package
+      - run: npm run lint:firefox
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

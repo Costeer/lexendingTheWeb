@@ -21,6 +21,16 @@ test("both manifests expose the same user-facing capability", async () => {
 
   assert.equal(firefox.browser_specific_settings.gecko.id,
     "lexend-the-web@costeer.dev");
+  assert.equal(firefox.browser_specific_settings.gecko.strict_min_version,
+    "140.0");
+  assert.deepEqual(
+    firefox.browser_specific_settings.gecko.data_collection_permissions.required,
+    ["none"]
+  );
+  assert.equal(
+    firefox.browser_specific_settings.gecko_android.strict_min_version,
+    "142.0"
+  );
   assert.equal(chrome.options_ui.page, "options.html");
   assert.equal(chrome.commands["toggle-current-site"].suggested_key.default,
     "Ctrl+Shift+L");
