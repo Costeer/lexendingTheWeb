@@ -7,8 +7,10 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox",
     "test": "node --test",
     "package": "npm run build && node scripts/package.mjs",
+    "verify:firefox": "npm test && npm run check && npm run package && npm run lint:firefox",
     "version": "node scripts/sync-version.mjs"
   },
   "engines": {
@@ -16,6 +18,7 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "web-ext": "^10.7.0"
   }
 }

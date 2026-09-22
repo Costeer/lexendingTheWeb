@@ -31,6 +31,7 @@ Requirement: Node.js 20+.
 npm test
 npm run check
 npm run build
+npm run verify:firefox
 ```
 
 The browser-ready folders are written to `dist/chrome` and `dist/firefox`.
@@ -59,6 +60,11 @@ npm run package
 
 This creates Chrome and Firefox ZIP archives in `dist/releases`.
 
+`npm run verify:firefox` runs the tests and static checks, creates a fresh
+archive, and validates the Firefox build with Mozilla's `web-ext` linter. The
+resulting `lexend-the-web-firefox-v*.zip` is the file to upload to the
+[Firefox Add-on Developer Hub](https://addons.mozilla.org/developers/).
+
 Package filenames include the version from `package.json`. To bump a release,
 use `npm version patch`, `npm version minor`, or `npm version major`; the npm
 version lifecycle synchronizes both browser manifests automatically.
@@ -86,7 +92,8 @@ See the complete [privacy policy](PRIVACY.md). A standalone HTML copy lives at
 
 Listing copy, permission explanations, screenshots, and promotional graphics
 live under `store/`. These assets cover the Chrome Web Store and Firefox
-Add-ons submission fields.
+Add-ons submission fields. The Firefox-specific upload and reviewer checklist
+is in [`store/firefox-submission.md`](store/firefox-submission.md).
 
 ## License
 
