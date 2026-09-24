@@ -379,12 +379,31 @@ fieldset:disabled {
 }
 
 .attribution-mark {
-  display: inline-block;
+  position: relative;
+  display: inline-flex;
+  width: 18px;
+  align-items: center;
+  justify-content: center;
   color: var(--accent);
   font-size: 18px;
   font-weight: 700;
   line-height: 1;
   vertical-align: -1px;
+}
+
+.attribution-hover-mark {
+  position: absolute;
+  opacity: 0;
+}
+
+.attribution > a:hover .attribution-heart,
+.attribution > a:focus-visible .attribution-heart {
+  opacity: 0;
+}
+
+.attribution > a:hover .attribution-hover-mark,
+.attribution > a:focus-visible .attribution-hover-mark {
+  opacity: 1;
 }
 
 .popup-feedback {
