@@ -53,12 +53,31 @@ main {
 }
 
 .page-attribution .attribution-mark {
-  display: inline-block;
+  position: relative;
+  display: inline-flex;
+  width: 18px;
+  align-items: center;
+  justify-content: center;
   color: var(--accent);
   font-size: 18px;
   font-weight: 700;
   line-height: 1;
   vertical-align: -1px;
+}
+
+.page-attribution .attribution-hover-mark {
+  position: absolute;
+  opacity: 0;
+}
+
+.page-attribution a:hover .attribution-heart,
+.page-attribution a:focus-visible .attribution-heart {
+  opacity: 0;
+}
+
+.page-attribution a:hover .attribution-hover-mark,
+.page-attribution a:focus-visible .attribution-hover-mark {
+  opacity: 1;
 }
 
 .masthead,
