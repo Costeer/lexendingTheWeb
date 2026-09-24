@@ -92,12 +92,17 @@ test("popup and settings pages expose their core controls", async () => {
 });
 
 test("content script reacts to page and settings changes", async () => {
-  const source = await read("src/content.js");
+  const [contentSource, popupSource] = await Promise.all([
+    read("src/content.js"),
+    read("popup.js")
+  ]);
 
-  assert.match(source, /MutationObserver/);
-  assert.match(source, /shadowRoot/);
-  assert.match(source, /storage\.onChanged\.addListener/);
-  assert.match(source, /data-lexend-ignore/);
+  assert.match(contentSource, /MutationObserver/);
+  assert.match(contentSource, /shadowRoot/);
+  assert.match(contentSource, /storage\.onChanged\.addListener/);
+  assert.match(contentSource, /data-lexend-ignore/);
+  assert.match(contentSource, /LEXEND_GET_STATE/);
+  assert.match(popupSource, /LEXEND_GET_STATE/);
 });
 
 test("quote selection returns an entry from the shared collection", () => {
