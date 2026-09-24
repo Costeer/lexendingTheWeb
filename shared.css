@@ -46,6 +46,21 @@
   font-synthesis: none;
 }
 
+:root[data-ui-style="modern"] {
+  --accent: #FF0000;
+  --accent-tint: #FFF0F0;
+  --ink: #000000;
+  --surface: #FFFFFF;
+  --popup-muted: #F7F7F5;
+  --settings-muted: #F4F4F1;
+  --secondary-text: rgba(0, 0, 0, .68);
+  --frame-border: 1px solid rgba(0, 0, 0, .14);
+  --section-divider: 1px solid rgba(0, 0, 0, .1);
+  --control-border: 1px solid rgba(0, 0, 0, .18);
+  --active-shadow: none;
+  --frame-shadow: 0 18px 60px rgba(0, 0, 0, .08);
+}
+
 *,
 *::before,
 *::after {
@@ -75,6 +90,14 @@ input:focus-visible,
 a:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px dashed var(--ink);
+  outline-offset: 3px;
+}
+
+:root[data-ui-style="modern"] button:focus-visible,
+:root[data-ui-style="modern"] input:focus-visible,
+:root[data-ui-style="modern"] a:focus-visible,
+:root[data-ui-style="modern"] [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 

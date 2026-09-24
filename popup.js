@@ -66,6 +66,7 @@
   ));
 
   const renderSettings = () => {
+    document.documentElement.dataset.uiStyle = settings.interfaceStyle;
     enabledInput.checked = settings.enabled;
     enabledInput.setAttribute(
       "aria-label",

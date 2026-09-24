@@ -3,6 +3,7 @@
 
   const defaults = Object.freeze({
     enabled: true,
+    interfaceStyle: "stylized",
     scope: "body",
     siteRules: [],
     textScale: 100,
@@ -92,6 +93,7 @@
 
     return {
       enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
+      interfaceStyle: value.interfaceStyle === "modern" ? "modern" : defaults.interfaceStyle,
       scope: value.scope === "all" ? "all" : defaults.scope,
       siteRules,
       textScale: clampNumber(value.textScale, defaults.textScale, 80, 140),

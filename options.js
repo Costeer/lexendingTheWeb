@@ -8,6 +8,8 @@
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
   const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
+  const modernInterfaceInput = document.querySelector("#modern-interface");
+  const interfaceStyleState = document.querySelector("#interface-style-state");
   const advancedModeInput = document.querySelector("#advanced-mode");
   const readabilityControlStage = document.querySelector("#readability-control-stage");
   const basicReadability = document.querySelector("#basic-readability");
@@ -206,6 +208,17 @@
     renderPreview();
   };
 
+  const renderAppearance = () => {
+    const modern = settings.interfaceStyle === "modern";
+    document.documentElement.dataset.uiStyle = modern ? "modern" : "stylized";
+    modernInterfaceInput.checked = modern;
+    modernInterfaceInput.setAttribute(
+      "aria-label",
+      modern ? "Use stylized interface" : "Use modern interface"
+    );
+    interfaceStyleState.textContent = modern ? "On" : "Off";
+  };
+
   const makeDeleteButton = (rule) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -280,6 +293,7 @@
   };
 
   const render = () => {
+    renderAppearance();
     renderReadability();
     renderRules();
   };
@@ -351,6 +365,13 @@
     } catch {
       showToast("The advanced view preference could not be saved");
     }
+  });
+
+  modernInterfaceInput.addEventListener("change", () => {
+    save({
+      ...settings,
+      interfaceStyle: modernInterfaceInput.checked ? "modern" : "stylized"
+    });
   });
 
   const basicControlGroups = [

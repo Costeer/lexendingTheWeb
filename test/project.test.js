@@ -72,6 +72,7 @@ test("popup and settings pages expose their core controls", async () => {
   }
 
   for (const id of [
+    "modern-interface",
     "advanced-mode",
     "text-scale",
     "line-height",
@@ -169,4 +170,16 @@ test("normalization rejects invalid values and respects the sync storage limit",
   assert.equal(settings.letterSpacing, 0.2);
   assert.ok(JSON.stringify(settings.siteRules).length <= 7000);
   assert.ok(settings.siteRules.length < siteRules.length);
+});
+
+test("interface style defaults safely and accepts the modern preference", () => {
+  assert.equal(settingsApi.normalizeSettings().interfaceStyle, "stylized");
+  assert.equal(
+    settingsApi.normalizeSettings({ interfaceStyle: "modern" }).interfaceStyle,
+    "modern"
+  );
+  assert.equal(
+    settingsApi.normalizeSettings({ interfaceStyle: "unknown" }).interfaceStyle,
+    "stylized"
+  );
 });
