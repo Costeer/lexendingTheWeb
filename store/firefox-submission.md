@@ -57,9 +57,6 @@ Permission rationale:
   and update visible typography.
 - `storage` saves the enabled state, typography preferences, and user-created
   site rules with Firefox Sync.
-- `activeTab` lets the popup and keyboard command identify the current site
-  after a direct user action. Browsing history is not recorded.
-
 Firefox 140 desktop and Firefox for Android 142 are the declared minimums so
 the manifest can use Firefox's built-in data-collection disclosure. The
 manifest declares `none`, matching the extension's behavior.

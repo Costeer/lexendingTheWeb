@@ -10,6 +10,7 @@
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
     "test": "node --test",
     "package": "npm run build && node scripts/package.mjs",
+    "verify:chrome": "npm test && npm run check && npm run package",
     "verify:firefox": "npm test && npm run check && npm run package && npm run lint:firefox",
     "version": "node scripts/sync-version.mjs"
   },

@@ -170,18 +170,15 @@ button {
 }
 
 .text-link {
+  flex: 0 0 auto;
   min-height: 24px;
   padding: 0;
   border: 0;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.text-link {
-  flex: 0 0 auto;
-  font-weight: 500;
 }
 
 .text-link:hover {

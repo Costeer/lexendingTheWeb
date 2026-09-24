@@ -1,27 +1,20 @@
 # Lexend for the Web
 
-A small Chrome and Firefox extension that replaces website typography with
-[Lexend](https://www.lexend.com/). Choose between body text only or body text
-plus headings, and toggle the effect without reloading the page.
+A Chrome and Firefox extension that replaces website typography with
+[Lexend](https://www.lexend.com/).
 
 ## Features
 
-- Applies Lexend to every HTTP and HTTPS website
-- Switches between **body text** and **body + headers**
-- Pauses globally or on individual websites
-- Supports exact-host and subdomain-wide rules with per-site text scope
-- Adjusts base text size, line height, and letter spacing when requested
-- Manages, searches, and clears saved site rules from a dedicated settings page
-- Toggles the current website with `Ctrl+Shift+L` (`Command+Shift+L` on macOS)
-- Updates open tabs as soon as a setting changes
-- Handles content added later, open shadow roots, and related iframe documents
-- Preserves code, SVGs, common icon-font systems, and opt-out regions
-- Imports and exports settings through a versioned JSON file
-- Syncs preferences through the browser's extension storage
-- Visually distinguishes active and paused toolbar states
-- Uses a deliberately light-only, square-cornered interface
-- Ships the font locally—no page data or external font request is involved
-- Includes Latin, Latin Extended, and Vietnamese Lexend subsets
+- Apply Lexend to body copy alone or include headings.
+- Set text size, line height, and letter spacing.
+- Pause the extension globally, for one hostname, or for a domain and its
+  subdomains.
+- Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
+- Import, export, and sync settings through browser storage.
+- Keep code, mathematical notation, SVGs, and common icon fonts unchanged.
+
+The font files are bundled with the extension. It does not use analytics or
+send page content to a server.
 
 ## Develop
 
@@ -31,12 +24,11 @@ Requirement: Node.js 20+.
 npm test
 npm run check
 npm run build
+npm run verify:chrome
 npm run verify:firefox
 ```
 
-The browser-ready folders are written to `dist/chrome` and `dist/firefox`.
-The popup handles the active website; the browser's extension settings link
-opens the full site-rule, readability, and backup manager.
+Browser-ready files are written to `dist/chrome` and `dist/firefox`.
 
 ### Load in Chrome
 
@@ -58,42 +50,39 @@ opens the full site-rule, readability, and backup manager.
 npm run package
 ```
 
-This creates Chrome and Firefox ZIP archives in `dist/releases`.
+This creates both browser archives in `dist/releases`.
 
-`npm run verify:firefox` runs the tests and static checks, creates a fresh
-archive, and validates the Firefox build with Mozilla's `web-ext` linter. The
-resulting `lexend-the-web-firefox-v*.zip` is the file to upload to the
+`npm run verify:chrome` runs the tests and checks, then creates a fresh archive
+for the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole/).
+
+`npm run verify:firefox` does the same and runs Mozilla's `web-ext` linter. Use
+the resulting Firefox ZIP in the
 [Firefox Add-on Developer Hub](https://addons.mozilla.org/developers/).
 
-Package filenames include the version from `package.json`. To bump a release,
-use `npm version patch`, `npm version minor`, or `npm version major`; the npm
-version lifecycle synchronizes both browser manifests automatically.
+Package filenames use the version from `package.json`. `npm version` also
+updates both manifests.
 
 Pushing a `v*` tag runs the release workflow and publishes both browser ZIPs
 to a GitHub release.
 
 ## Website opt-out
 
-Extension users can preserve a specific subtree by adding
-`data-lexend-ignore` to it. The extension also leaves code, mathematical
-notation, SVGs, hidden accessible content, and common icon/symbol containers
-alone.
+Add `data-lexend-ignore` to any subtree that the extension should leave alone.
 
 ## Privacy
 
-Lexend for the Web does not collect, transmit, or sell data. The only stored data
-is the user's enabled state, typography preferences, and user-created site
-rules, saved through the browser's synchronized extension storage.
+Lexend for the Web stores its enabled state, typography preferences, and site
+rules in the browser's synchronized extension storage. The developer does not
+collect or receive them.
 
 See the complete [privacy policy](PRIVACY.md). A standalone HTML copy lives at
 `docs/privacy.html` and is ready for any static host.
 
 ## Store submission
 
-Listing copy, permission explanations, screenshots, and promotional graphics
-live under `store/`. These assets cover the Chrome Web Store and Firefox
-Add-ons submission fields. The Firefox-specific upload and reviewer checklist
-is in [`store/firefox-submission.md`](store/firefox-submission.md).
+Store copy, screenshots, and submission notes live under `store/`. See the
+[Chrome checklist](store/chrome-submission.md) or the
+[Firefox checklist](store/firefox-submission.md).
 
 ## License
 
