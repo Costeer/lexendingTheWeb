@@ -111,9 +111,7 @@
         index = (index + 1 + Math.floor(Math.random() * (quotes.length - 1))) % quotes.length;
       }
       globalThis.localStorage.setItem(key, String(index));
-    } catch {
-      // Random selection still works if local storage is unavailable.
-    }
+    } catch {}
     return quotes[index];
   };
 

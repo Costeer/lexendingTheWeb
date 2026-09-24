@@ -11,29 +11,28 @@ plus headings, with per-site controls and no tracking.
 
 ## Detailed description
 
-Lexend for the Web gives websites a clearer, more comfortable typeface without
-sending page data anywhere.
+Lexend for the Web replaces website typography with Lexend. Page text is
+processed locally and is never recorded or sent to the developer.
 
 Key features:
 
 - Apply Lexend to body text or to body text and headings
 - Pause the extension globally or on individual websites
-- Apply rules to one hostname or all of its subdomains
-- Override the text scope for individual websites
-- Optionally adjust base text size, line height, and letter spacing
-- Search, edit, and clear saved rules from a dedicated settings page
+- Apply a rule to one hostname or include its subdomains
+- Adjust text size, line height, and letter spacing
+- Search, edit, and clear rules from the settings page
 - Toggle Lexend on the current website with a keyboard shortcut
-- Import and export settings as a local JSON file
-- Preserve code, mathematical notation, SVG graphics, and common icon fonts
-- Cover dynamic content, open shadow roots, and related iframe documents
-- Sync preferences using the browser's built-in extension storage
-- Load the included Lexend font locally with no external font requests
-- Use a focused, light-only interface with full keyboard support
+- Import and export settings as JSON
+- Leave code, mathematical notation, SVG graphics, and common icon fonts alone
+- Handle dynamic content, open shadow roots, and related frames
+- Sync preferences with the browser's extension storage
 
-Some browser pages and extension stores are protected by the browser and cannot
-be changed. The popup clearly identifies these pages.
+Browsers do not allow extensions to change protected pages such as settings and
+extension stores. The popup identifies those pages.
 
 Lexend for the Web contains no analytics, advertising, remote code, or trackers.
+User-created hostname rules may be synchronized by the browser when browser
+sync is enabled; the developer cannot access that sync account or its data.
 
 ## Permission justifications
 
@@ -46,12 +45,6 @@ contents remain in the browser and are not stored or transmitted.
 
 Stores the enabled state, typography preferences, and user-created site rules
 using the browser's synchronized extension storage.
-
-### Active tab
-
-Used only when the user opens the popup, so it can display the current hostname,
-offer the per-site toggle, and report browser-protected pages. The extension
-does not record browsing history.
 
 ## Support URL
 
