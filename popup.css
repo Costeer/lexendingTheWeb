@@ -15,7 +15,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   background: transparent;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .wordmark-lexend {
@@ -77,7 +77,7 @@ button:not(:disabled):active,
   min-width: 0;
   gap: 12px;
   color: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: .06em;
   text-decoration: none;
@@ -142,7 +142,7 @@ button:not(:disabled):active,
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -203,7 +203,7 @@ button:not(:disabled):active,
   padding: 8px 13px;
   border-bottom: var(--section-divider);
   background: var(--popup-muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .site-strip p {
@@ -224,7 +224,7 @@ button:not(:disabled):active,
   padding: 0;
   border: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -247,7 +247,7 @@ button:not(:disabled):active,
   width: 100%;
   margin: 0 0 10px;
   padding: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -311,7 +311,7 @@ button:not(:disabled):active,
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 4px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
 }
 
@@ -359,7 +359,7 @@ fieldset:disabled {
   padding: 5px 3px;
   place-items: center;
   background: var(--surface);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -392,14 +392,14 @@ fieldset:disabled {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
 }
 
 .quote-footer {
   margin-top: 7px;
   color: var(--secondary-text);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
 }
 
@@ -431,7 +431,7 @@ fieldset:disabled {
 
 .restricted-note p {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.4;
 }
 
@@ -439,7 +439,7 @@ fieldset:disabled {
   min-height: 0;
   margin: 0;
   color: var(--secondary-text);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
 }
 
@@ -528,7 +528,7 @@ fieldset:disabled {
 :root[data-ui-style="lexend"] .master-control {
   gap: 10px;
   color: var(--secondary-text);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -574,7 +574,7 @@ fieldset:disabled {
 
 :root[data-ui-style="lexend"] #site-status-text {
   color: inherit;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -590,7 +590,7 @@ fieldset:disabled {
 :root[data-ui-style="lexend"] .site-strip .text-link {
   margin: 0;
   color: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
 }
 
@@ -610,7 +610,7 @@ fieldset:disabled {
 :root[data-ui-style="lexend"] .popup-section legend {
   margin-bottom: 10px;
   color: var(--ink);
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 400;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -652,14 +652,14 @@ fieldset:disabled {
 
 :root[data-ui-style="lexend"] .choice-copy {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.6;
 }
 
 :root[data-ui-style="lexend"] .choice-copy strong {
   color: var(--text-title);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   letter-spacing: .025em;
 }
@@ -677,7 +677,7 @@ fieldset:disabled {
 :root[data-ui-style="lexend"] .segments span {
   min-height: 38px;
   padding: 9px 4px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   font-weight: 400;
   letter-spacing: .02em;
@@ -723,7 +723,7 @@ fieldset:disabled {
 
 :root[data-ui-style="lexend"] .spacing-preview blockquote {
   color: var(--text-body);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.75;
 }
@@ -731,7 +731,7 @@ fieldset:disabled {
 :root[data-ui-style="lexend"] .quote-footer {
   margin-top: 8px;
   color: var(--secondary-text);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 400;
   letter-spacing: .12em;
   text-transform: uppercase;
