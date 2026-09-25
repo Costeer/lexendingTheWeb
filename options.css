@@ -1020,6 +1020,7 @@ input::placeholder {
   background: var(--surface);
   color: var(--text-body);
   font-family: var(--font-ui);
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.65;
   letter-spacing: 0;
@@ -1027,7 +1028,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] main {
   position: relative;
-  width: min(860px, 100%);
+  width: min(920px, 100%);
   overflow: hidden;
   border: var(--frame-border);
   border-radius: 0;
@@ -1036,7 +1037,7 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .page-attribution {
-  width: min(860px, 100%);
+  width: min(920px, 100%);
 }
 
 :root[data-ui-style="lexend"] h2,
@@ -1047,7 +1048,7 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] h2 {
-  font-size: 24px;
+  font-size: 26px;
   letter-spacing: .04em;
 }
 
@@ -1066,7 +1067,7 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] section {
-  padding: 30px 24px;
+  padding: 34px 30px;
 }
 
 :root[data-ui-style="lexend"] .appearance-section {
@@ -1074,7 +1075,7 @@ input::placeholder {
   align-items: flex-start;
   flex-direction: column;
   gap: 0;
-  padding: 40px 36px 30px;
+  padding: 44px 40px 34px;
   border: 0;
   color: var(--surface);
   background: var(--accent);
@@ -1087,7 +1088,7 @@ input::placeholder {
 :root[data-ui-style="lexend"] .appearance-section h2 {
   max-width: none;
   color: var(--surface);
-  font-size: 40px;
+  font-size: 42px;
   font-weight: 650;
   line-height: 1.2;
   letter-spacing: .015em;
@@ -1097,7 +1098,7 @@ input::placeholder {
   max-width: 61ch;
   margin-top: 16px;
   color: var(--surface);
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 400;
   line-height: 1.7;
 }
@@ -1106,7 +1107,7 @@ input::placeholder {
   display: inline-block;
   margin-top: 12px;
   color: var(--surface);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -1140,7 +1141,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .appearance-label strong {
   color: var(--surface);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 300;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -1152,8 +1153,8 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .appearance-switch-track {
   order: -1;
-  width: 50px;
-  height: 26px;
+  width: 54px;
+  height: 28px;
   border: 1px solid var(--surface);
   border-radius: 0;
   background: transparent;
@@ -1162,8 +1163,8 @@ input::placeholder {
 :root[data-ui-style="lexend"] .appearance-switch-thumb {
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   background: var(--surface);
   border-radius: 0;
 }
@@ -1174,7 +1175,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .appearance-control input:checked + .appearance-switch-track .appearance-switch-thumb {
   background: var(--accent);
-  transform: translateX(24px);
+  transform: translateX(26px);
 }
 
 :root[data-ui-style="lexend"] .appearance-disclaimer {
@@ -1185,7 +1186,7 @@ input::placeholder {
   padding-top: 18px;
   border-top: 1px solid rgb(255 255 255 / 35%);
   color: var(--surface);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   line-height: 1.65;
 }
@@ -1199,7 +1200,7 @@ input::placeholder {
   max-width: none;
   margin-top: 12px;
   color: var(--text-body);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.75;
 }
@@ -1211,15 +1212,15 @@ input::placeholder {
 :root[data-ui-style="lexend"] .advanced-control {
   gap: 10px;
   color: var(--secondary-text);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 300;
   letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 :root[data-ui-style="lexend"] .mode-switch-track {
-  width: 50px;
-  height: 26px;
+  width: 54px;
+  height: 28px;
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   background: var(--surface);
@@ -1228,8 +1229,8 @@ input::placeholder {
 :root[data-ui-style="lexend"] .mode-switch-thumb {
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   background: var(--accent);
   border-radius: 50%;
 }
@@ -1240,23 +1241,23 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .advanced-control input:checked + .mode-switch-track .mode-switch-thumb {
   background: var(--surface);
-  transform: translateX(24px);
+  transform: translateX(26px);
 }
 
 :root[data-ui-style="lexend"] .control-grid {
-  gap: 16px;
+  gap: 18px;
 }
 
 :root[data-ui-style="lexend"] .basic-controls,
 :root[data-ui-style="lexend"] .slider-grid {
-  grid-auto-rows: 126px;
+  grid-auto-rows: 136px;
 }
 
 :root[data-ui-style="lexend"] .setting-control,
 :root[data-ui-style="lexend"] .slider-control {
-  height: 126px;
-  min-height: 126px;
-  padding: 16px 18px;
+  height: 136px;
+  min-height: 136px;
+  padding: 18px 20px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   outline: 0;
@@ -1268,24 +1269,24 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .slider-control {
-  grid-template-rows: 22px 24px 17px;
+  grid-template-rows: 24px 26px 18px;
   align-content: center;
-  row-gap: 7px;
+  row-gap: 8px;
 }
 
 :root[data-ui-style="lexend"] .slider-heading {
-  min-height: 22px;
+  min-height: 24px;
   align-items: center;
 }
 
 :root[data-ui-style="lexend"] .setting-control legend {
   position: absolute;
-  top: 24px;
-  left: 18px;
-  width: calc(100% - 36px);
+  top: 25px;
+  left: 20px;
+  width: calc(100% - 40px);
   margin: 0;
   color: var(--text-title);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   letter-spacing: .025em;
 }
@@ -1293,14 +1294,14 @@ input::placeholder {
 :root[data-ui-style="lexend"] .setting-control legend::before,
 :root[data-ui-style="lexend"] .slider-heading strong::before {
   display: inline-grid;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   margin-right: 8px;
   place-items: center;
   border: 1px solid var(--accent);
   border-radius: 50%;
   color: var(--ink);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 300;
   letter-spacing: 0;
 }
@@ -1322,10 +1323,10 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .segment-group {
   position: absolute;
-  top: 60px;
-  right: 18px;
-  left: 18px;
-  height: 42px;
+  top: 64px;
+  right: 20px;
+  left: 20px;
+  height: 44px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
@@ -1337,14 +1338,14 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .segment-group span {
-  height: 40px;
-  min-height: 40px;
-  padding: 8px 4px;
+  height: 42px;
+  min-height: 42px;
+  padding: 9px 5px;
   border: 0;
   border-left: 1px solid var(--ui-border);
   color: var(--text-muted);
   background: var(--surface);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: .02em;
 }
@@ -1362,7 +1363,7 @@ input::placeholder {
   display: flex;
   align-items: center;
   color: var(--text-title);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   letter-spacing: .025em;
 }
@@ -1398,7 +1399,7 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .readability-preview {
-  margin-top: 20px;
+  margin-top: 22px;
   padding: 0;
   border: 0;
   background: var(--surface);
@@ -1468,7 +1469,7 @@ input::placeholder {
   margin: 0;
   overflow: visible;
   color: var(--text-title);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.65;
   scrollbar-gutter: auto;
@@ -1478,7 +1479,7 @@ input::placeholder {
   position: relative;
   z-index: 2;
   margin-top: 10px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -1490,7 +1491,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .add-rule {
   grid-template-columns: minmax(180px, 1fr) auto auto;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   border: 0;
   background: var(--surface);
@@ -1498,8 +1499,8 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] input[type="text"],
 :root[data-ui-style="lexend"] input[type="search"] {
-  min-height: 42px;
-  padding: 11px 14px;
+  min-height: 46px;
+  padding: 12px 16px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   color: var(--ink);
@@ -1514,13 +1515,13 @@ input::placeholder {
 :root[data-ui-style="lexend"] .primary-button,
 :root[data-ui-style="lexend"] .secondary-button,
 :root[data-ui-style="lexend"] .danger-button {
-  min-height: 42px;
-  padding: 11px 20px;
+  min-height: 46px;
+  padding: 12px 22px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   color: var(--ink);
   background: var(--surface);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 300;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -1553,7 +1554,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .rule-row,
 :root[data-ui-style="lexend"] .rule-row + .rule-row {
-  min-height: 54px;
+  min-height: 60px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--surface);
@@ -1561,7 +1562,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .rule-domain strong {
   color: var(--text-title);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
 }
 
@@ -1602,17 +1603,17 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .tools-grid {
-  gap: 8px;
+  gap: 10px;
 }
 
 :root[data-ui-style="lexend"] .tool-card {
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
 }
 
 :root[data-ui-style="lexend"] .tool-card h3 {
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: .035em;
 }
 
