@@ -72,6 +72,7 @@ test("popup and settings pages expose their core controls", async () => {
   }
 
   for (const id of [
+    "modern-ui",
     "advanced-mode",
     "text-scale",
     "line-height",
@@ -158,6 +159,7 @@ test("normalization rejects invalid values and respects the sync storage limit",
     scope: index % 2 === 0 ? "all" : "body"
   }));
   const settings = settingsApi.normalizeSettings({
+    uiStyle: "lexend",
     textScale: 500,
     lineHeight: -1,
     letterSpacing: 3,
@@ -167,6 +169,10 @@ test("normalization rejects invalid values and respects the sync storage limit",
   assert.equal(settings.textScale, 140);
   assert.equal(settings.lineHeight, 1);
   assert.equal(settings.letterSpacing, 0.2);
+  assert.equal(settings.uiStyle, "lexend");
   assert.ok(JSON.stringify(settings.siteRules).length <= 7000);
   assert.ok(settings.siteRules.length < siteRules.length);
+
+  assert.equal(settingsApi.normalizeSettings({ uiStyle: "unknown" }).uiStyle, "classic");
+  assert.equal(settingsApi.normalizeSettings({ uiStyle: "modern" }).uiStyle, "lexend");
 });

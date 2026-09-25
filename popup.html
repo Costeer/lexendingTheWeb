@@ -10,28 +10,47 @@
   <body>
     <main class="panel">
       <header class="masthead">
-        <div class="wordmark" aria-label="Lexend for the Web">
-          <span class="wordmark-mark" aria-hidden="true">L</span>
-          <span>Lexend for the Web</span>
-        </div>
-        <div class="masthead-actions">
+        <div class="masthead-leading">
           <button id="settings-button" class="settings-button" type="button" aria-label="Open settings" title="Settings">
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a8 8 0 0 0-1.7-1L15 3.3h-4L10.7 6a8 8 0 0 0-1.7 1L6.5 6l-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4L9 17a8 8 0 0 0 1.7 1l.3 2.7h4l.3-2.7a8 8 0 0 0 1.7-1l2.5 1 2-3.4-2.1-1.6ZM13 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
             </svg>
           </button>
-          <label class="master-control">
-            <span id="master-state">On</span>
-            <input id="enabled" type="checkbox" aria-label="Turn Lexend off" />
-            <span class="switch-track" aria-hidden="true">
-              <span class="switch-thumb"></span>
+          <a
+            class="wordmark lexend-wordmark"
+            href="https://www.lexend.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Visit the Lexend website"
+          >
+            <span class="wordmark-mark" aria-hidden="true">L</span>
+            <span class="wordmark-classic">Lexend for the Web</span>
+            <span class="wordmark-lexend lxnd-word" aria-hidden="true">
+              <span class="lxnd-letter">L</span>
+              <span class="lxnd-letter lxnd-letter-insert">E</span>
+              <span class="lxnd-letter">X</span>
+              <span class="lxnd-letter lxnd-letter-insert">E</span>
+              <span class="lxnd-letter">N</span>
+              <span class="lxnd-letter">D</span>
             </span>
-          </label>
+          </a>
         </div>
+        <label class="master-control">
+          <span id="master-state">On</span>
+          <input id="enabled" type="checkbox" aria-label="Turn Lexend off" />
+          <span class="switch-track" aria-hidden="true">
+            <span class="switch-thumb"></span>
+          </span>
+        </label>
       </header>
 
+      <p id="popup-feedback" class="popup-feedback" role="status" aria-live="polite"></p>
+
       <section id="site-strip" class="site-strip" aria-label="Current site" hidden>
-        <p id="site-status-text"></p>
+        <div class="site-strip-copy">
+          <p id="site-status-text"></p>
+          <p id="site-message" class="site-message"></p>
+        </div>
         <button id="toggle-site" class="text-link" type="button">Pause here</button>
       </section>
 
@@ -86,20 +105,6 @@
         <p>Browser pages like settings and new tab can't be changed by extensions.</p>
       </aside>
 
-      <div class="attribution">
-        <a href="https://costeer.dev" target="_blank" rel="noopener noreferrer">
-          <span
-            >made with
-            <span class="attribution-mark" aria-hidden="true">
-              <span class="attribution-heart">♥</span>
-              <span class="attribution-hover-mark">☭</span>
-            </span>
-            by costeer</span
-          >
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h6v2H7v10h10v-4h2v6H5V5Zm8-2h8v8h-2V6.4l-6.3 6.3-1.4-1.4L17.6 5H13V3Z" /></svg>
-        </a>
-        <p id="popup-feedback" class="popup-feedback" role="status" aria-live="polite"></p>
-      </div>
     </main>
     <script src="src/settings.js"></script>
     <script src="src/quotes.js"></script>

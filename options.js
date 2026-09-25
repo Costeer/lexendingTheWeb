@@ -8,6 +8,8 @@
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
   const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
+  const modernUiInput = document.querySelector("#modern-ui");
+  const appearanceState = document.querySelector("#appearance-state");
   const advancedModeInput = document.querySelector("#advanced-mode");
   const readabilityControlStage = document.querySelector("#readability-control-stage");
   const basicReadability = document.querySelector("#basic-readability");
@@ -28,6 +30,7 @@
   const saveStatusText = document.querySelector("#save-status-text");
   const retrySaveButton = document.querySelector("#retry-save");
   const addRuleForm = document.querySelector("#add-rule");
+  const addRuleButton = document.querySelector("#add-rule-button");
   const hostnameInput = document.querySelector("#new-hostname");
   const hostnameError = document.querySelector("#hostname-error");
   const subdomainsInput = document.querySelector("#new-subdomains");
@@ -37,7 +40,6 @@
   const ruleList = document.querySelector("#rule-list");
   const searchEmpty = document.querySelector("#search-empty");
   const emptyRules = document.querySelector("#empty-rules");
-  const clearRulesButton = document.querySelector("#clear-rules");
   const exportButton = document.querySelector("#export-settings");
   const importButton = document.querySelector("#import-settings");
   const importFile = document.querySelector("#import-file");
@@ -206,6 +208,13 @@
     renderPreview();
   };
 
+  const renderInterfaceStyle = () => {
+    const lexendMode = settings.uiStyle === "lexend";
+    document.documentElement.dataset.uiStyle = lexendMode ? "lexend" : "classic";
+    modernUiInput.checked = lexendMode;
+    appearanceState.textContent = lexendMode ? "On" : "Off";
+  };
+
   const makeDeleteButton = (rule) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -249,37 +258,18 @@
       status.className = "rule-status";
       status.textContent = active ? "Active" : "Paused";
 
-      const switchLabel = document.createElement("label");
-      switchLabel.className = "rule-switch";
-      const switchInput = document.createElement("input");
-      switchInput.type = "checkbox";
-      switchInput.className = "rule-enabled";
-      switchInput.checked = active;
-      switchInput.setAttribute(
-        "aria-label",
-        `${active ? "Pause" : "Activate"} Lexend for ${rule.hostname}`
-      );
-      const track = document.createElement("span");
-      track.className = "switch-track";
-      track.setAttribute("aria-hidden", "true");
-      const thumb = document.createElement("span");
-      thumb.className = "switch-thumb";
-      track.append(thumb);
-      switchLabel.append(switchInput, track);
-
-      row.append(domain, status, switchLabel, makeDeleteButton(rule));
+      row.append(domain, status, makeDeleteButton(rule));
       ruleList.append(row);
     });
 
     const hasRules = settings.siteRules.length > 0;
     emptyRules.hidden = hasRules;
-    ruleToolbar.hidden = !hasRules;
-    ruleToolbar.querySelector(".search-field").hidden = settings.siteRules.length <= 5;
-    clearRulesButton.hidden = !hasRules;
+    ruleToolbar.hidden = !hasRules || settings.siteRules.length <= 5;
     searchEmpty.hidden = !hasRules || !query || rules.length > 0;
   };
 
   const render = () => {
+    renderInterfaceStyle();
     renderReadability();
     renderRules();
   };
@@ -341,6 +331,11 @@
     subdomainPreview.textContent = `*.${settingsApi.validHostname(hostname) ? hostname : "example.com"}`;
   };
 
+  const updateAddRuleState = () => {
+    const hostname = normalizeHostnameInput(hostnameInput.value);
+    addRuleButton.disabled = !settingsApi.validHostname(hostname);
+  };
+
   advancedModeInput.addEventListener("change", async () => {
     renderReadabilityMode(true);
     if (!preferenceStorage) return;
@@ -351,6 +346,13 @@
     } catch {
       showToast("The advanced view preference could not be saved");
     }
+  });
+
+  modernUiInput.addEventListener("change", () => {
+    save({
+      ...settings,
+      uiStyle: modernUiInput.checked ? "lexend" : "classic"
+    });
   });
 
   const basicControlGroups = [
@@ -419,6 +421,7 @@
   hostnameInput.addEventListener("input", () => {
     clearHostnameError();
     updateSubdomainPreview();
+    updateAddRuleState();
   });
 
   addRuleForm.addEventListener("submit", (event) => {
@@ -449,21 +452,11 @@
     hostnameInput.value = "";
     subdomainsInput.checked = false;
     updateSubdomainPreview();
+    updateAddRuleState();
     save(nextSettings);
   });
 
   searchInput.addEventListener("input", renderRules);
-
-  ruleList.addEventListener("change", (event) => {
-    if (!event.target.classList.contains("rule-enabled")) return;
-    const row = event.target.closest(".rule-row");
-    if (!row) return;
-    save(settingsApi.setSiteRule(settings, {
-      hostname: row.dataset.hostname,
-      includeSubdomains: row.dataset.subdomains === "true",
-      enabled: event.target.checked
-    }));
-  });
 
   ruleList.addEventListener("click", (event) => {
     const button = event.target.closest(".delete-rule");
@@ -474,17 +467,6 @@
       row.dataset.hostname,
       row.dataset.subdomains === "true"
     ));
-  });
-
-  clearRulesButton.addEventListener("click", async () => {
-    const removedRules = settings.siteRules.map((rule) => ({ ...rule }));
-    const saved = await save({ ...settings, siteRules: [] });
-    if (!saved) return;
-    showToast("Site rules cleared", "Undo", () => {
-      toast.hidden = true;
-      clearTimeout(toastTimer);
-      save({ ...settings, siteRules: removedRules });
-    }, 8000);
   });
 
   exportButton.addEventListener("click", () => {

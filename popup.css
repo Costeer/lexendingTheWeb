@@ -18,8 +18,41 @@ body {
   font-size: 14px;
 }
 
+.wordmark-lexend {
+  display: none;
+}
+
+.site-message {
+  display: none;
+}
+
 button {
   background: transparent;
+}
+
+button,
+a,
+.master-control,
+.choice-card,
+.segments span,
+.switch-track,
+.switch-thumb,
+.radio-mark,
+.radio-mark::after {
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) ease,
+    transform var(--motion-base) var(--motion-ease);
+}
+
+button:not(:disabled):active,
+.choice-card:active,
+.segments label:active span,
+.master-control:active .switch-track {
+  transform: translateY(1px) scale(.98);
 }
 
 .panel {
@@ -43,10 +76,17 @@ button {
   align-items: center;
   min-width: 0;
   gap: 12px;
+  color: inherit;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: .06em;
+  text-decoration: none;
   white-space: nowrap;
+}
+
+.wordmark:hover {
+  color: var(--accent);
+  transform: translateY(-1px);
 }
 
 .wordmark-mark {
@@ -62,11 +102,11 @@ button {
   line-height: 1;
 }
 
-.masthead-actions {
+.masthead-leading {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
 }
 
 .settings-button {
@@ -83,12 +123,18 @@ button {
 .settings-button:hover {
   color: var(--surface);
   background: var(--ink);
+  transform: translateY(-1px);
+}
+
+.settings-button:hover svg {
+  transform: rotate(24deg);
 }
 
 .settings-button svg {
   width: 18px;
   height: 18px;
   fill: currentColor;
+  transition: transform var(--motion-base) var(--motion-ease);
 }
 
 .master-control {
@@ -127,7 +173,10 @@ button {
   width: 14px;
   height: 14px;
   background: var(--surface);
-  transition: transform 120ms ease;
+}
+
+.master-control:hover .switch-track {
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .master-control input:checked + .switch-track {
@@ -183,6 +232,7 @@ button {
 
 .text-link:hover {
   color: var(--accent);
+  text-underline-offset: 4px;
 }
 
 .popup-section {
@@ -221,6 +271,12 @@ button {
   margin-top: 9px;
 }
 
+.choice-card:hover {
+  background: var(--accent-tint);
+  box-shadow: 0 4px 10px rgb(0 0 0 / 10%);
+  transform: translateY(-1px);
+}
+
 .choice-card:has(input:checked) {
   background: var(--accent-tint);
   box-shadow: var(--active-shadow);
@@ -236,12 +292,19 @@ button {
   border-radius: 50%;
 }
 
+.radio-mark::after {
+  opacity: 0;
+  transform: scale(.25);
+}
+
 .choice-card input:checked + .radio-mark::after {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--accent);
   content: "";
+  opacity: 1;
+  transform: scale(1);
 }
 
 .choice-copy {
@@ -263,6 +326,16 @@ button {
 
 fieldset:disabled {
   opacity: .55;
+}
+
+fieldset {
+  transition:
+    opacity var(--motion-base) var(--motion-ease),
+    filter var(--motion-base) var(--motion-ease);
+}
+
+fieldset:disabled {
+  filter: grayscale(.35);
 }
 
 .segments {
@@ -290,9 +363,19 @@ fieldset:disabled {
   font-weight: 500;
 }
 
+.segments label:hover span {
+  color: var(--ink);
+  background: var(--accent-tint);
+}
+
 .segments input:checked + span {
   color: var(--surface);
   background: var(--ink);
+}
+
+.segments label:has(input:checked):hover span {
+  color: var(--surface);
+  background: var(--accent);
 }
 
 .spacing-preview {
@@ -328,6 +411,7 @@ fieldset:disabled {
 
 .quote-footer a:hover {
   color: var(--accent);
+  text-underline-offset: 4px;
 }
 
 .restricted-note {
@@ -351,61 +435,6 @@ fieldset:disabled {
   line-height: 1.4;
 }
 
-.attribution {
-  padding: 9px 13px 8px;
-}
-
-.attribution > a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 28px;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.attribution > a:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.attribution svg {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
-}
-
-.attribution-mark {
-  position: relative;
-  display: inline-flex;
-  width: 18px;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  vertical-align: -1px;
-}
-
-.attribution-hover-mark {
-  position: absolute;
-  opacity: 0;
-}
-
-.attribution > a:hover .attribution-heart,
-.attribution > a:focus-visible .attribution-heart {
-  opacity: 0;
-}
-
-.attribution > a:hover .attribution-hover-mark,
-.attribution > a:focus-visible .attribution-hover-mark {
-  opacity: 1;
-}
-
 .popup-feedback {
   min-height: 0;
   margin: 0;
@@ -415,7 +444,9 @@ fieldset:disabled {
 }
 
 .popup-feedback:not(:empty) {
-  margin-top: 7px;
+  padding: 8px 13px;
+  border-bottom: var(--section-divider);
+  background: var(--popup-muted);
 }
 
 .popup-feedback.is-error {
@@ -423,8 +454,312 @@ fieldset:disabled {
   font-weight: 500;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .switch-thumb {
-    transition: none;
-  }
+/* Lexend mode follows the supplied interface sketch. */
+:root[data-ui-style="lexend"] body {
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+:root[data-ui-style="lexend"] .panel {
+  position: relative;
+  width: 360px;
+  overflow: hidden;
+  border: var(--frame-border);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: var(--frame-shadow);
+}
+
+:root[data-ui-style="lexend"] .masthead {
+  min-height: 78px;
+  padding: 18px 24px;
+  border-bottom: 0;
+}
+
+:root[data-ui-style="lexend"] .wordmark-mark,
+:root[data-ui-style="lexend"] .wordmark-classic {
+  display: none;
+}
+
+:root[data-ui-style="lexend"] .wordmark-lexend {
+  display: flex;
+}
+
+:root[data-ui-style="lexend"] .wordmark {
+  display: grid;
+  width: 76px;
+  height: 34px;
+  padding: 0 12px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 0;
+  color: var(--surface);
+  background: var(--accent);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition: width 460ms var(--motion-ease);
+}
+
+:root[data-ui-style="lexend"] .wordmark:is(:hover, :focus) {
+  width: 154px;
+  color: var(--surface);
+  transform: none;
+}
+
+:root[data-ui-style="lexend"] .settings-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--accent);
+  background: var(--surface);
+}
+
+:root[data-ui-style="lexend"] .master-control {
+  gap: 10px;
+  color: var(--secondary-text);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+:root[data-ui-style="lexend"] .switch-track {
+  width: 50px;
+  height: 26px;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--surface);
+}
+
+:root[data-ui-style="lexend"] .switch-thumb {
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 0;
+}
+
+:root[data-ui-style="lexend"] .master-control input:checked + .switch-track {
+  background: var(--accent);
+}
+
+:root[data-ui-style="lexend"] .master-control input:checked + .switch-track .switch-thumb {
+  background: var(--surface);
+  transform: translateX(24px);
+}
+
+:root[data-ui-style="lexend"] .site-strip {
+  display: block;
+  min-height: 0;
+  padding: 26px 24px;
+  border: 0;
+  color: var(--surface);
+  background: var(--accent);
+}
+
+:root[data-ui-style="lexend"] #site-status-text {
+  color: var(--surface);
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  opacity: .85;
+}
+
+:root[data-ui-style="lexend"] #site-status-text strong {
+  font-weight: 400;
+}
+
+:root[data-ui-style="lexend"] .site-message {
+  display: block;
+  margin-top: 6px;
+  overflow: visible;
+  color: var(--surface);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: .045em;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+:root[data-ui-style="lexend"] .site-message strong {
+  font-weight: 600;
+}
+
+:root[data-ui-style="lexend"] .site-strip .text-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+:root[data-ui-style="lexend"] .popup-section {
+  padding: 22px 24px;
+  border-bottom: 0;
+}
+
+:root[data-ui-style="lexend"] .scope-section {
+  padding-bottom: 6px;
+}
+
+:root[data-ui-style="lexend"] .spacing-section {
+  padding-top: 12px;
+}
+
+:root[data-ui-style="lexend"] .popup-section legend {
+  margin-bottom: 10px;
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+:root[data-ui-style="lexend"] .choice-card {
+  grid-template-columns: 18px 1fr;
+  gap: 12px;
+  margin-right: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--text-body);
+  background: var(--surface);
+}
+
+:root[data-ui-style="lexend"] .choice-card:has(input:checked) {
+  padding: 8px 9px;
+  border-width: 6px;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--active-shadow);
+}
+
+:root[data-ui-style="lexend"] .radio-mark {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--ui-border);
+}
+
+:root[data-ui-style="lexend"] .choice-card input:checked + .radio-mark {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 4px var(--surface);
+}
+
+:root[data-ui-style="lexend"] .choice-card input:checked + .radio-mark::after {
+  display: none;
+}
+
+:root[data-ui-style="lexend"] .choice-copy {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+:root[data-ui-style="lexend"] .choice-copy strong {
+  color: var(--text-title);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .025em;
+}
+
+:root[data-ui-style="lexend"] .segments {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+}
+
+:root[data-ui-style="lexend"] .segments label + label {
+  border-left: 1px solid var(--ui-border);
+}
+
+:root[data-ui-style="lexend"] .segments span {
+  min-height: 38px;
+  padding: 9px 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  letter-spacing: .02em;
+}
+
+:root[data-ui-style="lexend"] .segments input:checked + span {
+  color: var(--surface);
+  background: var(--accent);
+}
+
+:root[data-ui-style="lexend"] .spacing-preview {
+  position: relative;
+  margin: 30px 6px 34px;
+  padding: 20px 22px;
+  border: 7px solid var(--accent);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 14%);
+}
+
+:root[data-ui-style="lexend"] .spacing-preview::before,
+:root[data-ui-style="lexend"] .spacing-preview::after {
+  position: absolute;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 70px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:root[data-ui-style="lexend"] .spacing-preview::before {
+  top: -24px;
+  left: 8px;
+  content: "“";
+}
+
+:root[data-ui-style="lexend"] .spacing-preview::after {
+  right: 8px;
+  bottom: -58px;
+  content: "”";
+}
+
+:root[data-ui-style="lexend"] .spacing-preview blockquote {
+  color: var(--text-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.75;
+}
+
+:root[data-ui-style="lexend"] .quote-footer {
+  margin-top: 8px;
+  color: var(--secondary-text);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+:root[data-ui-style="lexend"] .restricted-note {
+  border-bottom: 0;
+  background: var(--popup-muted);
+}
+
+:root[data-ui-style="lexend"] .master-control input:focus-visible + .switch-track,
+:root[data-ui-style="lexend"] .choice-card input:focus-visible + .radio-mark,
+:root[data-ui-style="lexend"] .segments input:focus-visible + span {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+:root[data-ui-style="lexend"] .popup-feedback:not(:empty) {
+  padding: 10px 24px;
+  border-bottom: 0;
+  color: var(--surface);
+  background: var(--ink);
 }
