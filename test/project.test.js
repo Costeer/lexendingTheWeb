@@ -101,6 +101,9 @@ test("content script reacts to page and settings changes", async () => {
   assert.match(contentSource, /shadowRoot/);
   assert.match(contentSource, /storage\.onChanged\.addListener/);
   assert.match(contentSource, /data-lexend-ignore/);
+  assert.match(contentSource, /data-lexend-text-scale/);
+  assert.match(contentSource, /getComputedStyle\(element\)\.fontSize/);
+  assert.match(contentSource, /requestAnimationFrame/);
   assert.match(contentSource, /LEXEND_GET_STATE/);
   assert.match(popupSource, /LEXEND_GET_STATE/);
 });
