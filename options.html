@@ -8,38 +8,57 @@
         <link rel="stylesheet" href="options.css" />
     </head>
     <body>
+        <div
+            id="save-status"
+            class="save-status is-saved"
+            role="status"
+            aria-live="polite"
+        >
+            <svg
+                id="save-status-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    d="m9.2 17.3-5-5 1.6-1.6 3.4 3.4 9-9 1.6 1.6-10.6 10.6Z"
+                />
+            </svg>
+            <span id="save-status-text">All changes saved</span>
+            <button
+                id="retry-save"
+                class="inline-link"
+                type="button"
+                hidden
+            >
+                Retry
+            </button>
+        </div>
+
         <main>
-            <header class="masthead">
-                <div class="brand">
-                    <span class="brand-mark" aria-hidden="true">L</span>
-                    <h1>Settings</h1>
+            <section class="appearance-section" aria-labelledby="appearance-title">
+                <div class="appearance-copy">
+                    <span class="section-kicker">Appearance</span>
+                    <h2 id="appearance-title">A calmer way to read</h2>
+                    <p class="helper">
+                        Switch to a cleaner interface inspired by Lexend's bold,
+                        spacious website.
+                    </p>
                 </div>
-                <div
-                    id="save-status"
-                    class="save-status is-saved"
-                    role="status"
-                    aria-live="polite"
-                >
-                    <svg
-                        id="save-status-icon"
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            d="m9.2 17.3-5-5 1.6-1.6 3.4 3.4 9-9 1.6 1.6-10.6 10.6Z"
-                        />
-                    </svg>
-                    <span id="save-status-text">All changes saved</span>
-                    <button
-                        id="retry-save"
-                        class="inline-link"
-                        type="button"
-                        hidden
-                    >
-                        Retry
-                    </button>
-                </div>
-            </header>
+                <label class="appearance-control">
+                    <span class="appearance-label">
+                        <strong>Lexend mode</strong>
+                        <small id="appearance-state">Off</small>
+                    </span>
+                    <input
+                        id="modern-ui"
+                        type="checkbox"
+                        aria-describedby="appearance-title"
+                    />
+                    <span class="appearance-switch-track" aria-hidden="true">
+                        <span class="appearance-switch-thumb"></span>
+                    </span>
+                </label>
+            </section>
 
             <section aria-labelledby="readability-title">
                 <div class="section-heading readability-heading">
@@ -54,8 +73,14 @@
                         </label>
                     </div>
                     <p class="helper">
-                        Applies only while Lexend is on. Larger text and spacing
-                        can break tightly fitted layouts.
+                        Applies
+                        <span class="lexend-emphasis"
+                            >only while Lexend is on.</span
+                        >
+                        Larger text and spacing
+                        <span class="lexend-emphasis"
+                            >can break tightly fitted layouts.</span
+                        >
                     </p>
                 </div>
 
@@ -231,19 +256,21 @@
                             Reset to default
                         </button>
                     </div>
-                    <blockquote id="preview-copy" lang="de" tabindex="0">
-                        “Zu sagen, was ist, bleibt die revolutionärste Tat.”
-                    </blockquote>
-                    <p class="preview-attribution">
-                        —
-                        <a
-                            id="preview-author"
-                            href="https://en.wikipedia.org/wiki/Rosa_Luxemburg"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            >Rosa Luxemburg</a
-                        >
-                    </p>
+                    <figure class="preview-quote-frame">
+                        <blockquote id="preview-copy" lang="de" tabindex="0">
+                            “Zu sagen, was ist, bleibt die revolutionärste Tat.”
+                        </blockquote>
+                        <figcaption class="preview-attribution">
+                            —
+                            <a
+                                id="preview-author"
+                                href="https://en.wikipedia.org/wiki/Rosa_Luxemburg"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                >Rosa Luxemburg</a
+                            >
+                        </figcaption>
+                    </figure>
                 </div>
             </section>
 
@@ -281,7 +308,12 @@
                             <small id="subdomain-preview">*.example.com</small>
                         </span>
                     </label>
-                    <button class="primary-button" type="submit">
+                    <button
+                        id="add-rule-button"
+                        class="primary-button"
+                        type="submit"
+                        disabled
+                    >
                         Add rule
                     </button>
                 </form>
@@ -300,13 +332,6 @@
                             placeholder="Search saved sites"
                         />
                     </label>
-                    <button
-                        id="clear-rules"
-                        class="danger-button"
-                        type="button"
-                    >
-                        Clear all
-                    </button>
                 </div>
 
                 <div id="rule-list" class="rule-list"></div>
@@ -396,6 +421,22 @@
                     </article>
                 </div>
             </section>
+            <a
+                class="lxnd-badge"
+                href="https://www.lexend.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Visit the Lexend website"
+            >
+                <span class="lxnd-word" aria-hidden="true">
+                    <span class="lxnd-letter">L</span>
+                    <span class="lxnd-letter lxnd-letter-insert">E</span>
+                    <span class="lxnd-letter">X</span>
+                    <span class="lxnd-letter lxnd-letter-insert">E</span>
+                    <span class="lxnd-letter">N</span>
+                    <span class="lxnd-letter">D</span>
+                </span>
+            </a>
         </main>
 
         <footer class="page-attribution">

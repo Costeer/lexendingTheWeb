@@ -33,6 +33,7 @@
   const quoteAuthor = document.querySelector("#quote-author");
   const siteStrip = document.querySelector("#site-strip");
   const siteStatusText = document.querySelector("#site-status-text");
+  const siteMessage = document.querySelector("#site-message");
   const toggleSiteButton = document.querySelector("#toggle-site");
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
@@ -66,6 +67,7 @@
   ));
 
   const renderSettings = () => {
+    document.documentElement.dataset.uiStyle = settings.uiStyle;
     enabledInput.checked = settings.enabled;
     enabledInput.setAttribute(
       "aria-label",
@@ -93,11 +95,20 @@
     const effective = settingsApi.resolveSite(settings, site.hostname);
     if (!settings.enabled) {
       siteStatusText.textContent = "Off";
+      siteMessage.textContent = "Lexend is paused everywhere.";
     } else {
       const status = effective.active ? "Active on " : "Paused on ";
       const hostname = document.createElement("strong");
       hostname.textContent = site.hostname;
       siteStatusText.replaceChildren(document.createTextNode(status), hostname);
+      siteMessage.replaceChildren(
+        document.createTextNode(effective.active
+          ? "Reading here is set up for "
+          : "Lexend is paused for "),
+        Object.assign(document.createElement("strong"), {
+          textContent: effective.active ? "you." : "this site."
+        })
+      );
     }
     toggleSiteButton.textContent = effective.siteEnabled ? "Pause here" : "Resume here";
     toggleSiteButton.setAttribute(
