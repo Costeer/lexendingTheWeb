@@ -28,11 +28,11 @@
 :root {
   --accent: #C40000;
   --accent-tint: #FDECEC;
-  --ink: #111111;
+  --ink: #000000;
   --surface: #FFFFFF;
   --popup-muted: #F4F4F4;
   --settings-muted: #FAF8F4;
-  --secondary-text: #444444;
+  --secondary-text: #000000;
   --frame-border: 3px solid var(--ink);
   --section-divider: 2px solid var(--ink);
   --control-border: 2px solid var(--ink);
