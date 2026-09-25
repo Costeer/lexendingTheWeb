@@ -517,8 +517,12 @@ fieldset:disabled {
   height: 32px;
   border: 1px solid var(--ui-border);
   border-radius: 0;
-  color: var(--accent);
+  color: var(--ink);
   background: var(--surface);
+}
+
+:root[data-ui-style="lexend"] .settings-button:hover {
+  color: var(--surface);
 }
 
 :root[data-ui-style="lexend"] .master-control {
@@ -564,7 +568,7 @@ fieldset:disabled {
   border-top: 1px solid #F2DADA;
   border-bottom: 1px solid #E8D4D4;
   border-left: 4px solid var(--accent);
-  color: #7A2020;
+  color: var(--ink);
   background: #FDEAEA;
 }
 
@@ -605,7 +609,7 @@ fieldset:disabled {
 
 :root[data-ui-style="lexend"] .popup-section legend {
   margin-bottom: 10px;
-  color: var(--accent);
+  color: var(--ink);
   font-size: 10.5px;
   font-weight: 400;
   letter-spacing: .14em;
@@ -736,6 +740,11 @@ fieldset:disabled {
 :root[data-ui-style="lexend"] .restricted-note {
   border-bottom: 0;
   background: var(--popup-muted);
+}
+
+:root[data-ui-style="lexend"] .quote-footer a:hover,
+:root[data-ui-style="lexend"] .popup-feedback.is-error {
+  color: var(--ink);
 }
 
 :root[data-ui-style="lexend"] .master-control input:focus-visible + .switch-track,
