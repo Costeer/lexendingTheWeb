@@ -557,48 +557,36 @@ fieldset:disabled {
 }
 
 :root[data-ui-style="lexend"] .site-strip {
-  display: block;
-  min-height: 0;
-  padding: 26px 24px;
+  display: flex;
+  min-height: 40px;
+  padding: 9px 26px 9px 22px;
   border: 0;
-  color: var(--surface);
-  background: var(--accent);
+  border-top: 1px solid #F2DADA;
+  border-bottom: 1px solid #E8D4D4;
+  border-left: 4px solid var(--accent);
+  color: #7A2020;
+  background: #FDEAEA;
 }
 
 :root[data-ui-style="lexend"] #site-status-text {
-  color: var(--surface);
-  font-size: 10.5px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  opacity: .85;
+  color: inherit;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] #site-status-text strong {
-  font-weight: 400;
+  font-weight: 500;
 }
 
 :root[data-ui-style="lexend"] .site-message {
-  display: block;
-  margin-top: 6px;
-  overflow: visible;
-  color: var(--surface);
-  font-size: 22px;
-  font-weight: 400;
-  line-height: 1.25;
-  letter-spacing: .045em;
-  text-overflow: clip;
-  white-space: normal;
-}
-
-:root[data-ui-style="lexend"] .site-message strong {
-  font-weight: 600;
+  display: none;
 }
 
 :root[data-ui-style="lexend"] .site-strip .text-link {
-  display: inline-block;
-  margin-top: 10px;
-  color: var(--surface);
-  font-size: 13px;
+  margin: 0;
+  color: inherit;
+  font-size: 14px;
   font-weight: 400;
 }
 
