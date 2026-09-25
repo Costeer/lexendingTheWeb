@@ -870,6 +870,7 @@ input::placeholder {
 }
 
 .empty-state {
+  margin-top: 14px;
   padding: 18px;
   border: 1px dashed var(--ink);
   background: var(--settings-muted);
@@ -1085,7 +1086,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .appearance-section h2 {
   max-width: none;
-  color: var(--ink);
+  color: var(--surface);
   font-size: 40px;
   font-weight: 650;
   line-height: 1.2;
@@ -1113,7 +1114,7 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .appearance-link:hover {
-  color: var(--ink);
+  color: var(--surface);
   text-underline-offset: 5px;
 }
 
@@ -1204,7 +1205,7 @@ input::placeholder {
 }
 
 :root[data-ui-style="lexend"] .lexend-emphasis {
-  color: var(--accent);
+  color: var(--ink);
 }
 
 :root[data-ui-style="lexend"] .advanced-control {
@@ -1298,7 +1299,7 @@ input::placeholder {
   place-items: center;
   border: 1px solid var(--accent);
   border-radius: 50%;
-  color: var(--accent);
+  color: var(--ink);
   font-size: 11px;
   font-weight: 300;
   letter-spacing: 0;
@@ -1371,7 +1372,7 @@ input::placeholder {
   margin-left: auto;
   padding: 0;
   border: 0;
-  color: var(--accent);
+  color: var(--ink);
   background: transparent;
   font-weight: 400;
   line-height: 1.4;
@@ -1446,7 +1447,7 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .preview-heading > span,
 :root[data-ui-style="lexend"] .section-kicker {
-  color: var(--accent);
+  color: var(--ink);
   font-size: 10.5px;
   font-weight: 400;
   letter-spacing: .14em;
@@ -1506,6 +1507,10 @@ input::placeholder {
   font-weight: 400;
 }
 
+:root[data-ui-style="lexend"] input::placeholder {
+  color: var(--ink);
+}
+
 :root[data-ui-style="lexend"] .primary-button,
 :root[data-ui-style="lexend"] .secondary-button,
 :root[data-ui-style="lexend"] .danger-button {
@@ -1513,7 +1518,7 @@ input::placeholder {
   padding: 11px 20px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
-  color: var(--accent);
+  color: var(--ink);
   background: var(--surface);
   font-size: 11px;
   font-weight: 300;
@@ -1577,7 +1582,16 @@ input::placeholder {
 :root[data-ui-style="lexend"] .delete-rule {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
-  color: var(--accent);
+  color: var(--ink);
+}
+
+:root[data-ui-style="lexend"] .field-error,
+:root[data-ui-style="lexend"] .check-label:hover strong {
+  color: var(--ink);
+}
+
+:root[data-ui-style="lexend"] .preview-attribution a:hover {
+  color: var(--ink);
 }
 
 :root[data-ui-style="lexend"] .empty-state,

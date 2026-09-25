@@ -56,7 +56,7 @@
   --surface: #FFFFFF;
   --popup-muted: #EEEEEE;
   --settings-muted: #EEEEEE;
-  --secondary-text: #777777;
+  --secondary-text: #000000;
   --ui-border: #C2C2C2;
   --ui-radius: 5px;
   --frame-border: 1px solid var(--ui-border);
@@ -64,10 +64,10 @@
   --control-border: 1px solid var(--ui-border);
   --active-shadow: 0 6px 16px rgb(0 0 0 / 14%);
   --frame-shadow: 0 12px 32px rgb(0 0 0 / 14%);
-  --text-title: #111111;
-  --text-body: #383838;
-  --text-muted: #6E6E6E;
-  --text-soft: #969696;
+  --text-title: #000000;
+  --text-body: #000000;
+  --text-muted: #000000;
+  --text-soft: #000000;
   font-weight: 400;
   letter-spacing: 0;
 }
