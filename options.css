@@ -1117,6 +1117,16 @@ input::placeholder {
   text-underline-offset: 5px;
 }
 
+:root[data-ui-style="lexend"] .appearance-link-word {
+  display: inline-block;
+  letter-spacing: 0;
+  transition: letter-spacing 320ms var(--motion-ease);
+}
+
+:root[data-ui-style="lexend"] .appearance-link:is(:hover, :focus-visible) .appearance-link-word {
+  letter-spacing: .14em;
+}
+
 :root[data-ui-style="lexend"] .appearance-control {
   justify-content: flex-start;
   margin-top: 26px;
