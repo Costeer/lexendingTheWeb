@@ -760,3 +760,84 @@ fieldset:disabled {
   color: var(--surface);
   background: var(--ink);
 }
+
+/* Mobile browsers present the popup in a full-page viewport. Keep desktop
+   popup sizing intrinsic, but let touch layouts fill their browser surface. */
+@media (hover: none) and (pointer: coarse) {
+  :root[data-ui-style="lexend"],
+  :root[data-ui-style="lexend"] body {
+    width: 100%;
+    min-height: 100%;
+    background: var(--surface);
+  }
+
+  :root[data-ui-style="lexend"] .panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+
+  :root[data-ui-style="lexend"] .masthead,
+  :root[data-ui-style="lexend"] .site-strip,
+  :root[data-ui-style="lexend"] .popup-section {
+    padding-inline: clamp(16px, 5vw, 32px);
+  }
+
+  :root[data-ui-style="lexend"] .masthead {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  :root[data-ui-style="lexend"] .settings-button,
+  :root[data-ui-style="lexend"] .master-control,
+  :root[data-ui-style="lexend"] .site-strip .text-link,
+  :root[data-ui-style="lexend"] .segments span {
+    min-height: 44px;
+  }
+
+  :root[data-ui-style="lexend"] .settings-button {
+    width: 44px;
+  }
+
+  :root[data-ui-style="lexend"] .site-strip-copy {
+    min-width: 0;
+  }
+
+  :root[data-ui-style="lexend"] #site-status-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  :root[data-ui-style="lexend"] .popup-section {
+    min-width: 0;
+  }
+
+  :root[data-ui-style="lexend"] .spacing-section {
+    flex: 1;
+  }
+
+  :root[data-ui-style="lexend"] .segments {
+    grid-template-columns: .9fr 1.2fr .9fr;
+  }
+
+  :root[data-ui-style="lexend"] .spacing-preview {
+    padding-inline: clamp(16px, 4vw, 28px);
+  }
+
+  :root[data-ui-style="lexend"] .spacing-preview blockquote {
+    max-height: none;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    scrollbar-gutter: auto;
+  }
+
+  :root[data-ui-style="lexend"] .quote-footer {
+    overflow-wrap: anywhere;
+  }
+}
