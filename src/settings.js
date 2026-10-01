@@ -17,11 +17,29 @@
     wider: 0.08
   });
 
+  const normalizeHostname = (hostname) => {
+    if (typeof hostname !== "string") return "";
+    const value = hostname.trim().toLowerCase().replace(/\.$/, "");
+    if (/^\[[0-9a-f:.]+\]$/.test(value)) {
+      try {
+        return new URL(`http://${value}`).hostname;
+      } catch {}
+    }
+    return value;
+  };
+
   const validHostname = (hostname) => {
     if (typeof hostname !== "string" || !hostname.length || hostname.length > 253) {
       return false;
     }
-    if (/^\[[0-9a-f:]+\]$/.test(hostname)) return true;
+    if (hostname.startsWith("[")) {
+      try {
+        new URL(`http://${hostname}`);
+        return /^\[[0-9a-f:.]+\]$/i.test(hostname);
+      } catch {
+        return false;
+      }
+    }
     return hostname.split(".").every((label) => (
       label.length > 0
       && label.length <= 63
@@ -30,6 +48,8 @@
   };
 
   const clampNumber = (value, fallback, min, max, precision = 0) => {
+    if (typeof value !== "number" && typeof value !== "string") return fallback;
+    if (typeof value === "string" && !value.trim()) return fallback;
     const number = Number(value);
     if (!Number.isFinite(number)) return fallback;
     const clamped = Math.min(max, Math.max(min, number));
@@ -46,13 +66,13 @@
         3
       );
     }
-    return legacySpacingValues[value.spacing] ?? defaults.letterSpacing;
+    return typeof value.spacing === "string" && Object.hasOwn(legacySpacingValues, value.spacing)
+      ? legacySpacingValues[value.spacing]
+      : defaults.letterSpacing;
   };
 
   const normalizeRule = (rule) => {
-    const hostname = typeof rule?.hostname === "string"
-      ? rule.hostname.trim().toLowerCase().replace(/\.$/, "")
-      : "";
+    const hostname = normalizeHostname(rule?.hostname);
     if (!validHostname(hostname)) return null;
 
     const enabled = typeof rule?.enabled === "boolean" ? rule.enabled : null;
@@ -68,6 +88,7 @@
   };
 
   const normalizeSettings = (value = {}) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) value = {};
     const sourceRules = Object.prototype.hasOwnProperty.call(value, "siteRules")
       ? value.siteRules
       : (Array.isArray(value.disabledSites)
@@ -99,7 +120,7 @@
         ? "lexend"
         : defaults.uiStyle,
       textScale: clampNumber(value.textScale, defaults.textScale, 80, 140),
-      lineHeight: Number(value.lineHeight) === 0
+      lineHeight: (value.lineHeight === 0 || value.lineHeight === "0")
         ? 0
         : clampNumber(value.lineHeight, defaults.lineHeight, 1, 2.4, 2),
       letterSpacing: normalizeLetterSpacing(value)
@@ -123,7 +144,7 @@
 
   const resolveSite = (value, hostname) => {
     const settings = normalizeSettings(value);
-    const matches = matchingRules(settings, hostname.toLowerCase());
+    const matches = matchingRules(settings, normalizeHostname(hostname));
     const enabledRule = matches.find((rule) => rule.enabled !== null);
     const scopeRule = matches.find((rule) => rule.scope !== null);
     const siteEnabled = enabledRule?.enabled ?? true;
@@ -140,16 +161,14 @@
   const getDirectRule = (value, hostname, includeSubdomains = false) => {
     const settings = normalizeSettings(value);
     return settings.siteRules.find((rule) => (
-      rule.hostname === hostname.toLowerCase()
+      rule.hostname === normalizeHostname(hostname)
       && rule.includeSubdomains === Boolean(includeSubdomains)
     )) ?? null;
   };
 
   const setSiteRule = (value, candidate) => {
     const settings = normalizeSettings(value);
-    const hostname = typeof candidate?.hostname === "string"
-      ? candidate.hostname.toLowerCase()
-      : "";
+    const hostname = normalizeHostname(candidate?.hostname);
     const includeSubdomains = Boolean(candidate?.includeSubdomains);
     const keyMatches = (rule) => (
       rule.hostname === hostname && rule.includeSubdomains === includeSubdomains
@@ -173,9 +192,21 @@
     return normalizeSettings({
       ...settings,
       siteRules: settings.siteRules.filter((rule) => !(
-        rule.hostname === hostname.toLowerCase()
+        rule.hostname === normalizeHostname(hostname)
         && rule.includeSubdomains === Boolean(includeSubdomains)
       ))
+    });
+  };
+
+  const toggleSite = (value, hostname) => {
+    const settings = normalizeSettings(value);
+    const effective = resolveSite(settings, hostname);
+    const inherited = resolveSite(removeSiteRule(settings, hostname), hostname);
+    const enabled = settings.enabled ? !effective.siteEnabled : true;
+    return setSiteRule({ ...settings, enabled: true }, {
+      hostname,
+      includeSubdomains: false,
+      enabled: enabled === inherited.siteEnabled ? null : enabled
     });
   };
 
@@ -186,6 +217,7 @@
     removeSiteRule,
     resolveSite,
     setSiteRule,
+    toggleSite,
     validHostname
   });
 })();

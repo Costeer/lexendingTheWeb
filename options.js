@@ -49,7 +49,6 @@
   const shortcutInstructions = document.querySelector("#shortcut-instructions");
   const toast = document.querySelector("#toast");
   const toastMessage = document.querySelector("#toast-message");
-  const toastAction = document.querySelector("#toast-action");
 
   let settings = settingsApi.normalizeSettings();
   let failedSettings = null;
@@ -65,17 +64,13 @@
     retrySaveButton.hidden = state !== "error";
   };
 
-  const showToast = (message, actionLabel = "", action = null, timeout = 3000) => {
+  const showToast = (message) => {
     clearTimeout(toastTimer);
     toastMessage.textContent = message;
-    toastAction.textContent = actionLabel;
-    toastAction.hidden = !actionLabel;
-    toastAction.onclick = action;
     toast.hidden = false;
     toastTimer = setTimeout(() => {
       toast.hidden = true;
-      toastAction.onclick = null;
-    }, timeout);
+    }, 3000);
   };
 
   const normalizeHostnameInput = (rawValue) => {
@@ -236,7 +231,6 @@
     ruleList.replaceChildren();
 
     rules.forEach((rule) => {
-      const active = rule.enabled !== false;
       const row = document.createElement("div");
       row.className = "rule-row";
       row.dataset.hostname = rule.hostname;
@@ -256,7 +250,7 @@
 
       const status = document.createElement("span");
       status.className = "rule-status";
-      status.textContent = active ? "Active" : "Paused";
+      status.textContent = rule.enabled === null ? "Inherit" : (rule.enabled ? "Active" : "Paused");
 
       row.append(domain, status, makeDeleteButton(rule));
       ruleList.append(row);
@@ -264,7 +258,7 @@
 
     const hasRules = settings.siteRules.length > 0;
     emptyRules.hidden = hasRules;
-    ruleToolbar.hidden = !hasRules || settings.siteRules.length <= 5;
+    ruleToolbar.hidden = !hasRules || (settings.siteRules.length <= 5 && !query);
     searchEmpty.hidden = !hasRules || !query || rules.length > 0;
   };
 
@@ -495,7 +489,10 @@
     try {
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
       const payload = JSON.parse(await file.text());
-      if (![1, 2].includes(payload?.schemaVersion) || typeof payload.settings !== "object") {
+      if (![1, 2].includes(payload?.schemaVersion)
+          || !payload.settings
+          || typeof payload.settings !== "object"
+          || Array.isArray(payload.settings)) {
         throw new Error("Unsupported settings file");
       }
       if (await save(payload.settings)) showToast("Settings imported");

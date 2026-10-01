@@ -14,13 +14,11 @@ plus headings, with per-site controls and no tracking.
 Lexend for the Web replaces website typography with Lexend. Page text is
 processed locally and is never recorded or sent to the developer.
 
-Key features:
-
 - Apply Lexend to body text or to body text and headings
 - Pause the extension globally or on individual websites
 - Apply a rule to one hostname or include its subdomains
 - Adjust text size, line height, and letter spacing
-- Search, edit, and clear rules from the settings page
+- Add, search, and delete rules from the settings page
 - Toggle Lexend on the current website with a keyboard shortcut
 - Import and export settings as JSON
 - Leave code, mathematical notation, SVG graphics, and common icon fonts alone

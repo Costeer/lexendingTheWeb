@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Lexend for the Web — Settings</title>
+        <title>Lexend for the Web settings</title>
         <link rel="stylesheet" href="shared.css" />
         <link rel="stylesheet" href="options.css" />
     </head>
@@ -37,18 +37,17 @@
         <main>
             <section class="appearance-section" aria-labelledby="appearance-title">
                 <div class="appearance-copy">
-                    <h2 id="appearance-title">A calmer way to read</h2>
+                    <h2 id="appearance-title">Appearance</h2>
                     <p class="helper">
-                        This mode swaps in Lexend — a free, research-backed
-                        typeface designed to improve reading speed and reduce
-                        visual fatigue.
+                        Use the Lexend theme for the popup and settings page.
+                        This changes the extension's appearance only.
                     </p>
                     <a
                         class="appearance-link"
                         href="https://www.lexend.com/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        >Learn about
+                            >About
                         <span class="appearance-link-word">Lexend</span> ↗</a
                     >
                 </div>
@@ -167,7 +166,7 @@
                                         type="radio"
                                         name="basicLetterSpacing"
                                         value="0"
-                                    /><span>Compact</span></label
+                                    /><span>Default</span></label
                                 >
                                 <label
                                     ><input
@@ -353,7 +352,7 @@
                 </p>
                 <div id="empty-rules" class="empty-state">
                     <h3>No site rules yet</h3>
-                    <p>Add a site above to pause Lexend on it or keep it on.</p>
+                    <p>Add a site above to pause Lexend on it.</p>
                 </div>
             </section>
 
@@ -460,12 +459,6 @@
 
         <div id="toast" class="toast" role="status" aria-live="polite" hidden>
             <span id="toast-message"></span>
-            <button
-                id="toast-action"
-                class="inline-link"
-                type="button"
-                hidden
-            ></button>
         </div>
 
         <script src="src/settings.js"></script>

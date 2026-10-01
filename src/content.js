@@ -5,7 +5,7 @@
   const settingsApi = globalThis.LexendSettings;
   const STYLE_ID = "lexend-the-web-styles";
   const FONT_FAMILY = '"Lexend for the Web", sans-serif';
-  const styledRoots = new Set();
+  const styledRoots = new Map();
   let settings = settingsApi.normalizeSettings();
 
   const iconAndContentExclusions = [
@@ -179,22 +179,33 @@
       root.append(style);
     }
 
-    style.textContent = createCss(getEffectiveSettings(), root instanceof ShadowRoot);
-    styledRoots.add(root);
+    const css = createCss(getEffectiveSettings(), root instanceof ShadowRoot);
+    if (style.textContent !== css) style.textContent = css;
+    if (!styledRoots.has(root)) {
+      const observer = root instanceof ShadowRoot ? new MutationObserver(handleMutations) : null;
+      observer?.observe(root, { childList: true, subtree: true });
+      styledRoots.set(root, observer);
+    }
   };
 
   const visitShadowRoots = (node) => {
-    if (!(node instanceof Element) && node !== document.documentElement) return;
+    if (!(node instanceof Element) && !(node instanceof ShadowRoot)) return;
+    if (!node.isConnected) return;
 
-    if (node.shadowRoot) {
-      applyToRoot(node.shadowRoot);
-      node.shadowRoot.querySelectorAll("*").forEach((element) => {
-        if (element.shadowRoot) visitShadowRoots(element);
-      });
-    }
+    const visitHost = (element) => {
+      if (!element.shadowRoot) return;
+      applyToRoot(element.shadowRoot);
+      visitShadowRoots(element.shadowRoot);
+    };
+    visitHost(node);
+    node.querySelectorAll("*").forEach(visitHost);
+  };
 
-    node.querySelectorAll?.("*").forEach((element) => {
-      if (element.shadowRoot) visitShadowRoots(element);
+  const pruneRoots = () => {
+    styledRoots.forEach((observer, root) => {
+      if (root.isConnected) return;
+      observer?.disconnect();
+      styledRoots.delete(root);
     });
   };
 
@@ -210,7 +221,8 @@
   const applySettings = (nextSettings) => {
     settings = settingsApi.normalizeSettings(nextSettings);
 
-    styledRoots.forEach(applyToRoot);
+    pruneRoots();
+    styledRoots.forEach((_observer, root) => applyToRoot(root));
 
     if (document.documentElement) {
       applyToRoot(document.documentElement);
@@ -220,7 +232,8 @@
     notifyState();
   };
 
-  const observer = new MutationObserver((mutations) => {
+  const handleMutations = (mutations) => {
+    if (mutations.some(({ removedNodes }) => removedNodes.length)) pruneRoots();
     if (document.documentElement && !styledRoots.has(document.documentElement)) {
       applyToRoot(document.documentElement);
     }
@@ -228,7 +241,9 @@
     mutations.forEach(({ addedNodes }) => {
       addedNodes.forEach(visitShadowRoots);
     });
-  });
+  };
+
+  const observer = new MutationObserver(handleMutations);
 
   const start = async () => {
     try {

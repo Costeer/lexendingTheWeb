@@ -453,7 +453,6 @@ fieldset:disabled {
   font-weight: 500;
 }
 
-/* Lexend mode follows the supplied interface sketch. */
 :root[data-ui-style="lexend"] body {
   color: var(--text-body);
   font-family: var(--font-ui);

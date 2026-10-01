@@ -7,8 +7,7 @@ A Chrome and Firefox extension that replaces website typography with
 
 - Apply Lexend to body copy alone or include headings.
 - Set text size, line height, and letter spacing.
-- Switch between the original controls and a bold, editorial Lexend mode for
-  the popup and settings page.
+- Choose between the classic and Lexend themes for the popup and settings page.
 - Pause the extension globally, for one hostname, or for a domain and its
   subdomains.
 - Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
@@ -23,6 +22,7 @@ send page content to a server.
 Requirement: Node.js 20+.
 
 ```sh
+npm ci
 npm test
 npm run check
 npm run build

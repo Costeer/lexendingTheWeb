@@ -1014,7 +1014,6 @@ input::placeholder {
   }
 }
 
-/* Lexend mode follows the supplied interface sketch. */
 :root[data-ui-style="lexend"] body {
   padding: 32px 20px 56px;
   background: var(--surface);
