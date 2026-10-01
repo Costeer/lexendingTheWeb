@@ -179,3 +179,58 @@ test("normalization rejects invalid values and respects the sync storage limit",
   assert.equal(settingsApi.normalizeSettings({ uiStyle: "unknown" }).uiStyle, "classic");
   assert.equal(settingsApi.normalizeSettings({ uiStyle: "modern" }).uiStyle, "lexend");
 });
+
+test("malformed settings do not coerce missing numbers or inherit legacy spacing", () => {
+  for (const value of [null, [], false, "settings"]) {
+    assert.deepEqual(settingsApi.normalizeSettings(value), settingsApi.normalizeSettings());
+  }
+  for (const value of [null, false, [], {}, "", " "]) {
+    assert.equal(settingsApi.normalizeSettings({ textScale: value }).textScale, 100);
+  }
+  for (const spacing of ["toString", "constructor", "__proto__"]) {
+    assert.equal(settingsApi.normalizeSettings({ spacing }).letterSpacing, 0);
+  }
+  assert.equal(settingsApi.validHostname("[::1]"), true);
+  assert.equal(settingsApi.validHostname("[0:0:0:0:0:0:0:1]"), true);
+  assert.equal(settingsApi.validHostname("[::::]"), false);
+  assert.equal(settingsApi.validHostname("[::1]/path"), false);
+  assert.equal(settingsApi.normalizeSettings({ spacing: { toString: null } }).letterSpacing, 0);
+  assert.equal(settingsApi.normalizeSettings({ lineHeight: { toString: null } }).lineHeight, 0);
+});
+
+test("rule lookup, update, resolution and removal normalize hostnames consistently", () => {
+  let settings = settingsApi.setSiteRule({}, {
+    hostname: " Example.COM. ", enabled: false, scope: "all"
+  });
+  assert.equal(settingsApi.getDirectRule(settings, "Example.COM.").scope, "all");
+  assert.equal(settingsApi.resolveSite(settings, " Example.COM. ").active, false);
+  settings = settingsApi.setSiteRule(settings, { hostname: "Example.COM.", enabled: true });
+  assert.equal(settings.siteRules.length, 1);
+  assert.equal(settings.siteRules[0].scope, "all");
+  assert.equal(settings.siteRules[0].enabled, true);
+  assert.equal(settingsApi.removeSiteRule(settings, "Example.COM.").siteRules.length, 0);
+
+  const ipv6 = settingsApi.setSiteRule({}, { hostname: "[0:0:0:0:0:0:0:1]", enabled: false });
+  assert.equal(settingsApi.resolveSite(ipv6, "[::1]").active, false);
+});
+
+test("site toggles remove redundant overrides and preserve per-site scope", () => {
+  let settings = settingsApi.setSiteRule({}, {
+    hostname: "example.com", includeSubdomains: true, enabled: false
+  });
+  settings = settingsApi.setSiteRule(settings, { hostname: "docs.example.com", scope: "all" });
+  settings = settingsApi.toggleSite(settings, "docs.example.com");
+  assert.equal(settingsApi.resolveSite(settings, "docs.example.com").active, true);
+  settings = settingsApi.toggleSite(settings, "docs.example.com");
+  assert.equal(settingsApi.resolveSite(settings, "docs.example.com").active, false);
+  assert.equal(settingsApi.getDirectRule(settings, "docs.example.com").enabled, null);
+  assert.equal(settingsApi.getDirectRule(settings, "docs.example.com").scope, "all");
+
+  const resumed = settingsApi.toggleSite({ ...settings, enabled: false }, "docs.example.com");
+  assert.equal(resumed.enabled, true);
+  assert.equal(settingsApi.resolveSite(resumed, "docs.example.com").active, true);
+  assert.equal(settingsApi.resolveSite(resumed, "other.example.com").active, false);
+
+  const paused = settingsApi.toggleSite({}, "example.org");
+  assert.deepEqual(settingsApi.toggleSite(paused, "example.org").siteRules, []);
+});

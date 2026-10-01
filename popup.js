@@ -101,19 +101,14 @@
       const hostname = document.createElement("strong");
       hostname.textContent = site.hostname;
       siteStatusText.replaceChildren(document.createTextNode(status), hostname);
-      siteMessage.replaceChildren(
-        document.createTextNode(effective.active
-          ? "Reading here is set up for "
-          : "Lexend is paused for "),
-        Object.assign(document.createElement("strong"), {
-          textContent: effective.active ? "you." : "this site."
-        })
-      );
+      siteMessage.textContent = effective.active
+        ? (effective.scope === "all" ? "Body text and headings use Lexend." : "Body text uses Lexend.")
+        : "This site uses its original fonts.";
     }
-    toggleSiteButton.textContent = effective.siteEnabled ? "Pause here" : "Resume here";
+    toggleSiteButton.textContent = effective.active ? "Pause here" : "Resume here";
     toggleSiteButton.setAttribute(
       "aria-label",
-      `${effective.siteEnabled ? "Pause" : "Resume"} Lexend on ${site.hostname}`
+      `${effective.active ? "Pause" : "Resume"} Lexend on ${site.hostname}`
     );
   };
 
@@ -211,15 +206,7 @@
 
   toggleSiteButton.addEventListener("click", () => {
     if (!site?.supported) return;
-    const effective = settingsApi.resolveSite(settings, site.hostname);
-    const withoutExactRule = settingsApi.removeSiteRule(settings, site.hostname, false);
-    const inherited = settingsApi.resolveSite(withoutExactRule, site.hostname);
-    const desiredEnabled = !effective.siteEnabled;
-    save(settingsApi.setSiteRule(settings, {
-      hostname: site.hostname,
-      includeSubdomains: false,
-      enabled: desiredEnabled === inherited.siteEnabled ? null : desiredEnabled
-    }));
+    save(settingsApi.toggleSite(settings, site.hostname));
   });
 
   extension?.storage?.onChanged?.addListener((changes, areaName) => {
