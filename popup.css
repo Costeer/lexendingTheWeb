@@ -523,6 +523,7 @@ fieldset:disabled {
 
 :root[data-ui-style="lexend"] .settings-button:hover {
   color: var(--surface);
+  background: var(--ink);
 }
 
 :root[data-ui-style="lexend"] .master-control {
