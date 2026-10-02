@@ -50,6 +50,8 @@
       ],
       "js": [
         "src/settings.js",
+        "src/adaptive-controls.js",
+        "src/adaptive-layout.js",
         "src/content.js"
       ],
       "run_at": "document_start",

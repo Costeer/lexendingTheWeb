@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lexend compatibility specimen</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 300 15px/1.35 Arial, sans-serif; color: #243044; background: #f2f5f9; }
+  main { max-width: 1060px; margin: auto; padding: 32px 24px; }
+  nav { display: flex; flex-wrap: wrap; gap: 20px; padding: 18px 24px; background: #182d43; color: white; }
+  a { color: inherit; } h1 { font-size: 38px; line-height: 1.1; } h2 { font-size: 23px; }
+  section { background: white; border: 1px solid #dce3eb; border-radius: 12px; padding: 24px; margin: 20px 0; }
+  .grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+  label { display: block; margin: 12px 0 6px; }
+  input,textarea,select,button { font: 13px Arial,sans-serif; max-width: 100%; padding: 10px; }
+  textarea { width: 100%; } button { cursor: pointer; } td,th { padding: 8px; text-align: left; }
+  table { width: 100%; } pre { overflow: auto; font: 13px/1.5 monospace; background: #eef2f7; padding: 12px; }
+  .fixed { height: 38px; overflow: hidden; font-size: 14px; }
+  .priority { font-family: Georgia !important; }
+  .generated::before { content: "Reading tip: "; font-family: Georgia; }
+  .material-icons { font-family: monospace; }
+  footer { padding: 24px; } iframe { width: 100%; height: 170px; border: 1px solid #dce3eb; }
+  @media(max-width:600px) { .grid { grid-template-columns: 1fr; } main { padding: 16px; } }
+</style>
+<nav><strong>FIELD NOTES</strong><a href="#article">Read the article</a><a href="#controls">Reading preferences</a></nav>
+<main>
+  <h1>A page built to test every kind of text</h1>
+  <p>This specimen mixes everyday website patterns with deliberate compatibility traps. Inspect every screenshot before judging readability.</p>
+  <div class="grid">
+    <section id="article"><h2>Article typography</h2>
+      <p>Good typography makes long passages easier to follow. This paragraph contains <strong>bold emphasis</strong>, <em>italic words</em>, <small>small print</small>, and <a href="#controls">an inline link</a>.</p>
+      Bare text next to a heading must also convert in the full scope.
+      <blockquote>Reading should feel calm, clear, and comfortable.</blockquote>
+      <ul><li>A list item with <span>nested text</span></li><li>Accents: café, déjà vu, Tiếng Việt.</li></ul>
+      <dl><dt>Legibility</dt><dd>Distinguishing one letter from another.</dd></dl>
+      <p class="priority" style="font-family: Georgia !important">An author !important rule can block conversion. The harness must catch it.</p>
+      <p class="generated">Generated text needs a visual check too.</p>
+    </section>
+    <section id="controls"><h2>Forms and interactions</h2>
+      <label for="name">Your name</label><input id="name" placeholder="Enter a name" value="Alex Morgan">
+      <label for="mode">Reading mode</label><select id="mode"><option>Comfortable</option><option>Compact</option></select>
+      <label for="notes">Notes</label><textarea id="notes">Text inside a multiline form control.</textarea>
+      <p><button id="add-content">Add dynamic content</button></p><div id="dynamic"></div>
+      <details><summary>Expand for more text</summary><p>Collapsed content must convert when it becomes visible.</p></details>
+    </section>
+  </div>
+  <section><h2>Tables, constraints, and protected content</h2>
+    <table><caption>Reading measurements</caption><thead><tr><th>Pattern</th><th>Example</th></tr></thead><tbody><tr><td>Body copy</td><td>Clear and readable</td></tr><tr><td>Timestamp</td><td><time>October 1, 2026</time></td></tr></tbody></table>
+    <p class="fixed">A fixed height container with enough text to wrap onto multiple lines on smaller screens. Increasing text size and line height should expose clipping in this intentionally constrained component.</p>
+    <pre><code>const preserveCode = true;</code></pre>
+    <p>Shortcut: <kbd>Ctrl + L</kbd> <span class="material-icons">★</span> <span data-icon>→</span></p>
+    <div data-lexend-ignore><p>This entire opt-out subtree must retain its original typography.</p></div>
+    <svg width="180" height="30" role="img" aria-label="SVG preserved"><text x="0" y="20">Preserved SVG text</text></svg>
+  </section>
+  <section><h2>Web components and frames</h2><reading-card></reading-card><iframe src="frame.html" title="Same-origin frame"></iframe><iframe title="Cross-origin frame" id="cross-frame"></iframe></section>
+  <section><h2>Less common elements</h2><figure><figcaption>Figure captions remain readable.</figcaption></figure><address>Reader's Lane, Example City</address><output>A native output element</output><p>Fallback scripts: Ελληνικά · 日本語 · العربية</p><div hidden>This text should not count until revealed.</div></section>
+</main><footer>End of the specimen — review the entire page.</footer>
+<script>
+customElements.define('reading-card', class extends HTMLElement {
+  connectedCallback() { this.attachShadow({mode:'open'}).innerHTML = '<style>:host{display:block;margin:12px 0}p{font:14px/1.4 Georgia}button{font:12px Arial}</style><h3>Open shadow root</h3><p>Typography inside a component should convert.</p><button>Component action</button><span data-lexend-ignore>Protected component text</span>'; }
+});
+document.querySelector('#add-content').onclick = () => {
+  const node = document.createElement('p'); node.textContent = 'Dynamically inserted text must convert too.';
+  document.querySelector('#dynamic').append(node);
+  const card = document.createElement('reading-card'); document.querySelector('#dynamic').append(card);
+};
+document.querySelector('#cross-frame').src = 'http://127.0.0.2:' + location.port + '/frame.html';
+</script></html>

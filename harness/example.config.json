@@ -1,0 +1,15 @@
+{
+  "viewports": [
+    { "name": "desktop", "width": 1440, "height": 900 },
+    { "name": "mobile", "width": 390, "height": 844 }
+  ],
+  "profiles": [
+    { "name": "body-default", "settings": { "scope": "body", "textScale": 100 } },
+    { "name": "all-readable", "settings": { "scope": "all", "textScale": 110, "lineHeight": 1.6, "letterSpacing": 0.02 } },
+    { "name": "all-stress", "settings": { "scope": "all", "textScale": 140, "lineHeight": 2, "letterSpacing": 0.08 } }
+  ],
+  "actions": [],
+  "afterActions": [],
+  "settleMs": 500,
+  "maxTiles": 30
+}

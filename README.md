@@ -12,6 +12,11 @@ A Chrome and Firefox extension that replaces website typography with
 - Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
 - Import, export, and sync settings through browser storage.
 - Keep code, mathematical notation, SVGs, and common icon fonts unchanged.
+- Adapt newly clipped text, overlapping labels, photo captions, and growing
+  dialogs using measured geometry rather than website-specific rules.
+
+The [adaptation rules](docs/adaptive-layout.md) explain how measured typography
+and layout changes are repaired and restored.
 
 The font files are bundled with the extension. It does not use analytics or
 send page content to a server.
@@ -29,6 +34,32 @@ npm run verify:firefox
 ```
 
 Browser-ready files are written to `dist/chrome` and `dist/firefox`.
+
+### Visually test a real website
+
+```sh
+npx playwright install chromium
+npm run build
+npm run test:visual -- --url https://example.com --output artifacts/example
+npm run test:visual -- --serve artifacts/example
+```
+
+The harness loads the supplied website with the real extension, captures paired
+screenshots at desktop and mobile widths, and reports missed conversions and
+readability regressions. Agents must visually review every tile before a run
+can pass. See the [agent workflow and site-specific actions](harness/README.md).
+
+To repeat an existing real-website survey after changing the extension:
+
+```sh
+npm run build
+node harness/retest.mjs --survey artifacts/survey-60/summary.json \
+  --config artifacts/survey-60/config.json --output artifacts/retest --concurrency 3
+npm run test:visual -- --serve artifacts/retest
+```
+
+The comparison report retains the original findings and links new screenshot
+evidence. A clean automated count still requires visual review.
 
 ### Load in Chrome
 
