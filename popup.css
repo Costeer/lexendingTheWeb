@@ -118,23 +118,22 @@ button:not(:disabled):active,
   border: var(--control-border);
   background: var(--surface);
   cursor: pointer;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
 }
 
 .settings-button:hover {
   color: var(--surface);
   background: var(--ink);
-  transform: translateY(-1px);
 }
 
-.settings-button:hover svg {
-  transform: rotate(24deg);
+.settings-button:not(:disabled):active {
+  transform: none;
 }
 
 .settings-button svg {
   width: 18px;
   height: 18px;
   fill: currentColor;
-  transition: transform var(--motion-base) var(--motion-ease);
 }
 
 .master-control {
