@@ -138,7 +138,7 @@
     const [tab] = await tabs.query({ active: true, currentWindow: true });
     if (tab?.id !== undefined && tabs.sendMessage) {
       try {
-        const state = await tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" });
+        const state = await tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 });
         const hostname = state?.hostname?.trim().toLowerCase();
         if (state?.ready && hostname) {
           return { hostname, supported: true, restricted: false };

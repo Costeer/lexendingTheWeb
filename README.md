@@ -12,6 +12,11 @@ A Chrome and Firefox extension that replaces website typography with
 - Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
 - Import, export, and sync settings through browser storage.
 - Keep code, mathematical notation, SVGs, and common icon fonts unchanged.
+- Adapt newly clipped text, overlapping labels, photo captions, and growing
+  dialogs using measured geometry rather than website-specific rules.
+
+The [adaptation rules](docs/adaptive-layout.md) explain how measured typography
+and layout changes are repaired and restored.
 
 The font files are bundled with the extension. It does not use analytics or
 send page content to a server.
@@ -21,6 +26,8 @@ send page content to a server.
 Requirement: Node.js 20+.
 
 ```sh
+npm ci
+npx playwright install chromium
 npm test
 npm run check
 npm run build
