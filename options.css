@@ -1250,16 +1250,15 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .basic-controls,
 :root[data-ui-style="lexend"] .slider-grid {
-  grid-auto-rows: 136px;
+  grid-auto-rows: 108px;
 }
 
 :root[data-ui-style="lexend"] .setting-control,
 :root[data-ui-style="lexend"] .slider-control {
-  height: 136px;
-  min-height: 136px;
-  padding: 18px 20px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
+  height: 108px;
+  min-height: 108px;
+  padding: 0;
+  border: 0;
   outline: 0;
 }
 
@@ -1274,6 +1273,12 @@ input::placeholder {
   row-gap: 8px;
 }
 
+:root[data-ui-style="lexend"] .slider-control:hover {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
 :root[data-ui-style="lexend"] .slider-heading {
   min-height: 24px;
   align-items: center;
@@ -1281,9 +1286,9 @@ input::placeholder {
 
 :root[data-ui-style="lexend"] .setting-control legend {
   position: absolute;
-  top: 25px;
-  left: 20px;
-  width: calc(100% - 40px);
+  top: 12px;
+  left: 0;
+  width: 100%;
   margin: 0;
   color: var(--text-title);
   font-size: 16px;
@@ -1291,41 +1296,11 @@ input::placeholder {
   letter-spacing: .025em;
 }
 
-:root[data-ui-style="lexend"] .setting-control legend::before,
-:root[data-ui-style="lexend"] .slider-heading strong::before {
-  display: inline-grid;
-  width: 22px;
-  height: 22px;
-  margin-right: 8px;
-  place-items: center;
-  border: 1px solid var(--accent);
-  border-radius: 50%;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 300;
-  letter-spacing: 0;
-}
-
-:root[data-ui-style="lexend"] .setting-control:nth-child(1) legend::before,
-:root[data-ui-style="lexend"] .slider-control:nth-child(1) .slider-heading strong::before {
-  content: "1";
-}
-
-:root[data-ui-style="lexend"] .setting-control:nth-child(2) legend::before,
-:root[data-ui-style="lexend"] .slider-control:nth-child(2) .slider-heading strong::before {
-  content: "2";
-}
-
-:root[data-ui-style="lexend"] .setting-control:nth-child(3) legend::before,
-:root[data-ui-style="lexend"] .slider-control:nth-child(3) .slider-heading strong::before {
-  content: "3";
-}
-
 :root[data-ui-style="lexend"] .segment-group {
   position: absolute;
-  top: 64px;
-  right: 20px;
-  left: 20px;
+  top: 48px;
+  right: 0;
+  left: 0;
   height: 44px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
