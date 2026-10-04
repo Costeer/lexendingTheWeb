@@ -131,14 +131,24 @@ test("About owns the disclaimer and links donations to the project's Ko-fi page"
   for (const asset of ["about.js", "about.css"]) await access(join(root, asset));
 });
 
-test("the floating Ko-fi support button is bundled locally for MV3", async () => {
+test("Ko-fi support uses desktop navigation and an inline mobile button", async () => {
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
   assert.match(about, /<span>Support me<\/span>/);
   assert.match(about, /aria-label="Support me on Ko-fi \(opens in a new tab\)"/);
-  assert.match(css, /\.donate-button\s*\{[^}]*position: fixed;/);
+  assert.match(about, /<h3>Support development<\/h3>\s*<p>[^<]+<\/p>\s*<a\s+id="donate-link"/);
+  assert.doesNotMatch(css, /position:\s*fixed/);
+  assert.match(css, /\.donate-button\s*\{[^}]*margin-top: 20px;/);
+  assert.match(css, /@media \(min-width: 900px\) and \(hover: hover\) and \(pointer: fine\)\s*\{\s*\.about-back-link,\s*\.donate-button\s*\{\s*display: none;/);
   assert.match(css, /\.donate-button\s*\{[^}]*color: #fff;[^}]*background: #d9534f;/);
   for (const page of ["about.html", "options.html", "popup.html"]) {
     assert.doesNotMatch(await read(page), /<script\b[^>]*src=["']https?:\/\//i);
+  }
+  for (const page of ["about.html", "options.html"]) {
+    const html = await read(page);
+    const nav = html.match(/<nav class="desktop-settings-nav"[\s\S]*?<\/nav>/)?.[0];
+    assert.ok(nav, `${page} has desktop navigation`);
+    assert.match(nav, /class="sidebar-support" href="https:\/\/ko-fi\.com\/costeer" target="_blank" rel="noopener noreferrer"/);
+    assert.match(nav, /Support the project/);
   }
 });
 
