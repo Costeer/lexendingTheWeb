@@ -659,7 +659,16 @@ test("a native viewport shell retains the scroll range of its sidebar after pros
 });
 
 test("an originally whole Hangul token keeps its boundary only when every token fits the column", async () => {
- const page=await prepare(`<style>body{margin:0;font:17px/1.2 sans-serif}.copy{width:202px}p{margin:0;word-break:normal}.long{width:70px}</style><div class="copy"><p>브라우저를 업데이트하세요</p></div><div class="long"><p>업데이트하세요</p></div>`,{width:390,height:600},'p{font-size:18.7px!important;line-height:1.6!important;letter-spacing:.02em!important}');
+ const page=await prepare(`<style>body{margin:0;font:17px/1.2 sans-serif}.copy{width:202px}p{margin:0;word-break:normal}.long{width:70px}</style><div class="copy"><p>브라우저를 업데이트하세요</p></div><div class="long"><p>업데이트하세요</p></div><script>
+   // Derive the fitting and oversized columns from this browser's author font;
+   // fixed widths can miss the intended reflow when CI has different CJK fonts.
+   const caption=document.querySelector('.copy p');
+   caption.parentElement.style.width='max-content';
+   const range=document.createRange();range.selectNodeContents(caption);
+   const width=Math.ceil(range.getBoundingClientRect().width)+1;
+   caption.parentElement.style.width=width+'px';
+   document.querySelector('.long').style.width=Math.floor(width/4)+'px';
+ </script>`,{width:390,height:600},'p{font-size:18.7px!important;line-height:1.6!important;letter-spacing:.02em!important}');
  const state=await page.evaluate(()=>{let p=document.querySelector('.copy p'),n=p.firstChild,r=document.createRange();let start=n.textContent.indexOf('업데이트하세요');r.setStart(n,start);r.setEnd(n,n.length);return {word:getComputedStyle(p).wordBreak,font:getComputedStyle(p).fontSize,lines:new Set([...r.getClientRects()].map(b=>Math.round(b.top*2))).size,overflow:p.scrollWidth-p.clientWidth,longWord:getComputedStyle(document.querySelector('.long p')).wordBreak}});
  assert.equal(state.word,'keep-all');assert.equal(state.font,'18.7px');assert.equal(state.lines,1);assert.ok(state.overflow<=1);assert.equal(state.longWord,'normal');
  for(let i=0;i<4;i++){await page.evaluate(()=>{layout.capture();layout.repair()});assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.copy p')).wordBreak),'keep-all')}
