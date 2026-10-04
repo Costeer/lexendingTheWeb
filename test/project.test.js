@@ -132,16 +132,20 @@ test("About owns the disclaimer and links donations to the project's Ko-fi page"
   for (const asset of ["about.js", "about.css"]) await access(join(root, asset));
 });
 
-test("Ko-fi support uses desktop navigation and an inline mobile button", async () => {
+test("Ko-fi support uses desktop navigation and a responsive About card", async () => {
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
-  assert.match(about, /<span>Support me<\/span>/);
-  assert.match(about, /aria-label="Support me on Ko-fi \(opens in a new tab\)"/);
+  assert.match(about, /aria-label="Support costeer on Ko-fi \(opens in a new tab\)"/);
+  assert.match(about, /src="assets\/kofi-support\.jpg"/);
+  assert.match(about, /width="1200"\s+height="600"/);
+  assert.match(about, /alt="Support costeer — ko-fi\.com\/costeer"/);
+  await access(join(root, "assets/kofi-support.jpg"));
   assert.doesNotMatch(about, /Support development|If this extension helps you|Donations are entirely optional/);
   assert.match(about, /<main>[\s\S]*id="donate-link"[\s\S]*<\/main>/);
   assert.doesNotMatch(css, /position:\s*fixed/);
-  assert.match(css, /\.donate-button\s*\{[^}]*margin-top: 20px;/);
-  assert.match(css, /@media \(min-width: 900px\) and \(hover: hover\) and \(pointer: fine\)\s*\{\s*\.about-back-link,\s*\.donate-button\s*\{\s*display: none;/);
-  assert.match(css, /\.donate-button\s*\{[^}]*color: #fff;[^}]*background: #d9534f;/);
+  assert.match(css, /\.support-card\s*\{[^}]*width: 100%;[^}]*max-width: 660px;[^}]*color: #fff;/);
+  assert.doesNotMatch(css, /\.support-card\s*\{[^}]*display: none;/);
+  assert.doesNotMatch(css, /url\(["']?https?:/);
+  assert.doesNotMatch(about, /class="donate-button"/);
   for (const page of ["about.html", "options.html", "popup.html"]) {
     assert.doesNotMatch(await read(page), /<script\b[^>]*src=["']https?:\/\//i);
   }
