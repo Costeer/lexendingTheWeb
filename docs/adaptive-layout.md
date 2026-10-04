@@ -120,9 +120,11 @@ proof that the latest DOM update has finished.
 If an author hover rerender replaces owned inline typography, the mutation
 observer retains the current converted values before paint. The replacement
 declarations become the next author baseline and are restored on pause;
-unrelated author styles remain intact. Immediate retention is bounded within
-each task to prevent competing observers from creating a microtask write loop,
-while subsequent animation frames can retain typography again.
+unrelated author styles remain intact. Immediate retention drains the resulting
+observer notification and feedback before releasing each element, so queued
+independent author tasks recover without waiting for a timer. A finite write
+budget also stops feedback deferred through further microtasks, allowing
+ordinary tasks to progress.
 
 An already converted numeric counter can update without a full-page refresh
 when its formatting, character count, and measured text width stay the same

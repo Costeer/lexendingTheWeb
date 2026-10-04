@@ -33,6 +33,7 @@
   let refreshRevision = 0;
   let refreshing = false;
   let retainedTypography = new WeakSet();
+  let retentionWrites = new WeakMap();
   let retentionTimer = null;
   let counterContext = null;
   let layout = null;
@@ -407,7 +408,8 @@
   };
   const retainOverwrittenTypography = (element) => {
     const state = managedElements.get(element);
-    if (!state || !element.isConnected || retainedTypography.has(element) || !isActive()) return;
+    if (!state || !element.isConnected || retainedTypography.has(element)
+        || (retentionWrites.get(element) ?? 0) >= 32 || !isActive()) return;
     let overwritten = false;
     state.properties.forEach((property, name) => {
       const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
@@ -422,11 +424,17 @@
       overwritten = true;
     });
     if (overwritten) {
-      // Limit immediate writes to one rescue per element in the current task;
-      // an author MutationObserver must not start a microtask write loop.
+      // Let the notification caused by our writes and its author feedback
+      // drain before releasing this element. A timer alone can run after other
+      // queued author tasks and wrongly suppress their independent updates.
       retainedTypography.add(element);
+      retentionWrites.set(element, (retentionWrites.get(element) ?? 0) + 1);
+      queueMicrotask(() => queueMicrotask(() => retainedTypography.delete(element)));
+      // A hard task-budget also bounds authors that defer observer feedback
+      // through additional microtasks beyond the immediate notification turn.
       if (retentionTimer === null) retentionTimer = setTimeout(() => {
         retainedTypography = new WeakSet();
+        retentionWrites = new WeakMap();
         retentionTimer = null;
       }, 0);
       setAttribute(element, "data-lexend-original-typography", JSON.stringify({
@@ -760,6 +768,7 @@
     if (retentionTimer !== null) clearTimeout(retentionTimer);
     retentionTimer = null;
     retainedTypography = new WeakSet();
+    retentionWrites = new WeakMap();
     observer.disconnect();
     let focusedElement = document.activeElement;
     while (focusedElement?.shadowRoot?.activeElement) focusedElement = focusedElement.shadowRoot.activeElement;

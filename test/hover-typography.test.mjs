@@ -84,6 +84,15 @@ test("hover rerenders retain converted typography before paint and preserve new 
       assert.ok(Math.abs((await page.locator("#home").evaluate(e=>parseFloat(getComputedStyle(e).fontSize)))-17.6)<.02);
     }
     await page.evaluate(()=>{
+      globalThis.__phase="queued independent author tasks";
+      for(let i=0;i<3;i++)setTimeout(()=>{
+        document.getElementById("home").style.cssText="font-family:Georgia!important;font-size:18px!important";
+      },0);
+    });
+    await page.waitForTimeout(50);
+    assert.match(await page.locator("#home").evaluate(e=>getComputedStyle(e).fontFamily),/Lexend/,"queued independent author tasks retain the font");
+    await page.waitForFunction(()=>__state().healthy&&!__state().pending);
+    await page.evaluate(()=>{
       globalThis.__phase="continuous inline writes";
       globalThis.__styleLoop=setInterval(()=>{
         document.getElementById("home").style.cssText="font-family:Georgia!important;font-size:18px!important;background-color:rgb(240, 244, 248)";
@@ -120,6 +129,25 @@ test("hover rerenders retain converted typography before paint and preserve new 
       return writes;
     });
     assert.ok(feedbackWrites>0&&feedbackWrites<=2,"a competing author observer cannot trap the browser in a microtask write loop");
+    await page.waitForFunction(()=>__state().healthy&&!__state().pending);
+    const deferredFeedbackWrites = await page.evaluate(async()=>{
+      const element=document.getElementById("home");
+      let writes=0;
+      const author=new MutationObserver(()=>{
+        if (element.style.fontFamily.includes("Lexend")) {
+          queueMicrotask(()=>queueMicrotask(()=>queueMicrotask(()=>{
+            writes++;
+            element.style.setProperty("font-family","Georgia","important");
+          })));
+        }
+      });
+      author.observe(element,{attributes:true,attributeFilter:["style"]});
+      element.style.setProperty("font-family","Arial","important");
+      await new Promise(resolve=>setTimeout(resolve,30));
+      author.disconnect();
+      return writes;
+    });
+    assert.ok(deferredFeedbackWrites>0&&deferredFeedbackWrites<=32,"deferred observer feedback exhausts a finite write budget and releases the task queue");
     await page.waitForFunction(()=>__state().healthy&&!__state().pending);
     const counterValues = await page.locator("#description").evaluate(e=>{
       const context=document.createElement("canvas").getContext("2d");
