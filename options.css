@@ -39,7 +39,7 @@ a,
     transform var(--motion-base) var(--motion-ease);
 }
 
-button:not(:disabled):active,
+button:not(:disabled):not([data-settings-panel]):active,
 .segment-group label:active span,
 .appearance-control:active .appearance-switch-track,
 .advanced-control:active .mode-switch-track {

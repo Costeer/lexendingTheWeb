@@ -226,6 +226,23 @@ test("settings navigation keeps scrollbar space and selected label metrics stabl
   assert.doesNotMatch(selectedStyle, /font-weight|font-size|padding|border-width/);
 });
 
+test("sidebar press feedback animates only contents and keeps its hit area stable", async () => {
+  const [optionsCss, desktopCss] = await Promise.all([read("options.css"), read("options-desktop.css")]);
+  assert.match(optionsCss, /button:not\(:disabled\):not\(\[data-settings-panel\]\):active,/);
+  assert.doesNotMatch(optionsCss, /button:not\(:disabled\):active,/);
+  assert.match(desktopCss, /\.settings-nav-content\s*\{[^}]*pointer-events: none;[^}]*transition: transform var\(--motion-fast\) var\(--motion-ease\);/);
+  assert.match(desktopCss, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.desktop-settings-nav :is\(button, a\):active \.settings-nav-content\s*\{\s*transform: translateY\(1px\) scale\(\.98\);/);
+  for (const page of ["options.html", "about.html"]) {
+    const html = await read(page);
+    const nav = html.match(/<nav class="desktop-settings-nav"[\s\S]*?<\/nav>/)?.[0];
+    const items = [...nav.matchAll(/<(?:button|a)\b[^>]*>([\s\S]*?)<\/(?:button|a)>/g)];
+    assert.equal(items.length, 5);
+    for (const [, content] of items) {
+      assert.match(content, /^\s*<span class="settings-nav-content">[\s\S]*<svg\b[\s\S]*<\/span>\s*$/);
+    }
+  }
+});
+
 test("settings paper has a receipt edge on desktop and mobile, with an About footer outside", async () => {
   const css = await read("options-desktop.css");
   const sharedLayout = css.split("@media")[0];
