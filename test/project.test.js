@@ -255,6 +255,24 @@ test("sidebar press feedback animates only contents and keeps its hit area stabl
   }
 });
 
+test("preset controls use equal fixed slots and motion-aware selection growth", async () => {
+  const [sharedCss, optionsCss, desktopCss, popupCss, popupJs] = await Promise.all([
+    read("shared.css"), read("options.css"), read("options-desktop.css"), read("popup.css"), read("popup.js")
+  ]);
+  assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\)\s*\{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\) span\s*\{[^}]*pointer-events: none;[^}]*transform: scale\(1\);/);
+  assert.match(sharedCss, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*:root :is\(\.segment-group, \.segments\) input:checked \+ span\s*\{[^}]*transform: scale\(1\.04\);/);
+  for (const css of [optionsCss, desktopCss, popupCss]) {
+    assert.doesNotMatch(css, /grid-template-columns: \.9fr 1\.2fr \.9fr;/);
+    assert.match(css, /:root [^{]*\.(?:segment-group|segments)\s*\{[^}]*overflow: visible;/);
+  }
+  for (const css of [optionsCss, popupCss]) {
+    assert.match(css, /transform var\(--motion-base\) var\(--motion-ease\)/);
+  }
+  assert.doesNotMatch(popupJs, /nearestSpacing/);
+  assert.match(popupJs, /input.checked = Number\(input.value\) === settings.letterSpacing;/);
+});
+
 test("settings paper has a receipt edge on desktop and mobile, with an About footer outside", async () => {
   const css = await read("options-desktop.css");
   const sharedLayout = css.split("@media")[0];

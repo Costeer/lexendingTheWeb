@@ -313,7 +313,7 @@
     position: absolute;
     inset: 26px 0 auto 34%;
     height: 44px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius);
     background: var(--surface);

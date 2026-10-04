@@ -130,14 +130,9 @@
     }
   };
 
-  const setNearestRadioValue = (inputs, value) => {
-    const nearest = inputs.reduce((closest, input) => (
-      Math.abs(Number(input.value) - value) < Math.abs(Number(closest.value) - value)
-        ? input
-        : closest
-    ));
+  const setRadioValue = (inputs, value) => {
     inputs.forEach((input) => {
-      input.checked = input === nearest;
+      input.checked = Number(input.value) === value;
     });
   };
 
@@ -235,9 +230,9 @@
   };
 
   const renderReadability = () => {
-    setNearestRadioValue(basicTextScaleInputs, settings.textScale);
-    setNearestRadioValue(basicLineHeightInputs, settings.lineHeight);
-    setNearestRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
+    setRadioValue(basicTextScaleInputs, settings.textScale);
+    setRadioValue(basicLineHeightInputs, settings.lineHeight);
+    setRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
 
     textScaleSlider.value = String(settings.textScale);
     lineHeightSlider.value = String(lineHeightToSlider(settings.lineHeight));

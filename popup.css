@@ -642,7 +642,7 @@ fieldset:disabled {
 }
 
 :root .segments {
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
 }
@@ -797,10 +797,6 @@ fieldset:disabled {
 
   :root .spacing-section {
     flex: 1;
-  }
-
-  :root .segments {
-    grid-template-columns: .9fr 1.2fr .9fr;
   }
 
   :root .spacing-preview {

@@ -20,7 +20,6 @@
     "support.mozilla.org",
     "sync.services.mozilla.com"
   ]);
-  const spacingValues = [0, 0.04, 0.08];
 
   const enabledInput = document.querySelector("#enabled");
   const settingsButton = document.querySelector("#settings-button");
@@ -62,10 +61,6 @@
     }
   };
 
-  const nearestSpacing = (value) => spacingValues.reduce((nearest, candidate) => (
-    Math.abs(candidate - value) < Math.abs(nearest - value) ? candidate : nearest
-  ));
-
   const renderSettings = () => {
     globalThis.LexendTheme.apply(settings.theme);
     enabledInput.checked = settings.enabled;
@@ -79,9 +74,8 @@
     scopeInputs.forEach((input) => {
       input.checked = input.value === settings.scope;
     });
-    const selectedSpacing = nearestSpacing(settings.letterSpacing);
     spacingInputs.forEach((input) => {
-      input.checked = Number(input.value) === selectedSpacing;
+      input.checked = Number(input.value) === settings.letterSpacing;
     });
     spacingPreviewText.style.letterSpacing = `${settings.letterSpacing}em`;
   };
