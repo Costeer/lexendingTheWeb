@@ -7,6 +7,68 @@
   display: contents;
 }
 
+/* Use the same mobile layout as the panels, including wide touch screens. */
+@media not all and (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  :root body.settings-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 0;
+    background: var(--settings-muted);
+  }
+
+  :root .settings-page .settings-layout {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding-bottom: 12px;
+  }
+
+  :root .settings-page .settings-layout main {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+
+  /* Repeating triangles extend below the paper without masking its content. */
+  :root .settings-page .settings-layout main::after {
+    position: absolute;
+    right: 0;
+    bottom: -12px;
+    left: 0;
+    height: 12px;
+    background:
+      linear-gradient(135deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x,
+      linear-gradient(225deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x;
+    content: "";
+    pointer-events: none;
+  }
+
+  :root .settings-page .settings-panel {
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+  }
+
+  :root .settings-page .about-page-header {
+    width: 100%;
+    margin: 0;
+    padding: 16px max(20px, env(safe-area-inset-right, 0px)) 16px max(20px, env(safe-area-inset-left, 0px));
+    background: var(--surface);
+  }
+
+  :root .settings-page .page-attribution {
+    width: 100%;
+    margin: 0;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Touch devices keep the stacked settings page, including in landscape. */
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
   :root body.settings-page {

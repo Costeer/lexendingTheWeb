@@ -135,6 +135,14 @@ test("Ko-fi support uses desktop navigation and an inline mobile button", async 
   }
 });
 
+test("mobile settings fill the viewport and use a non-interactive receipt edge", async () => {
+  const css = await read("options-desktop.css");
+  assert.match(css, /@media not all and \(min-width: 900px\) and \(hover: hover\) and \(pointer: fine\)/);
+  assert.match(css, /:root body\.settings-page\s*\{[^}]*min-height: 100dvh;[^}]*padding: 0;/);
+  assert.match(css, /\.settings-layout main\s*\{[^}]*flex: 1;[^}]*width: 100%;[^}]*overflow: visible;/);
+  assert.match(css, /main::after\s*\{[^}]*linear-gradient\(135deg, var\(--surface\)[^}]*linear-gradient\(225deg, var\(--surface\)[^}]*pointer-events: none;/);
+});
+
 test("site rules migrate and resolve by specificity", () => {
   let settings = settingsApi.normalizeSettings({
     disabledSites: ["Example.com"],
