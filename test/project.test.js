@@ -179,9 +179,15 @@ test("support stars stay decorative and the departing arrow returns as a hammer 
   assert.match(about, /class="support-stars" aria-hidden="true"/);
   assert.equal((about.match(/class="support-sparkle"/g) ?? []).length, 5);
   assert.equal((about.match(/class="support-shooting-star"/g) ?? []).length, 5);
-  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.8;[^}]*pointer-events: none;/);
-  assert.match(css, /\.support-stars::before\s*\{[^}]*opacity: \.65;/);
-  assert.match(css, /animation: support-star-shoot 8s linear infinite;/);
+  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.06;[^}]*pointer-events: none;/);
+  assert.match(css, /\.support-card:hover \.support-stars\s*\{\s*opacity: \.8;/);
+  assert.match(css, /\.support-constellation::before\s*\{[^}]*opacity: \.65;/);
+  assert.match(about, /class="support-constellation"/);
+  assert.match(css, /\.support-constellation\s*\{\s*animation: support-star-drift 36s linear infinite;/);
+  assert.match(css, /@keyframes support-star-drift\s*\{[\s\S]*?translate\(48px, -32px\)/);
+  assert.match(css, /\.support-shooting-star\s*\{[^}]*opacity: 0;[^}]*animation: none;/);
+  assert.match(css, /\.support-card:hover \.support-shooting-star\s*\{\s*animation: support-star-shoot 8s linear infinite;/);
+  assert.match(css, /translate\(100px, -45px\) rotate\(-25deg\)/);
   assert.match(css, /@keyframes support-star-twinkle/);
   assert.match(css, /@keyframes support-star-shoot/);
   assert.match(about, /class="support-arrow-outbound"/);

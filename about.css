@@ -123,11 +123,22 @@
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  opacity: .8;
+  opacity: .06;
   pointer-events: none;
+  transition: opacity 600ms ease;
 }
 
-.support-stars::before {
+.support-card:hover .support-stars {
+  opacity: .8;
+}
+
+.support-constellation {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+}
+
+.support-constellation::before {
   position: absolute;
   inset: 0;
   content: "";
@@ -178,6 +189,7 @@
   height: 1.5px;
   background: linear-gradient(90deg, transparent, var(--support-lilac));
   opacity: 0;
+  animation: none;
 }
 
 .support-shooting-star::after {
@@ -386,6 +398,11 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .support-constellation {
+    animation: support-star-drift 36s linear infinite;
+    animation-delay: -4s;
+  }
+
   .support-sparkle {
     animation: support-star-twinkle 8s ease-in-out infinite;
   }
@@ -395,15 +412,15 @@
   .support-sparkle:nth-child(4) { animation-duration: 12s; animation-delay: -2s; }
   .support-sparkle:nth-child(5) { animation-duration: 10s; animation-delay: -7s; }
 
-  .support-shooting-star {
+  .support-card:hover .support-shooting-star {
     animation: support-star-shoot 8s linear infinite;
     animation-delay: -4s;
   }
 
-  .support-shooting-star:nth-last-child(4) { animation-duration: 9s; animation-delay: -7s; }
-  .support-shooting-star:nth-last-child(3) { animation-duration: 10s; animation-delay: -3s; }
-  .support-shooting-star:nth-last-child(2) { animation-duration: 11s; animation-delay: -6s; }
-  .support-shooting-star:last-child {
+  .support-card:hover .support-shooting-star:nth-last-child(4) { animation-duration: 9s; animation-delay: -7s; }
+  .support-card:hover .support-shooting-star:nth-last-child(3) { animation-duration: 10s; animation-delay: -3s; }
+  .support-card:hover .support-shooting-star:nth-last-child(2) { animation-duration: 11s; animation-delay: -6s; }
+  .support-card:hover .support-shooting-star:last-child {
     animation-duration: 12s;
     animation-delay: -2s;
   }
@@ -462,15 +479,21 @@
   }
 
   @keyframes support-star-twinkle {
-    0%, 70%, 100% { opacity: .28; transform: scale(.75); }
-    78% { opacity: .85; transform: scale(1); }
-    85% { opacity: .35; transform: scale(.85); }
+    0%, 70%, 100% { opacity: .28; }
+    78% { opacity: .85; }
+    85% { opacity: .35; }
+  }
+
+  @keyframes support-star-drift {
+    0% { transform: translate(0, 0); opacity: 0; }
+    8%, 92% { opacity: 1; }
+    100% { transform: translate(48px, -32px); opacity: 0; }
   }
 
   @keyframes support-star-shoot {
-    0%, 86% { opacity: 0; transform: translate(-35px, -20px) rotate(25deg); }
+    0%, 86% { opacity: 0; transform: translate(-35px, 20px) rotate(-25deg); }
     87% { opacity: .85; }
-    93%, 100% { opacity: 0; transform: translate(100px, 45px) rotate(25deg); }
+    93%, 100% { opacity: 0; transform: translate(100px, -45px) rotate(-25deg); }
   }
 
   @keyframes support-cup-steam {
