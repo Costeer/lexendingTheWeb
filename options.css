@@ -798,6 +798,42 @@ input::placeholder {
   display: none;
 }
 
+.rule-list-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.rule-list-toggle:hover {
+  border-color: var(--ink);
+}
+
+.rule-list-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--motion-base) var(--motion-ease);
+}
+
+.rule-list-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
 .rule-toolbar[hidden] + .rule-list:not(:empty) {
   margin-top: 14px;
 }

@@ -38,6 +38,10 @@
   const ruleToolbar = document.querySelector("#rule-toolbar");
   const searchInput = document.querySelector("#rule-search");
   const ruleList = document.querySelector("#rule-list");
+  const toggleRuleListButton = document.querySelector("#toggle-rule-list");
+  const toggleRuleListLabel = document.querySelector("#toggle-rule-list-label");
+  const MOBILE_RULE_LIMIT = 2;
+  let rulesExpanded = false;
   const searchEmpty = document.querySelector("#search-empty");
   const emptyRules = document.querySelector("#empty-rules");
   const exportButton = document.querySelector("#export-settings");
@@ -85,6 +89,7 @@
   desktopSettingsLayout.addEventListener("change", () => {
     renderSettingsNavigation();
     renderPreview();
+    renderRules();
   });
   renderSettingsNavigation();
 
@@ -268,7 +273,9 @@
       ));
     ruleList.replaceChildren();
 
-    rules.forEach((rule) => {
+    const limitRules = !desktopSettingsLayout.matches && !rulesExpanded;
+    const visibleRules = limitRules ? rules.slice(0, MOBILE_RULE_LIMIT) : rules;
+    visibleRules.forEach((rule) => {
       const row = document.createElement("div");
       row.className = "rule-row";
       row.dataset.hostname = rule.hostname;
@@ -303,6 +310,11 @@
     emptyRules.hidden = hasRules;
     ruleToolbar.hidden = !hasRules || (settings.siteRules.length <= 5 && !query);
     searchEmpty.hidden = !hasRules || !query || rules.length > 0;
+    toggleRuleListButton.hidden = desktopSettingsLayout.matches || rules.length <= MOBILE_RULE_LIMIT;
+    toggleRuleListButton.setAttribute("aria-expanded", String(rulesExpanded));
+    toggleRuleListLabel.textContent = rulesExpanded
+      ? "Show fewer rules"
+      : `Show all ${rules.length} rules`;
   };
 
   const render = () => {
@@ -494,6 +506,11 @@
   });
 
   searchInput.addEventListener("input", renderRules);
+
+  toggleRuleListButton.addEventListener("click", () => {
+    rulesExpanded = !rulesExpanded;
+    renderRules();
+  });
 
   ruleList.addEventListener("click", (event) => {
     const button = event.target.closest(".delete-rule");
