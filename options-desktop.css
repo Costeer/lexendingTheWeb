@@ -55,6 +55,11 @@
     padding-left: max(20px, env(safe-area-inset-left, 0px));
   }
 
+  :root .settings-page .readability-title-row {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+
   :root .settings-page .about-page-header {
     width: 100%;
     margin: 0;
