@@ -197,6 +197,23 @@
     border-color: var(--accent);
   }
 
+  /* Animate the contents, never the hit area or the selected border. */
+  .settings-nav-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    pointer-events: none;
+    transition: transform var(--motion-fast) var(--motion-ease);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .desktop-settings-nav :is(button, a):active .settings-nav-content {
+      transform: translateY(1px) scale(.98);
+    }
+  }
+
   .desktop-settings-nav svg {
     flex: 0 0 auto;
     width: 20px;

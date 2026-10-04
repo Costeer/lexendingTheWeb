@@ -94,11 +94,26 @@ async function openSettings({ count = 6, desktop = false } = {}) {
   await tick();
   assert.deepEqual(errors, []);
   return {
-    get, writes,
+    get, writes, panels, navigation,
     rows: () => get("#rule-list").children,
     resize(desktopMode) { media.matches = desktopMode; media.listener(); }
   };
 }
+
+test("rapid sidebar selections leave only the latest category selected and visible", async () => {
+  const page = await openSettings({ desktop: true });
+  for (const id of ["rules-panel", "tools-panel", "appearance-panel", "readability-panel", "rules-panel"]) {
+    page.navigation.find((button) => button.dataset.settingsPanel === id).emit("click");
+    assert.deepEqual(page.panels.filter((panel) => !panel.hidden).map((panel) => panel.id), [id]);
+    assert.deepEqual(page.navigation.filter((button) => button.getAttribute("aria-current") === "page")
+      .map((button) => button.dataset.settingsPanel), [id]);
+  }
+  page.resize(false);
+  assert.equal(page.panels.filter((panel) => !panel.hidden).length, 4);
+  page.resize(true);
+  assert.deepEqual(page.panels.filter((panel) => !panel.hidden).map((panel) => panel.id), ["rules-panel"]);
+  assert.equal(page.writes.length, 0);
+});
 
 test("mobile rules default to two and expand or collapse without saving preferences", async () => {
   const page = await openSettings();
