@@ -196,7 +196,7 @@ section + section {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .14em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .appearance-control {
@@ -1066,7 +1066,7 @@ input::placeholder {
   font-size: 13px;
   font-weight: 300;
   letter-spacing: .12em;
-  text-transform: uppercase;
+  text-transform: none;
   border-radius: var(--ui-radius);
 }
 
@@ -1152,7 +1152,7 @@ input::placeholder {
   font-size: 14px;
   font-weight: 300;
   letter-spacing: .12em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .appearance-label small {
@@ -1223,7 +1223,7 @@ input::placeholder {
   font-size: 14px;
   font-weight: 300;
   letter-spacing: .12em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .mode-switch-track {
@@ -1435,7 +1435,7 @@ input::placeholder {
   font-size: 13px;
   font-weight: 400;
   letter-spacing: .14em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .inline-link {
@@ -1465,7 +1465,7 @@ input::placeholder {
   font-size: 13px;
   font-weight: 400;
   letter-spacing: .12em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] section:not(.appearance-section) > .section-heading {
@@ -1507,7 +1507,7 @@ input::placeholder {
   font-size: 14px;
   font-weight: 300;
   letter-spacing: .14em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .primary-button {
