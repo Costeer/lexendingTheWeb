@@ -81,45 +81,35 @@
   letter-spacing: .14em;
 }
 
-.donate-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 52px;
-  margin-top: 20px;
-  padding: 10px 20px;
+.support-card {
+  display: block;
+  width: 100%;
+  max-width: 660px;
+  margin-top: 32px;
+  overflow: hidden;
   border: 0;
-  border-radius: 999px;
+  border-radius: 16px;
   color: #fff;
-  background: #d9534f;
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1.4;
+  background: #64409c;
   text-decoration: none;
 }
 
-.donate-icon {
-  width: 32px;
-  height: 28px;
-  flex: none;
+.support-card img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.donate-heart {
-  fill: #d9534f;
-}
-
-.donate-button:is(:hover, :focus-visible) {
+.support-card:is(:hover, :focus-visible) {
   transform: translateY(-2px);
 }
 
-.donate-button:active {
+.support-card:active {
   transform: translateY(1px);
 }
 
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  .about-back-link,
-  .donate-button {
+  .about-back-link {
     display: none;
   }
 }
