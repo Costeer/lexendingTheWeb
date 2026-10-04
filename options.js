@@ -238,7 +238,12 @@
 
       const domain = document.createElement("div");
       domain.className = "rule-domain";
-      const hostname = document.createElement("strong");
+      const hostname = document.createElement("a");
+      hostname.className = "rule-hostname";
+      hostname.href = `https://${rule.hostname}/`;
+      hostname.target = "_blank";
+      hostname.rel = "noopener noreferrer";
+      hostname.title = `Open ${rule.hostname}`;
       hostname.textContent = rule.hostname;
       domain.append(hostname);
       if (rule.includeSubdomains) {

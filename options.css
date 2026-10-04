@@ -825,13 +825,22 @@ input::placeholder {
   align-items: center;
 }
 
-.rule-domain strong {
+.rule-hostname {
   min-width: 0;
   overflow: hidden;
+  color: var(--ink);
   font-size: 15px;
   font-weight: 700;
+  text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rule-hostname:hover,
+.rule-hostname:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .rule-tag {
@@ -1534,10 +1543,14 @@ input::placeholder {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .rule-domain strong {
+:root[data-ui-style="lexend"] .rule-hostname {
   color: var(--text-title);
   font-size: 17px;
   font-weight: 500;
+}
+
+:root[data-ui-style="lexend"] .rule-hostname:is(:hover, :focus-visible) {
+  color: var(--accent);
 }
 
 :root[data-ui-style="lexend"] .check-label input,
