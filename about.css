@@ -123,7 +123,7 @@
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  opacity: .06;
+  opacity: .35;
   pointer-events: none;
   transition: opacity 600ms ease;
 }
