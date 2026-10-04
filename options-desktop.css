@@ -160,7 +160,8 @@
     color: var(--ink);
     background: var(--surface);
     font-size: 16px;
-    font-weight: 400;
+    /* Selection changes the border, not the label's wrapping or row height. */
+    font-weight: 500;
     line-height: 1.5;
     text-align: left;
     text-decoration: none;
@@ -172,7 +173,6 @@
 
   .desktop-settings-nav :is(button, a)[aria-current="page"] {
     border-color: var(--accent);
-    font-weight: 550;
   }
 
   .desktop-settings-nav .sidebar-support {

@@ -159,6 +159,15 @@ test("mobile About navigation is in the header and Appearance is renamed", async
   assert.doesNotMatch(options.match(/<footer\b[\s\S]*?<\/footer>/)?.[0], /mobile-about-link|href="about\.html"/);
 });
 
+test("settings navigation keeps scrollbar space and selected label metrics stable", async () => {
+  const [optionsCss, desktopCss] = await Promise.all([read("options.css"), read("options-desktop.css")]);
+  assert.match(optionsCss, /:root\s*\{[^}]*scrollbar-gutter: stable;/);
+  const selectedStyle = desktopCss.match(/\.desktop-settings-nav :is\(button, a\)\[aria-current="page"\]\s*\{([^}]*)\}/)?.[1];
+  assert.ok(selectedStyle, "selected sidebar navigation has a style");
+  assert.match(selectedStyle, /border-color: var\(--accent\);/);
+  assert.doesNotMatch(selectedStyle, /font-weight|font-size|padding|border-width/);
+});
+
 test("site rules migrate and resolve by specificity", () => {
   let settings = settingsApi.normalizeSettings({
     disabledSites: ["Example.com"],
