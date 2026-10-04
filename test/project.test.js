@@ -72,7 +72,7 @@ test("popup and settings pages expose their core controls", async () => {
   }
 
   for (const id of [
-    "modern-ui",
+    "dark-theme",
     "advanced-mode",
     "text-scale",
     "line-height",
@@ -90,6 +90,8 @@ test("popup and settings pages expose their core controls", async () => {
   assert.match(options, /src="src\/settings\.js"/);
   assert.match(popup, /href="shared\.css"/);
   assert.match(options, /href="shared\.css"/);
+  assert.doesNotMatch(options, /id="modern-ui"/);
+  assert.doesNotMatch(popup, /wordmark-classic/);
 });
 
 test("quote selection returns an entry from the shared collection", () => {
@@ -155,12 +157,38 @@ test("normalization rejects invalid values and respects the sync storage limit",
   assert.equal(settings.textScale, 140);
   assert.equal(settings.lineHeight, 1);
   assert.equal(settings.letterSpacing, 0.2);
-  assert.equal(settings.uiStyle, "lexend");
+  assert.equal(settings.theme, "light");
   assert.ok(JSON.stringify(settings.siteRules).length <= 7000);
   assert.ok(settings.siteRules.length < siteRules.length);
+});
 
-  assert.equal(settingsApi.normalizeSettings({ uiStyle: "unknown" }).uiStyle, "classic");
-  assert.equal(settingsApi.normalizeSettings({ uiStyle: "modern" }).uiStyle, "lexend");
+test("interface themes normalize and replace legacy styles without changing readability", () => {
+  for (const uiStyle of ["classic", "lexend", "modern", "unknown"]) {
+    const migrated = settingsApi.normalizeSettings({
+      uiStyle,
+      enabled: false,
+      scope: "all",
+      textScale: 120,
+      lineHeight: 1.8,
+      letterSpacing: 0.08,
+      siteRules: [{ hostname: "example.com", enabled: false }]
+    });
+    assert.equal(migrated.theme, "light");
+    assert.equal(Object.hasOwn(migrated, "uiStyle"), false);
+    assert.equal(migrated.enabled, false);
+    assert.equal(migrated.scope, "all");
+    assert.equal(migrated.textScale, 120);
+    assert.equal(migrated.lineHeight, 1.8);
+    assert.equal(migrated.letterSpacing, 0.08);
+    assert.equal(migrated.siteRules[0].hostname, "example.com");
+  }
+  assert.equal(settingsApi.normalizeSettings({ theme: "dark" }).theme, "dark");
+  for (const theme of [undefined, "light", "unknown", null, true]) {
+    assert.equal(settingsApi.normalizeSettings({ theme }).theme, "light");
+  }
+  const dark = settingsApi.normalizeSettings({ theme: "dark" });
+  assert.deepEqual(settingsApi.normalizeSettings(dark), dark);
+  assert.equal(settingsApi.toggleSite(dark, "example.com").theme, "dark");
 });
 
 test("malformed settings do not coerce missing numbers or inherit legacy spacing", () => {

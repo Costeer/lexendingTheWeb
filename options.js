@@ -8,7 +8,7 @@
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
   const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
-  const modernUiInput = document.querySelector("#modern-ui");
+  const darkThemeInput = document.querySelector("#dark-theme");
   const appearanceState = document.querySelector("#appearance-state");
   const advancedModeInput = document.querySelector("#advanced-mode");
   const readabilityControlStage = document.querySelector("#readability-control-stage");
@@ -240,10 +240,9 @@
   };
 
   const renderInterfaceStyle = () => {
-    const lexendMode = settings.uiStyle === "lexend";
-    document.documentElement.dataset.uiStyle = lexendMode ? "lexend" : "classic";
-    modernUiInput.checked = lexendMode;
-    appearanceState.textContent = lexendMode ? "On" : "Off";
+    document.documentElement.dataset.theme = settings.theme;
+    darkThemeInput.checked = settings.theme === "dark";
+    appearanceState.textContent = darkThemeInput.checked ? "On" : "Off";
   };
 
   const makeDeleteButton = (rule) => {
@@ -324,7 +323,7 @@
       }
       try {
         await storage.set(snapshot);
-        await storage.remove?.(["disabledSites", "spacing"]);
+        await storage.remove?.(["disabledSites", "spacing", "uiStyle"]);
         if (revision === saveRevision) {
           failedSettings = null;
           setSaveState("saved", "All changes saved");
@@ -383,10 +382,10 @@
     }
   });
 
-  modernUiInput.addEventListener("change", () => {
+  darkThemeInput.addEventListener("change", () => {
     save({
       ...settings,
-      uiStyle: modernUiInput.checked ? "lexend" : "classic"
+      theme: darkThemeInput.checked ? "dark" : "light"
     });
   });
 

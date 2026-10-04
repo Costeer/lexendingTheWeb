@@ -26,50 +26,55 @@
 }
 
 :root {
-  --accent: #C40000;
-  --accent-tint: #FDECEC;
-  --ink: #000000;
-  --surface: #FFFFFF;
-  --popup-muted: #F4F4F4;
-  --settings-muted: #FAF8F4;
-  --secondary-text: #000000;
-  --frame-border: 3px solid var(--ink);
-  --section-divider: 2px solid var(--ink);
-  --control-border: 2px solid var(--ink);
-  --active-shadow: 4px 4px 0 var(--accent);
-  --frame-shadow: 8px 8px 0 var(--accent);
   --font-ui: "Lexend UI", system-ui, sans-serif;
   --motion-fast: 140ms;
   --motion-base: 200ms;
   --motion-ease: cubic-bezier(.22, 1, .36, 1);
-  color-scheme: only light;
-  font-family: var(--font-ui);
-  color: var(--ink);
-  background: var(--surface);
-  font-synthesis: none;
-}
-
-:root[data-ui-style="lexend"] {
   --accent: #FF0000;
   --accent-tint: #FFF2F2;
+  --on-accent: #FFFFFF;
   --ink: #000000;
   --surface: #FFFFFF;
   --popup-muted: #EEEEEE;
   --settings-muted: #EEEEEE;
-  --secondary-text: #000000;
+  --secondary-text: var(--ink);
   --ui-border: #C2C2C2;
   --ui-radius: 5px;
   --frame-border: 1px solid var(--ui-border);
-  --section-divider: 1px solid #DDDDDD;
+  --divider: #DDDDDD;
+  --section-divider: 1px solid var(--divider);
+  --row-divider: #E5E5E5;
+  --site-strip-background: #FDEAEA;
+  --site-strip-border: #E8D4D4;
   --control-border: 1px solid var(--ui-border);
   --active-shadow: 0 6px 16px rgb(0 0 0 / 14%);
   --frame-shadow: 0 12px 32px rgb(0 0 0 / 14%);
-  --text-title: #000000;
-  --text-body: #000000;
-  --text-muted: #000000;
-  --text-soft: #000000;
+  --text-title: var(--ink);
+  --text-body: var(--ink);
+  --text-muted: var(--ink);
+  --text-soft: var(--ink);
+  color-scheme: light;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--surface);
+  font-synthesis: none;
   font-weight: 400;
   letter-spacing: 0;
+}
+
+:root[data-theme="dark"] {
+  --accent: #D90000;
+  --accent-tint: #351B1B;
+  --ink: #FFFFFF;
+  --surface: #151515;
+  --popup-muted: #242424;
+  --settings-muted: #242424;
+  --ui-border: #686868;
+  --divider: #424242;
+  --row-divider: #383838;
+  --site-strip-background: #351B1B;
+  --site-strip-border: #613333;
+  color-scheme: dark;
 }
 
 *,
@@ -96,18 +101,10 @@ input[type="radio"] {
   -webkit-tap-highlight-color: transparent;
 }
 
-button:focus-visible,
-input:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
-  outline: 3px dashed var(--ink);
-  outline-offset: 3px;
-}
-
-:root[data-ui-style="lexend"] button:focus-visible,
-:root[data-ui-style="lexend"] input:focus-visible,
-:root[data-ui-style="lexend"] a:focus-visible,
-:root[data-ui-style="lexend"] [tabindex]:focus-visible {
+:root button:focus-visible,
+:root input:focus-visible,
+:root a:focus-visible,
+:root [tabindex]:focus-visible {
   outline: 3px solid var(--ink);
   outline-offset: 2px;
 }
@@ -142,17 +139,17 @@ a:focus-visible,
   transform: translateX(-.3em) scaleX(.25);
 }
 
-:root[data-ui-style="lexend"] :is(.lxnd-badge, .lexend-wordmark):is(:hover, :focus) .lxnd-letter:not(:last-child) {
+:root :is(.lxnd-badge, .lexend-wordmark):is(:hover, :focus) .lxnd-letter:not(:last-child) {
   margin-right: .55em;
 }
 
-:root[data-ui-style="lexend"] :is(.lxnd-badge, .lexend-wordmark):is(:hover, :focus) .lxnd-letter-insert {
+:root :is(.lxnd-badge, .lexend-wordmark):is(:hover, :focus) .lxnd-letter-insert {
   width: .72em;
   opacity: 1;
   transform: translateX(0) scaleX(1);
 }
 
-:root[data-ui-style="lexend"] :is(.lxnd-badge, .lexend-wordmark) .lxnd-letter:hover {
+:root :is(.lxnd-badge, .lexend-wordmark) .lxnd-letter:hover {
   transform: translateY(-2px) scale(1.12);
 }
 

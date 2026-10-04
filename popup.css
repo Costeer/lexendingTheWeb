@@ -18,10 +18,6 @@ body {
   font-size: 15px;
 }
 
-.wordmark-lexend {
-  display: none;
-}
-
 .site-message {
   display: none;
 }
@@ -85,21 +81,8 @@ button:not(:disabled):active,
 }
 
 .wordmark:hover {
-  color: var(--accent);
+  color: var(--ink);
   transform: translateY(-1px);
-}
-
-.wordmark-mark {
-  display: grid;
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: var(--frame-border);
-  box-shadow: var(--active-shadow);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
 }
 
 .masthead-leading {
@@ -230,7 +213,7 @@ button:not(:disabled):active,
 }
 
 .text-link:hover {
-  color: var(--accent);
+  color: var(--ink);
   text-underline-offset: 4px;
 }
 
@@ -409,7 +392,7 @@ fieldset:disabled {
 }
 
 .quote-footer a:hover {
-  color: var(--accent);
+  color: var(--ink);
   text-underline-offset: 4px;
 }
 
@@ -449,11 +432,11 @@ fieldset:disabled {
 }
 
 .popup-feedback.is-error {
-  color: var(--accent);
+  color: var(--ink);
   font-weight: 500;
 }
 
-:root[data-ui-style="lexend"] body {
+:root body {
   color: var(--text-body);
   font-family: var(--font-ui);
   font-weight: 400;
@@ -461,7 +444,7 @@ fieldset:disabled {
   letter-spacing: 0;
 }
 
-:root[data-ui-style="lexend"] .panel {
+:root .panel {
   position: relative;
   width: 360px;
   overflow: hidden;
@@ -471,22 +454,17 @@ fieldset:disabled {
   box-shadow: var(--frame-shadow);
 }
 
-:root[data-ui-style="lexend"] .masthead {
+:root .masthead {
   min-height: 78px;
   padding: 18px 24px;
   border-bottom: 0;
 }
 
-:root[data-ui-style="lexend"] .wordmark-mark,
-:root[data-ui-style="lexend"] .wordmark-classic {
-  display: none;
-}
-
-:root[data-ui-style="lexend"] .wordmark-lexend {
+:root .wordmark-lexend {
   display: flex;
 }
 
-:root[data-ui-style="lexend"] .wordmark {
+:root .wordmark {
   display: grid;
   width: 76px;
   height: 34px;
@@ -494,7 +472,7 @@ fieldset:disabled {
   overflow: hidden;
   place-items: center;
   border-radius: 0;
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
   font-size: 18px;
   font-weight: 400;
@@ -504,13 +482,13 @@ fieldset:disabled {
   transition: width 460ms var(--motion-ease);
 }
 
-:root[data-ui-style="lexend"] .wordmark:is(:hover, :focus) {
+:root .wordmark:is(:hover, :focus) {
   width: 154px;
-  color: var(--surface);
+  color: var(--on-accent);
   transform: none;
 }
 
-:root[data-ui-style="lexend"] .settings-button {
+:root .settings-button {
   width: 32px;
   height: 32px;
   border: 1px solid var(--ui-border);
@@ -519,12 +497,12 @@ fieldset:disabled {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .settings-button:hover {
+:root .settings-button:hover {
   color: var(--surface);
   background: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .master-control {
+:root .master-control {
   gap: 10px;
   color: var(--secondary-text);
   font-size: 14px;
@@ -533,7 +511,7 @@ fieldset:disabled {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .switch-track {
+:root .switch-track {
   width: 50px;
   height: 26px;
   border: 1px solid var(--ui-border);
@@ -541,7 +519,7 @@ fieldset:disabled {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .switch-thumb {
+:root .switch-thumb {
   top: 3px;
   left: 3px;
   width: 18px;
@@ -550,63 +528,63 @@ fieldset:disabled {
   border-radius: 0;
 }
 
-:root[data-ui-style="lexend"] .master-control input:checked + .switch-track {
+:root .master-control input:checked + .switch-track {
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .master-control input:checked + .switch-track .switch-thumb {
-  background: var(--surface);
+:root .master-control input:checked + .switch-track .switch-thumb {
+  background: var(--on-accent);
   transform: translateX(24px);
 }
 
-:root[data-ui-style="lexend"] .site-strip {
+:root .site-strip {
   display: flex;
   min-height: 40px;
   padding: 9px 26px 9px 22px;
   border: 0;
-  border-top: 1px solid #F2DADA;
-  border-bottom: 1px solid #E8D4D4;
+  border-top: 1px solid var(--site-strip-border);
+  border-bottom: 1px solid var(--site-strip-border);
   border-left: 4px solid var(--accent);
   color: var(--ink);
-  background: #FDEAEA;
+  background: var(--site-strip-background);
 }
 
-:root[data-ui-style="lexend"] #site-status-text {
+:root #site-status-text {
   color: inherit;
   font-size: 15px;
   letter-spacing: 0;
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] #site-status-text strong {
+:root #site-status-text strong {
   font-weight: 500;
 }
 
-:root[data-ui-style="lexend"] .site-message {
+:root .site-message {
   display: none;
 }
 
-:root[data-ui-style="lexend"] .site-strip .text-link {
+:root .site-strip .text-link {
   margin: 0;
   color: inherit;
   font-size: 15px;
   font-weight: 400;
 }
 
-:root[data-ui-style="lexend"] .popup-section {
+:root .popup-section {
   padding: 22px 24px;
   border-bottom: 0;
 }
 
-:root[data-ui-style="lexend"] .scope-section {
+:root .scope-section {
   padding-bottom: 6px;
 }
 
-:root[data-ui-style="lexend"] .spacing-section {
+:root .spacing-section {
   padding-top: 12px;
 }
 
-:root[data-ui-style="lexend"] .popup-section legend {
+:root .popup-section legend {
   margin-bottom: 10px;
   color: var(--ink);
   font-size: 13px;
@@ -615,7 +593,7 @@ fieldset:disabled {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .choice-card {
+:root .choice-card {
   grid-template-columns: 18px 1fr;
   gap: 12px;
   margin-right: 0;
@@ -626,7 +604,7 @@ fieldset:disabled {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .choice-card:has(input:checked) {
+:root .choice-card:has(input:checked) {
   padding: 8px 9px;
   border-width: 6px;
   border-color: var(--accent);
@@ -634,46 +612,46 @@ fieldset:disabled {
   box-shadow: var(--active-shadow);
 }
 
-:root[data-ui-style="lexend"] .radio-mark {
+:root .radio-mark {
   width: 18px;
   height: 18px;
   border: 1px solid var(--ui-border);
 }
 
-:root[data-ui-style="lexend"] .choice-card input:checked + .radio-mark {
+:root .choice-card input:checked + .radio-mark {
   background: var(--accent);
   box-shadow: inset 0 0 0 4px var(--surface);
 }
 
-:root[data-ui-style="lexend"] .choice-card input:checked + .radio-mark::after {
+:root .choice-card input:checked + .radio-mark::after {
   display: none;
 }
 
-:root[data-ui-style="lexend"] .choice-copy {
+:root .choice-copy {
   color: var(--text-muted);
   font-size: 15px;
   font-weight: 400;
   line-height: 1.6;
 }
 
-:root[data-ui-style="lexend"] .choice-copy strong {
+:root .choice-copy strong {
   color: var(--text-title);
   font-size: 16px;
   font-weight: 500;
   letter-spacing: .025em;
 }
 
-:root[data-ui-style="lexend"] .segments {
+:root .segments {
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
 }
 
-:root[data-ui-style="lexend"] .segments label + label {
+:root .segments label + label {
   border-left: 1px solid var(--ui-border);
 }
 
-:root[data-ui-style="lexend"] .segments span {
+:root .segments span {
   min-height: 38px;
   padding: 9px 4px;
   font-size: 14px;
@@ -682,12 +660,12 @@ fieldset:disabled {
   letter-spacing: .02em;
 }
 
-:root[data-ui-style="lexend"] .segments input:checked + span {
-  color: var(--surface);
+:root .segments input:checked + span {
+  color: var(--on-accent);
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .spacing-preview {
+:root .spacing-preview {
   position: relative;
   margin: 30px 6px 34px;
   padding: 20px 22px;
@@ -697,8 +675,8 @@ fieldset:disabled {
   box-shadow: 0 8px 20px rgb(0 0 0 / 14%);
 }
 
-:root[data-ui-style="lexend"] .spacing-preview::before,
-:root[data-ui-style="lexend"] .spacing-preview::after {
+:root .spacing-preview::before,
+:root .spacing-preview::after {
   position: absolute;
   color: var(--ink);
   font-family: var(--font-ui);
@@ -708,26 +686,26 @@ fieldset:disabled {
   pointer-events: none;
 }
 
-:root[data-ui-style="lexend"] .spacing-preview::before {
+:root .spacing-preview::before {
   top: -24px;
   left: 8px;
   content: "“";
 }
 
-:root[data-ui-style="lexend"] .spacing-preview::after {
+:root .spacing-preview::after {
   right: 8px;
   bottom: -58px;
   content: "”";
 }
 
-:root[data-ui-style="lexend"] .spacing-preview blockquote {
+:root .spacing-preview blockquote {
   color: var(--text-body);
   font-size: 15px;
   font-weight: 400;
   line-height: 1.75;
 }
 
-:root[data-ui-style="lexend"] .quote-footer {
+:root .quote-footer {
   margin-top: 8px;
   color: var(--secondary-text);
   font-size: 13px;
@@ -736,24 +714,24 @@ fieldset:disabled {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .restricted-note {
+:root .restricted-note {
   border-bottom: 0;
   background: var(--popup-muted);
 }
 
-:root[data-ui-style="lexend"] .quote-footer a:hover,
-:root[data-ui-style="lexend"] .popup-feedback.is-error {
+:root .quote-footer a:hover,
+:root .popup-feedback.is-error {
   color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .master-control input:focus-visible + .switch-track,
-:root[data-ui-style="lexend"] .choice-card input:focus-visible + .radio-mark,
-:root[data-ui-style="lexend"] .segments input:focus-visible + span {
+:root .master-control input:focus-visible + .switch-track,
+:root .choice-card input:focus-visible + .radio-mark,
+:root .segments input:focus-visible + span {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
 
-:root[data-ui-style="lexend"] .popup-feedback:not(:empty) {
+:root .popup-feedback:not(:empty) {
   padding: 10px 24px;
   border-bottom: 0;
   color: var(--surface);
@@ -763,14 +741,14 @@ fieldset:disabled {
 /* Mobile browsers present the popup in a full-page viewport. Keep desktop
    popup sizing intrinsic, but let touch layouts fill their browser surface. */
 @media (hover: none) and (pointer: coarse) {
-  :root[data-ui-style="lexend"],
-  :root[data-ui-style="lexend"] body {
+  :root,
+  :root body {
     width: 100%;
     min-height: 100%;
     background: var(--surface);
   }
 
-  :root[data-ui-style="lexend"] .panel {
+  :root .panel {
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -782,61 +760,61 @@ fieldset:disabled {
     box-shadow: none;
   }
 
-  :root[data-ui-style="lexend"] .masthead,
-  :root[data-ui-style="lexend"] .site-strip,
-  :root[data-ui-style="lexend"] .popup-section {
+  :root .masthead,
+  :root .site-strip,
+  :root .popup-section {
     padding-inline: clamp(16px, 5vw, 32px);
   }
 
-  :root[data-ui-style="lexend"] .masthead {
+  :root .masthead {
     flex-wrap: wrap;
     row-gap: 12px;
   }
 
-  :root[data-ui-style="lexend"] .settings-button,
-  :root[data-ui-style="lexend"] .master-control,
-  :root[data-ui-style="lexend"] .site-strip .text-link,
-  :root[data-ui-style="lexend"] .segments span {
+  :root .settings-button,
+  :root .master-control,
+  :root .site-strip .text-link,
+  :root .segments span {
     min-height: 44px;
   }
 
-  :root[data-ui-style="lexend"] .settings-button {
+  :root .settings-button {
     width: 44px;
   }
 
-  :root[data-ui-style="lexend"] .site-strip-copy {
+  :root .site-strip-copy {
     min-width: 0;
   }
 
-  :root[data-ui-style="lexend"] #site-status-text {
+  :root #site-status-text {
     white-space: normal;
     overflow-wrap: anywhere;
   }
 
-  :root[data-ui-style="lexend"] .popup-section {
+  :root .popup-section {
     min-width: 0;
   }
 
-  :root[data-ui-style="lexend"] .spacing-section {
+  :root .spacing-section {
     flex: 1;
   }
 
-  :root[data-ui-style="lexend"] .segments {
+  :root .segments {
     grid-template-columns: .9fr 1.2fr .9fr;
   }
 
-  :root[data-ui-style="lexend"] .spacing-preview {
+  :root .spacing-preview {
     padding-inline: clamp(16px, 4vw, 28px);
   }
 
-  :root[data-ui-style="lexend"] .spacing-preview blockquote {
+  :root .spacing-preview blockquote {
     max-height: none;
     overflow: visible;
     overflow-wrap: anywhere;
     scrollbar-gutter: auto;
   }
 
-  :root[data-ui-style="lexend"] .quote-footer {
+  :root .quote-footer {
     overflow-wrap: anywhere;
   }
 }

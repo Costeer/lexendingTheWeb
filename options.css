@@ -166,7 +166,7 @@ h3 {
 }
 
 .save-status.is-error {
-  color: var(--accent);
+  color: var(--ink);
 }
 
 section + section {
@@ -192,7 +192,7 @@ section + section {
 .section-kicker {
   display: block;
   margin-bottom: 7px;
-  color: var(--accent);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .14em;
@@ -415,12 +415,12 @@ section + section {
 .segment-group input:checked + span {
   position: relative;
   z-index: 1;
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--ink);
 }
 
 .segment-group label:has(input:checked):hover span {
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
 }
 
@@ -578,7 +578,7 @@ section + section {
 }
 
 .preview-attribution a:hover {
-  color: var(--accent);
+  color: var(--ink);
   text-underline-offset: 4px;
 }
 
@@ -594,7 +594,7 @@ section + section {
 }
 
 .inline-link:hover {
-  color: var(--accent);
+  color: var(--ink);
   text-underline-offset: 4px;
 }
 
@@ -641,7 +641,7 @@ input::placeholder {
 .field-error {
   min-height: 0;
   margin: 0;
-  color: var(--accent);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.35;
@@ -677,7 +677,7 @@ input::placeholder {
 }
 
 .check-label:hover strong {
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .check-label span {
@@ -711,12 +711,12 @@ input::placeholder {
 }
 
 .primary-button {
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--ink);
 }
 
 .primary-button:hover {
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
   box-shadow: 0 4px 10px rgb(0 0 0 / 12%);
   transform: translateY(-1px);
@@ -738,20 +738,20 @@ input::placeholder {
 }
 
 .secondary-button:hover {
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
   box-shadow: 0 4px 10px rgb(0 0 0 / 12%);
   transform: translateY(-1px);
 }
 
 .danger-button {
-  color: var(--accent);
+  color: var(--ink);
   border-color: var(--accent);
   background: var(--surface);
 }
 
 .danger-button:hover {
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
   box-shadow: 0 4px 10px rgb(0 0 0 / 12%);
   transform: translateY(-1px);
@@ -838,7 +838,7 @@ input::placeholder {
 
 .rule-hostname:hover,
 .rule-hostname:focus-visible {
-  color: var(--accent);
+  color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -868,7 +868,7 @@ input::placeholder {
 }
 
 .delete-rule:hover {
-  color: var(--accent);
+  color: var(--ink);
   background: var(--accent-tint);
 }
 
@@ -1023,7 +1023,7 @@ input::placeholder {
   }
 }
 
-:root[data-ui-style="lexend"] body {
+:root body {
   padding: 32px 20px 56px;
   background: var(--surface);
   color: var(--text-body);
@@ -1034,7 +1034,7 @@ input::placeholder {
   letter-spacing: 0;
 }
 
-:root[data-ui-style="lexend"] main {
+:root main {
   position: relative;
   width: min(920px, 100%);
   overflow: hidden;
@@ -1044,23 +1044,23 @@ input::placeholder {
   box-shadow: var(--frame-shadow);
 }
 
-:root[data-ui-style="lexend"] .page-attribution {
+:root .page-attribution {
   width: min(920px, 100%);
 }
 
-:root[data-ui-style="lexend"] h2,
-:root[data-ui-style="lexend"] h3 {
+:root h2,
+:root h3 {
   color: var(--text-title);
   font-weight: 500;
   letter-spacing: .045em;
 }
 
-:root[data-ui-style="lexend"] h2 {
+:root h2 {
   font-size: 26px;
   letter-spacing: .04em;
 }
 
-:root[data-ui-style="lexend"] .save-status {
+:root .save-status {
   min-width: 0;
   color: var(--secondary-text);
   font-size: 13px;
@@ -1070,51 +1070,51 @@ input::placeholder {
   border-radius: var(--ui-radius);
 }
 
-:root[data-ui-style="lexend"] .save-status svg {
+:root .save-status svg {
   fill: var(--accent);
 }
 
-:root[data-ui-style="lexend"] section {
+:root section {
   padding: 34px 30px;
 }
 
-:root[data-ui-style="lexend"] .appearance-section {
+:root .appearance-section {
   display: flex;
   align-items: flex-start;
   flex-direction: column;
   gap: 0;
   padding: 44px 40px 34px;
   border: 0;
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .appearance-copy {
+:root .appearance-copy {
   max-width: 64ch;
 }
 
-:root[data-ui-style="lexend"] .appearance-section h2 {
+:root .appearance-section h2 {
   max-width: none;
-  color: var(--surface);
+  color: var(--on-accent);
   font-size: 42px;
   font-weight: 650;
   line-height: 1.2;
   letter-spacing: .015em;
 }
 
-:root[data-ui-style="lexend"] .appearance-section .helper {
+:root .appearance-section .helper {
   max-width: 61ch;
   margin-top: 16px;
-  color: var(--surface);
+  color: var(--on-accent);
   font-size: 18px;
   font-weight: 400;
   line-height: 1.7;
 }
 
-:root[data-ui-style="lexend"] .appearance-link {
+:root .appearance-link {
   display: inline-block;
   margin-top: 12px;
-  color: var(--surface);
+  color: var(--on-accent);
   font-size: 16px;
   font-weight: 500;
   text-decoration: underline;
@@ -1122,89 +1122,89 @@ input::placeholder {
   text-underline-offset: 3px;
 }
 
-:root[data-ui-style="lexend"] .appearance-link:hover {
-  color: var(--surface);
+:root .appearance-link:hover {
+  color: var(--on-accent);
   text-underline-offset: 5px;
 }
 
-:root[data-ui-style="lexend"] .appearance-link-word {
+:root .appearance-link-word {
   display: inline-block;
   letter-spacing: 0;
   transition: letter-spacing 320ms var(--motion-ease);
 }
 
-:root[data-ui-style="lexend"] .appearance-link:is(:hover, :focus-visible) .appearance-link-word {
+:root .appearance-link:is(:hover, :focus-visible) .appearance-link-word {
   letter-spacing: .14em;
 }
 
-:root[data-ui-style="lexend"] .appearance-control {
+:root .appearance-control {
   justify-content: flex-start;
   margin-top: 26px;
   gap: 14px;
 }
 
-:root[data-ui-style="lexend"] .appearance-label {
+:root .appearance-label {
   text-align: left;
 }
 
-:root[data-ui-style="lexend"] .appearance-label strong {
-  color: var(--surface);
+:root .appearance-label strong {
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 300;
   letter-spacing: .12em;
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .appearance-label small {
+:root .appearance-label small {
   display: none;
 }
 
-:root[data-ui-style="lexend"] .appearance-switch-track {
+:root .appearance-switch-track {
   order: -1;
   width: 54px;
   height: 28px;
-  border: 1px solid var(--surface);
+  border: 1px solid var(--on-accent);
   border-radius: 0;
   background: transparent;
 }
 
-:root[data-ui-style="lexend"] .appearance-switch-thumb {
+:root .appearance-switch-thumb {
   top: 3px;
   left: 3px;
   width: 20px;
   height: 20px;
-  background: var(--surface);
+  background: var(--on-accent);
   border-radius: 0;
 }
 
-:root[data-ui-style="lexend"] .appearance-control input:checked + .appearance-switch-track {
-  background: var(--surface);
+:root .appearance-control input:checked + .appearance-switch-track {
+  background: var(--on-accent);
 }
 
-:root[data-ui-style="lexend"] .appearance-control input:checked + .appearance-switch-track .appearance-switch-thumb {
+:root .appearance-control input:checked + .appearance-switch-track .appearance-switch-thumb {
   background: var(--accent);
   transform: translateX(26px);
 }
 
-:root[data-ui-style="lexend"] .appearance-disclaimer {
+:root .appearance-disclaimer {
   display: block;
   width: 100%;
   max-width: 70ch;
   margin: 26px 0 0;
   padding-top: 18px;
   border-top: 1px solid rgb(255 255 255 / 35%);
-  color: var(--surface);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.65;
 }
 
-:root[data-ui-style="lexend"] .readability-title-row {
+:root .readability-title-row {
   align-items: flex-start;
   gap: 28px;
 }
 
-:root[data-ui-style="lexend"] .readability-heading .helper {
+:root .readability-heading .helper {
   max-width: none;
   margin-top: 12px;
   color: var(--text-body);
@@ -1213,11 +1213,11 @@ input::placeholder {
   line-height: 1.75;
 }
 
-:root[data-ui-style="lexend"] .lexend-emphasis {
+:root .lexend-emphasis {
   color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .advanced-control {
+:root .advanced-control {
   gap: 10px;
   color: var(--secondary-text);
   font-size: 14px;
@@ -1226,7 +1226,7 @@ input::placeholder {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .mode-switch-track {
+:root .mode-switch-track {
   width: 54px;
   height: 28px;
   border: 1px solid var(--ui-border);
@@ -1234,7 +1234,7 @@ input::placeholder {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .mode-switch-thumb {
+:root .mode-switch-thumb {
   top: 3px;
   left: 3px;
   width: 20px;
@@ -1243,26 +1243,26 @@ input::placeholder {
   border-radius: 50%;
 }
 
-:root[data-ui-style="lexend"] .advanced-control input:checked + .mode-switch-track {
+:root .advanced-control input:checked + .mode-switch-track {
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .advanced-control input:checked + .mode-switch-track .mode-switch-thumb {
+:root .advanced-control input:checked + .mode-switch-track .mode-switch-thumb {
   background: var(--surface);
   transform: translateX(26px);
 }
 
-:root[data-ui-style="lexend"] .control-grid {
+:root .control-grid {
   gap: 18px;
 }
 
-:root[data-ui-style="lexend"] .basic-controls,
-:root[data-ui-style="lexend"] .slider-grid {
+:root .basic-controls,
+:root .slider-grid {
   grid-auto-rows: 108px;
 }
 
-:root[data-ui-style="lexend"] .setting-control,
-:root[data-ui-style="lexend"] .slider-control {
+:root .setting-control,
+:root .slider-control {
   height: 108px;
   min-height: 108px;
   padding: 0;
@@ -1270,29 +1270,29 @@ input::placeholder {
   outline: 0;
 }
 
-:root[data-ui-style="lexend"] .setting-control {
+:root .setting-control {
   position: relative;
   display: block;
 }
 
-:root[data-ui-style="lexend"] .slider-control {
+:root .slider-control {
   grid-template-rows: 24px 26px 18px;
   align-content: center;
   row-gap: 8px;
 }
 
-:root[data-ui-style="lexend"] .slider-control:hover {
+:root .slider-control:hover {
   background: transparent;
   box-shadow: none;
   transform: none;
 }
 
-:root[data-ui-style="lexend"] .slider-heading {
+:root .slider-heading {
   min-height: 24px;
   align-items: center;
 }
 
-:root[data-ui-style="lexend"] .setting-control legend {
+:root .setting-control legend {
   position: absolute;
   top: 12px;
   left: 0;
@@ -1304,7 +1304,7 @@ input::placeholder {
   letter-spacing: .025em;
 }
 
-:root[data-ui-style="lexend"] .segment-group {
+:root .segment-group {
   position: absolute;
   top: 48px;
   right: 0;
@@ -1316,11 +1316,11 @@ input::placeholder {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .setting-control:nth-child(3) .segment-group {
+:root .setting-control:nth-child(3) .segment-group {
   grid-template-columns: .9fr 1.2fr .9fr;
 }
 
-:root[data-ui-style="lexend"] .segment-group span {
+:root .segment-group span {
   height: 42px;
   min-height: 42px;
   padding: 9px 5px;
@@ -1333,16 +1333,16 @@ input::placeholder {
   letter-spacing: .02em;
 }
 
-:root[data-ui-style="lexend"] .segment-group label:first-child span {
+:root .segment-group label:first-child span {
   border-left: 0;
 }
 
-:root[data-ui-style="lexend"] .segment-group input:checked + span {
-  color: var(--surface);
+:root .segment-group input:checked + span {
+  color: var(--on-accent);
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .slider-heading strong {
+:root .slider-heading strong {
   display: flex;
   align-items: center;
   color: var(--text-title);
@@ -1351,7 +1351,7 @@ input::placeholder {
   letter-spacing: .025em;
 }
 
-:root[data-ui-style="lexend"] .slider-heading output {
+:root .slider-heading output {
   min-width: 0;
   margin-left: auto;
   padding: 0;
@@ -1363,36 +1363,36 @@ input::placeholder {
   text-align: right;
 }
 
-:root[data-ui-style="lexend"] .slider-control input[type="range"] {
+:root .slider-control input[type="range"] {
   align-self: center;
 }
 
-:root[data-ui-style="lexend"] .slider-control input[type="range"]::-webkit-slider-runnable-track,
-:root[data-ui-style="lexend"] .slider-control input[type="range"]::-moz-range-track {
+:root .slider-control input[type="range"]::-webkit-slider-runnable-track,
+:root .slider-control input[type="range"]::-moz-range-track {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .slider-control input[type="range"]::-webkit-slider-thumb,
-:root[data-ui-style="lexend"] .slider-control input[type="range"]::-moz-range-thumb {
+:root .slider-control input[type="range"]::-webkit-slider-thumb,
+:root .slider-control input[type="range"]::-moz-range-thumb {
   border: 0;
   border-radius: 3px;
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .readability-preview {
+:root .readability-preview {
   margin-top: 22px;
   padding: 0;
   border: 0;
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .preview-heading {
+:root .preview-heading {
   margin-bottom: clamp(22px, 3vw, 30px);
 }
 
-:root[data-ui-style="lexend"] .preview-quote-frame {
+:root .preview-quote-frame {
   position: relative;
   margin: 0 clamp(4px, 1.2vw, 10px) clamp(28px, 4vw, 38px);
   padding:
@@ -1405,8 +1405,8 @@ input::placeholder {
   box-shadow: 0 8px 20px rgb(0 0 0 / 14%);
 }
 
-:root[data-ui-style="lexend"] .preview-quote-frame::before,
-:root[data-ui-style="lexend"] .preview-quote-frame::after {
+:root .preview-quote-frame::before,
+:root .preview-quote-frame::after {
   position: absolute;
   z-index: 1;
   color: var(--ink);
@@ -1417,20 +1417,20 @@ input::placeholder {
   pointer-events: none;
 }
 
-:root[data-ui-style="lexend"] .preview-quote-frame::before {
+:root .preview-quote-frame::before {
   top: -.34em;
   left: clamp(8px, 2vw, 18px);
   content: "“";
 }
 
-:root[data-ui-style="lexend"] .preview-quote-frame::after {
+:root .preview-quote-frame::after {
   right: clamp(8px, 2vw, 18px);
   bottom: -.78em;
   content: "”";
 }
 
-:root[data-ui-style="lexend"] .preview-heading > span,
-:root[data-ui-style="lexend"] .section-kicker {
+:root .preview-heading > span,
+:root .section-kicker {
   color: var(--ink);
   font-size: 13px;
   font-weight: 400;
@@ -1438,14 +1438,14 @@ input::placeholder {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .inline-link {
+:root .inline-link {
   color: var(--ink);
   font-weight: 300;
   text-decoration-color: var(--accent);
   text-underline-offset: 3px;
 }
 
-:root[data-ui-style="lexend"] #preview-copy {
+:root #preview-copy {
   position: relative;
   z-index: 2;
   max-height: none;
@@ -1458,7 +1458,7 @@ input::placeholder {
   scrollbar-gutter: auto;
 }
 
-:root[data-ui-style="lexend"] .preview-attribution {
+:root .preview-attribution {
   position: relative;
   z-index: 2;
   margin-top: 10px;
@@ -1468,11 +1468,11 @@ input::placeholder {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] section:not(.appearance-section) > .section-heading {
+:root section:not(.appearance-section) > .section-heading {
   margin-bottom: 24px;
 }
 
-:root[data-ui-style="lexend"] .add-rule {
+:root .add-rule {
   grid-template-columns: minmax(180px, 1fr) auto auto;
   gap: 12px;
   padding: 0;
@@ -1480,8 +1480,8 @@ input::placeholder {
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] input[type="text"],
-:root[data-ui-style="lexend"] input[type="search"] {
+:root input[type="text"],
+:root input[type="search"] {
   min-height: 46px;
   padding: 12px 16px;
   border: 1px solid var(--ui-border);
@@ -1491,13 +1491,13 @@ input::placeholder {
   font-weight: 400;
 }
 
-:root[data-ui-style="lexend"] input::placeholder {
+:root input::placeholder {
   color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .primary-button,
-:root[data-ui-style="lexend"] .secondary-button,
-:root[data-ui-style="lexend"] .danger-button {
+:root .primary-button,
+:root .secondary-button,
+:root .danger-button {
   min-height: 46px;
   padding: 12px 22px;
   border: 1px solid var(--ui-border);
@@ -1510,14 +1510,14 @@ input::placeholder {
   text-transform: none;
 }
 
-:root[data-ui-style="lexend"] .primary-button {
+:root .primary-button {
   border-color: var(--accent);
-  color: var(--surface);
+  color: var(--on-accent);
   background: var(--accent);
 }
 
-:root[data-ui-style="lexend"] .primary-button:disabled,
-:root[data-ui-style="lexend"] .primary-button:disabled:hover {
+:root .primary-button:disabled,
+:root .primary-button:disabled:hover {
   border-color: var(--ui-border);
   color: var(--text-muted);
   background: var(--settings-muted);
@@ -1526,137 +1526,137 @@ input::placeholder {
   transform: none;
 }
 
-:root[data-ui-style="lexend"] .secondary-button {
+:root .secondary-button {
   color: var(--ink);
   border-color: var(--ui-border);
 }
 
-:root[data-ui-style="lexend"] .rule-list {
+:root .rule-list {
   border: 0;
 }
 
-:root[data-ui-style="lexend"] .rule-row,
-:root[data-ui-style="lexend"] .rule-row + .rule-row {
+:root .rule-row,
+:root .rule-row + .rule-row {
   min-height: 60px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .rule-hostname {
+:root .rule-hostname {
   color: var(--text-title);
   font-size: 17px;
   font-weight: 500;
 }
 
-:root[data-ui-style="lexend"] .rule-hostname:is(:hover, :focus-visible) {
-  color: var(--accent);
+:root .rule-hostname:is(:hover, :focus-visible) {
+  color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .check-label input,
-:root[data-ui-style="lexend"] .rule-tag,
-:root[data-ui-style="lexend"] .shortcut kbd,
-:root[data-ui-style="lexend"] .toast {
+:root .check-label input,
+:root .rule-tag,
+:root .shortcut kbd,
+:root .toast {
   border-radius: var(--ui-radius);
 }
 
-:root[data-ui-style="lexend"] .rule-status,
-:root[data-ui-style="lexend"] .check-label {
+:root .rule-status,
+:root .check-label {
   color: var(--secondary-text);
   font-weight: 400;
   letter-spacing: .06em;
 }
 
-:root[data-ui-style="lexend"] .delete-rule {
+:root .delete-rule {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .field-error,
-:root[data-ui-style="lexend"] .check-label:hover strong {
+:root .field-error,
+:root .check-label:hover strong {
   color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .preview-attribution a:hover {
+:root .preview-attribution a:hover {
   color: var(--ink);
 }
 
-:root[data-ui-style="lexend"] .empty-state,
-:root[data-ui-style="lexend"] .search-empty {
+:root .empty-state,
+:root .search-empty {
   border: 10px solid var(--settings-muted);
   border-radius: var(--ui-radius);
   background: var(--surface);
 }
 
-:root[data-ui-style="lexend"] .tools-grid {
+:root .tools-grid {
   gap: 10px;
 }
 
-:root[data-ui-style="lexend"] .tool-card {
+:root .tool-card {
   padding: 20px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
 }
 
-:root[data-ui-style="lexend"] .tool-card h3 {
+:root .tool-card h3 {
   font-size: 16px;
   letter-spacing: .035em;
 }
 
-:root[data-ui-style="lexend"] .section-heading > .helper,
-:root[data-ui-style="lexend"] .tool-card > p,
-:root[data-ui-style="lexend"] .empty-state p,
-:root[data-ui-style="lexend"] .browser-note,
-:root[data-ui-style="lexend"] .shortcut-instructions {
+:root .section-heading > .helper,
+:root .tool-card > p,
+:root .empty-state p,
+:root .browser-note,
+:root .shortcut-instructions {
   color: var(--text-muted);
 }
 
-:root[data-ui-style="lexend"] .slider-limits,
-:root[data-ui-style="lexend"] .check-label small,
-:root[data-ui-style="lexend"] .rule-status {
+:root .slider-limits,
+:root .check-label small,
+:root .rule-status {
   color: var(--text-soft);
 }
 
-:root[data-ui-style="lexend"] .slider-limits {
+:root .slider-limits {
   align-items: baseline;
   line-height: 1.4;
 }
 
-:root[data-ui-style="lexend"] .appearance-control input:focus-visible + .appearance-switch-track,
-:root[data-ui-style="lexend"] .advanced-control input:focus-visible + .mode-switch-track,
-:root[data-ui-style="lexend"] .segment-group input:focus-visible + span {
+:root .appearance-control input:focus-visible + .appearance-switch-track,
+:root .advanced-control input:focus-visible + .mode-switch-track,
+:root .segment-group input:focus-visible + span {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 @media (max-width: 720px) {
-  :root[data-ui-style="lexend"] body {
+  :root body {
     padding: 16px 12px 36px;
   }
 
-  :root[data-ui-style="lexend"] section {
+  :root section {
     padding-right: 20px;
     padding-left: 20px;
   }
 
-  :root[data-ui-style="lexend"] .appearance-section {
+  :root .appearance-section {
     padding: 32px 24px 26px;
   }
 
-  :root[data-ui-style="lexend"] .appearance-section h2 {
+  :root .appearance-section h2 {
     font-size: 32px;
   }
 
-  :root[data-ui-style="lexend"] .appearance-section .helper {
+  :root .appearance-section .helper {
     font-size: 15px;
   }
 
-  :root[data-ui-style="lexend"] .appearance-control {
+  :root .appearance-control {
     width: auto;
   }
 
-  :root[data-ui-style="lexend"] .add-rule {
+  :root .add-rule {
     grid-template-columns: 1fr;
   }
 }

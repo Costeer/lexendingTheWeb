@@ -7,7 +7,7 @@ A Chrome and Firefox extension that replaces website typography with
 
 - Apply Lexend to body copy alone or include headings.
 - Set text size, line height, and letter spacing.
-- Choose between the classic and Lexend themes for the popup and settings page.
+- Use the Lexend interface with a light or dark theme for the popup and settings page.
 - Pause the extension globally, for one hostname, or for a domain and its
   subdomains.
 - Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
