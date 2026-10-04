@@ -191,6 +191,50 @@ input[type="radio"] {
   border: 0;
 }
 
+/* Preset slots stay equal; only their visual selection grows, not the hit area. */
+:root :is(.segment-group, .segments) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:root :is(.segment-group, .segments) label {
+  position: relative;
+}
+
+:root :is(.segment-group, .segments) label:has(input:checked) {
+  z-index: 1;
+}
+
+:root :is(.segment-group, .segments) span {
+  pointer-events: none;
+  transform: scale(1);
+}
+
+:root :is(.segment-group, .segments) label:first-child span {
+  border-top-left-radius: calc(var(--ui-radius) - 1px);
+  border-bottom-left-radius: calc(var(--ui-radius) - 1px);
+}
+
+:root :is(.segment-group, .segments) label:last-child span {
+  border-top-right-radius: calc(var(--ui-radius) - 1px);
+  border-bottom-right-radius: calc(var(--ui-radius) - 1px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root :is(.segment-group, .segments) input:checked + span {
+    border-radius: var(--ui-radius);
+    transform: scale(1.04);
+  }
+}
+
+/* Keep the longest label readable in equal slots on small phone screens. */
+@media (max-width: 360px) {
+  :root :is(.segment-group, .segments) label span {
+    padding-inline: 3px;
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+}
+
 [hidden] {
   display: none !important;
 }

@@ -52,7 +52,7 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   });
   const inputs = new Map(Object.entries({
     basicTextScale: [100, 110, 120],
-    basicLineHeight: [0, 1.6, 2],
+    basicLineHeight: [0, 1.5, 2],
     basicLetterSpacing: [0, 0.04, 0.08]
   }).map(([name, values]) => [
     `input[name="${name}"]`,
@@ -104,7 +104,7 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   await tick();
   assert.deepEqual(errors, []);
   return {
-    get, writes, panels, navigation, root, cache,
+    get, writes, panels, navigation, root, cache, inputs,
     rows: () => get("#rule-list").children,
     resize(desktopMode) { media.matches = desktopMode; media.listener(); }
   };
@@ -129,6 +129,44 @@ test("settings retain the dark navigation cache while loading, then honor synced
   const stale = await openSettings({ cachedTheme: "dark", getSettings: async () => ({ theme: "light" }) });
   assert.equal(stale.root.dataset.theme, "light", "the cache does not override synced settings");
   assert.equal(stale.cache.get("lexend-ui-theme"), "light");
+});
+
+test("readability presets select only exact saved values, never the nearest choice", async () => {
+  for (const settings of [
+    { textScale: 100, lineHeight: 0, letterSpacing: 0 },
+    { textScale: 110, lineHeight: 1.5, letterSpacing: 0.04 },
+    { textScale: 120, lineHeight: 2, letterSpacing: 0.08 },
+    { textScale: 105, lineHeight: 1.6, letterSpacing: 0.045 }
+  ]) {
+    const page = await openSettings({ getSettings: async () => settings });
+    for (const [name, key] of [["basicTextScale", "textScale"], ["basicLineHeight", "lineHeight"], ["basicLetterSpacing", "letterSpacing"]]) {
+      const selected = page.inputs.get(`input[name="${name}"]`).filter((input) => input.checked);
+      const expected = [105, 1.6, 0.045].includes(settings[key]) ? [] : [String(settings[key])];
+      assert.deepEqual(selected.map((input) => input.value), expected);
+    }
+  }
+});
+
+test("custom slider values clear the preset selection and choosing a preset restores it", async () => {
+  const page = await openSettings();
+  const controls = [
+    ["#text-scale", "basicTextScale", "105", "110", "textScale", 105],
+    ["#line-height", "basicLineHeight", "13", "1.5", "lineHeight", 1.6],
+    ["#letter-spacing", "basicLetterSpacing", "0.045", "0.04", "letterSpacing", 0.045]
+  ];
+  for (const [selector, name, custom, preset, key, value] of controls) {
+    const slider = page.get(selector);
+    slider.value = custom;
+    slider.emit("change");
+    const inputs = page.inputs.get(`input[name="${name}"]`);
+    assert.equal(inputs.some((input) => input.checked), false, `${name} has no selected preset for ${value}`);
+    await tick();
+    assert.equal(page.writes.at(-1)[key], value);
+    inputs.find((input) => input.value === preset).emit("click");
+    assert.deepEqual(inputs.filter((input) => input.checked).map((input) => input.value), [preset]);
+    await tick();
+    assert.equal(page.writes.at(-1)[key], Number(preset));
+  }
 });
 
 test("rapid sidebar selections leave only the latest category selected and visible", async () => {

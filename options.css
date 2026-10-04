@@ -339,7 +339,7 @@ section + section {
 
 .control-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 14px;
 }
 
@@ -1310,14 +1310,10 @@ input::placeholder {
   right: 0;
   left: 0;
   height: 44px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--surface);
-}
-
-:root .setting-control:nth-child(3) .segment-group {
-  grid-template-columns: .9fr 1.2fr .9fr;
 }
 
 :root .segment-group span {
