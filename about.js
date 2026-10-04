@@ -4,10 +4,8 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const applyTheme = (value) => {
-    document.documentElement.dataset.theme = settingsApi.normalizeSettings(value).theme;
+    globalThis.LexendTheme.apply(settingsApi.normalizeSettings(value).theme);
   };
-
-  applyTheme();
 
   const supportCard = document.getElementById("donate-link");
   const confetti = document.getElementById("support-confetti");
@@ -90,7 +88,9 @@
 
   const start = async () => {
     try {
-      applyTheme(await extension?.storage?.sync?.get(null));
+      if (extension?.storage?.sync) {
+        applyTheme(await extension.storage.sync.get(null));
+      }
     } catch (error) {
       console.error("Lexend for the Web could not load the interface theme.", error);
     }

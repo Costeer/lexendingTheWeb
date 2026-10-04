@@ -26,6 +26,10 @@ These use your browser's synchronized extension storage. If browser sync is on,
 your browser provider may sync them between signed-in profiles. The developer
 has no server and no access to your sync account.
 
+The popup and settings pages also keep a local copy of the interface theme so
+it can be applied before pages are painted. This cache stays in the browser and
+is not sent to the developer.
+
 ## You control your settings
 
 In Settings, you can edit or delete site rules, clear all rules, and reset your

@@ -38,7 +38,7 @@
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
 
-  let settings = settingsApi.normalizeSettings();
+  let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
   let feedbackTimer;
   const quote = quotesApi.random();
@@ -67,7 +67,7 @@
   ));
 
   const renderSettings = () => {
-    document.documentElement.dataset.theme = settings.theme;
+    globalThis.LexendTheme.apply(settings.theme);
     enabledInput.checked = settings.enabled;
     enabledInput.setAttribute(
       "aria-label",
@@ -223,7 +223,7 @@
   const start = async () => {
     try {
       const [storedSettings, siteContext] = await Promise.all([
-        storage ? storage.get(null) : settingsApi.defaults,
+        storage ? storage.get(null) : settings,
         getSiteContext()
       ]);
       settings = settingsApi.normalizeSettings(storedSettings);
@@ -231,7 +231,6 @@
       render();
     } catch (error) {
       console.error("Lexend for the Web could not load settings.", error);
-      settings = settingsApi.normalizeSettings();
       site = { hostname: "", supported: false, restricted: true };
       render();
       showFeedback("Settings could not be loaded.", true, 0);

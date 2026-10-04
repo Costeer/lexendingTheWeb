@@ -93,7 +93,7 @@
   });
   renderSettingsNavigation();
 
-  let settings = settingsApi.normalizeSettings();
+  let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let failedSettings = null;
   let writeQueue = Promise.resolve();
   let saveRevision = 0;
@@ -248,7 +248,7 @@
   };
 
   const renderInterfaceStyle = () => {
-    document.documentElement.dataset.theme = settings.theme;
+    globalThis.LexendTheme.apply(settings.theme);
     darkThemeInput.checked = settings.theme === "dark";
     appearanceState.textContent = darkThemeInput.checked ? "On" : "Off";
   };
@@ -615,7 +615,7 @@
   const start = async () => {
     try {
       settings = settingsApi.normalizeSettings(
-        storage ? await storage.get(null) : settingsApi.defaults
+        storage ? await storage.get(null) : settings
       );
       if (preferenceStorage) {
         try {
