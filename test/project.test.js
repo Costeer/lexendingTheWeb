@@ -115,7 +115,7 @@ test("About owns the disclaimer and links donations to the project's Ko-fi page"
   for (const asset of ["about.js", "about.css"]) await access(join(root, asset));
 });
 
-test("Ko-fi support uses desktop navigation and a responsive About card", async () => {
+test("Ko-fi support stays in a responsive About card, not the sidebar", async () => {
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
   assert.match(about, /aria-label="Support Me :3 on Ko-fi \(opens in a new tab\)"/);
   assert.match(about, /class="support-card-title">Support<br \/>Me :3<\/span>/);
@@ -152,8 +152,7 @@ test("Ko-fi support uses desktop navigation and a responsive About card", async 
     const html = await read(page);
     const nav = html.match(/<nav class="desktop-settings-nav"[\s\S]*?<\/nav>/)?.[0];
     assert.ok(nav, `${page} has desktop navigation`);
-    assert.match(nav, /class="sidebar-support" href="https:\/\/ko-fi\.com\/costeer" target="_blank" rel="noopener noreferrer"/);
-    assert.match(nav, /Support the project/);
+    assert.doesNotMatch(nav, /sidebar-support|Support the project|ko-fi\.com/);
   }
 });
 
@@ -186,7 +185,7 @@ test("mobile settings fill the viewport and use a non-interactive receipt edge",
   assert.match(css, /@media not all and \(min-width: 900px\) and \(hover: hover\) and \(pointer: fine\)/);
   assert.match(css, /:root body\.settings-page\s*\{[^}]*min-height: 100dvh;[^}]*padding: 0;/);
   assert.match(css, /\.settings-layout main\s*\{[^}]*flex: 1;[^}]*width: 100%;[^}]*overflow: visible;/);
-  assert.match(css, /main::after\s*\{[^}]*linear-gradient\(135deg, var\(--surface\)[^}]*linear-gradient\(225deg, var\(--surface\)[^}]*pointer-events: none;/);
+  assert.match(css, /\.settings-card\s*\{[^}]*flex: 1;[^}]*width: 100%;/);
   assert.match(css, /\.readability-title-row\s*\{[^}]*flex-wrap: wrap;/);
 });
 
@@ -202,7 +201,7 @@ test("mobile About is in the header and the desktop tab remains Appearance", asy
     assert.doesNotMatch(nav, /Lexend for the Web/);
   }
   assert.match(options, /<h2 id="appearance-title">Appearance<\/h2>/);
-  assert.doesNotMatch(options.match(/<footer\b[\s\S]*?<\/footer>/)?.[0], /mobile-about-link|href="about\.html"/);
+  assert.match(options.match(/<footer\b[\s\S]*?<\/footer>/)?.[0], /href="about\.html"/);
 });
 
 test("Appearance contains theme settings while About owns the project introduction", async () => {
@@ -227,15 +226,22 @@ test("settings navigation keeps scrollbar space and selected label metrics stabl
   assert.doesNotMatch(selectedStyle, /font-weight|font-size|padding|border-width/);
 });
 
-test("desktop support animation is subtle, occasional, and motion-preference aware", async () => {
+test("settings paper has a receipt edge on desktop and mobile, with an About footer outside", async () => {
   const css = await read("options-desktop.css");
-  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.desktop-settings-nav \.sidebar-support svg\s*\{[^}]*animation: support-heart-pulse 32s ease-in-out infinite;/);
-  assert.match(css, /\.sidebar-support:is\(:hover, :focus-visible\) svg\s*\{\s*animation: none;/);
-  const animation = css.match(/@keyframes support-heart-pulse\s*\{([\s\S]*?)\n  \}/)?.[1];
-  assert.ok(animation);
-  assert.match(animation, /0%, 94%, 100%\s*\{\s*transform: scale\(1\);/);
-  assert.match(animation, /97%\s*\{\s*transform: scale\(1\.12\);/);
-  assert.doesNotMatch(animation, /rotate|font-size|width|height|padding|margin/);
+  const sharedLayout = css.split("@media")[0];
+  assert.match(sharedLayout, /body\.settings-page\s*\{\s*background: var\(--settings-muted\);/);
+  assert.match(sharedLayout, /\.settings-card\s*\{[^}]*position: relative;[^}]*background: var\(--surface\);/);
+  assert.match(sharedLayout, /\.settings-card::after\s*\{[^}]*bottom: -12px;[^}]*linear-gradient\(135deg, var\(--surface\)[^}]*linear-gradient\(225deg, var\(--surface\)[^}]*pointer-events: none;/);
+  assert.doesNotMatch(css, /main::after|sidebar-support|support-heart-pulse/);
+  for (const page of ["options.html", "about.html"]) {
+    const html = await read(page);
+    assert.match(html, /class="settings-card">[\s\S]*<header\b[\s\S]*class="settings-layout"/);
+    assert.match(html, /<\/main>\s*<\/div>\s*<\/div>\s*<footer class="page-attribution">/);
+    const footer = html.match(/<footer\b[\s\S]*?<\/footer>/)?.[0];
+    assert.match(footer, /href="about\.html"/);
+    assert.match(footer, /aria-label="About Lexend for the Web, made by costeer"/);
+    assert.doesNotMatch(footer, /target="_blank"|costeer\.dev|<svg/);
+  }
 });
 
 test("site rules migrate and resolve by specificity", () => {

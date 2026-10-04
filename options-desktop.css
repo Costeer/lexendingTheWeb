@@ -8,6 +8,31 @@
   display: contents;
 }
 
+:root body.settings-page {
+  background: var(--settings-muted);
+}
+
+.settings-card {
+  position: relative;
+  width: min(1240px, 100%);
+  margin: 0 auto;
+  background: var(--surface);
+}
+
+/* Extend the paper edge without clipping content, focus rings, or hover effects. */
+.settings-card::after {
+  position: absolute;
+  right: 0;
+  bottom: -12px;
+  left: 0;
+  height: 12px;
+  background:
+    linear-gradient(135deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x,
+    linear-gradient(225deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x;
+  content: "";
+  pointer-events: none;
+}
+
 /* Use the same mobile layout as the panels, including wide touch screens. */
 @media not all and (min-width: 900px) and (hover: hover) and (pointer: fine) {
   :root body.settings-page {
@@ -19,12 +44,19 @@
     background: var(--settings-muted);
   }
 
+  :root .settings-page .settings-card {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    margin: 0 0 12px;
+  }
+
   :root .settings-page .settings-layout {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-width: 0;
-    padding-bottom: 12px;
   }
 
   :root .settings-page .settings-layout main {
@@ -35,20 +67,6 @@
     overflow: visible;
     border: 0;
     box-shadow: none;
-  }
-
-  /* Repeating triangles extend below the paper without masking its content. */
-  :root .settings-page .settings-layout main::after {
-    position: absolute;
-    right: 0;
-    bottom: -12px;
-    left: 0;
-    height: 12px;
-    background:
-      linear-gradient(135deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x,
-      linear-gradient(225deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x;
-    content: "";
-    pointer-events: none;
   }
 
   :root .settings-page .settings-panel {
@@ -106,11 +124,15 @@
     --ui-radius: 5px;
     --control-border: 1px solid var(--ui-border);
     --active-shadow: none;
-    padding: 28px 40px 32px;
+    padding: 28px 20px 32px;
     color: var(--ink);
-    background: var(--surface);
+    background: var(--settings-muted);
     font-size: 16px;
     line-height: 1.6;
+  }
+
+  .settings-card {
+    padding: 28px 40px 32px;
   }
 
   .desktop-settings-header {
@@ -175,13 +197,6 @@
     border-color: var(--accent);
   }
 
-  .desktop-settings-nav .sidebar-support {
-    margin-top: 18px;
-    padding: 12px;
-    border: 1px solid var(--ui-border);
-    font-weight: 500;
-  }
-
   .desktop-settings-nav svg {
     flex: 0 0 auto;
     width: 20px;
@@ -191,27 +206,6 @@
     stroke-width: 1.6;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .desktop-settings-nav .sidebar-support svg {
-      /* One small swell of the heart, with roughly 30 seconds of stillness. */
-      animation: support-heart-pulse 32s ease-in-out infinite;
-      transform-origin: center;
-    }
-
-    .desktop-settings-nav .sidebar-support:is(:hover, :focus-visible) svg {
-      animation: none;
-    }
-  }
-
-  @keyframes support-heart-pulse {
-    0%, 94%, 100% {
-      transform: scale(1);
-    }
-    97% {
-      transform: scale(1.12);
-    }
   }
 
   :root .settings-layout main {
