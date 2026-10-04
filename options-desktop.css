@@ -413,13 +413,6 @@
     max-width: 64ch;
   }
 
-  :root .settings-layout .appearance-link {
-    display: inline-block;
-    margin-top: 16px;
-    color: var(--ink);
-    font-size: 16px;
-  }
-
   :root .settings-layout .appearance-control {
     flex-direction: row;
     gap: 16px;
