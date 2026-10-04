@@ -62,7 +62,8 @@
       "resources": [
         "assets/fonts/lexend-latin-wght-normal.woff2",
         "assets/fonts/lexend-latin-ext-wght-normal.woff2",
-        "assets/fonts/lexend-vietnamese-wght-normal.woff2"
+        "assets/fonts/lexend-vietnamese-wght-normal.woff2",
+        "assets/fonts/nerd-fonts-symbols.woff2"
       ],
       "matches": [
         "<all_urls>"
