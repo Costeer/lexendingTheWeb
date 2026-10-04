@@ -130,7 +130,8 @@ test("Ko-fi support uses desktop navigation and a responsive About card", async 
   assert.doesNotMatch(css.match(/\.support-card\s*\{[^}]*\}/)?.[0], /position:\s*fixed/);
   assert.match(css, /\.support-confetti\s*\{[^}]*position: fixed;[^}]*overflow: hidden;[^}]*pointer-events: none;/);
   assert.doesNotMatch(css, /support-avatar-float|Bricolage|fonts\.googleapis/);
-  assert.match(css, /\.support-card\s*\{[^}]*width: 100%;[^}]*max-width: 520px;[^}]*font-family: var\(--font-ui\);/);
+  assert.match(css, /\.support-card\s*\{[^}]*width: 100%;[^}]*font-family: var\(--font-ui\);/);
+  assert.doesNotMatch(css.match(/\.support-card\s*\{[^}]*\}/)?.[0], /max-width:/);
   assert.match(about, /class="support-copy"/);
   assert.match(about, /class="support-live"/);
   assert.match(css, /radial-gradient\(380px circle at var\(--support-mx\) var\(--support-my\)/);
@@ -154,6 +155,22 @@ test("Ko-fi support uses desktop navigation and a responsive About card", async 
     assert.match(nav, /class="sidebar-support" href="https:\/\/ko-fi\.com\/costeer" target="_blank" rel="noopener noreferrer"/);
     assert.match(nav, /Support the project/);
   }
+});
+
+test("support stars stay decorative and the departing arrow returns as a hammer and sickle", async () => {
+  const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
+  assert.match(about, /class="support-stars" aria-hidden="true"/);
+  assert.equal((about.match(/class="support-sparkle"/g) ?? []).length, 5);
+  assert.equal((about.match(/class="support-shooting-star"/g) ?? []).length, 2);
+  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.5;[^}]*pointer-events: none;/);
+  assert.match(css, /@keyframes support-star-twinkle/);
+  assert.match(css, /@keyframes support-star-shoot/);
+  assert.match(about, /class="support-arrow-outbound"/);
+  assert.match(about, /class="support-arrow-return">☭<\/span>/);
+  assert.match(css, /\.support-arrow-outbound\s*\{\s*animation: support-arrow-shoot 550ms[^;]*both;/);
+  assert.match(css, /\.support-arrow-return\s*\{\s*animation: support-symbol-return 550ms[^;]*both;/);
+  assert.match(css, /@keyframes support-symbol-return/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.support-card \*\s*,[\s\S]*animation: none !important;/);
 });
 
 test("mobile settings fill the viewport and use a non-interactive receipt edge", async () => {
