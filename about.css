@@ -99,7 +99,7 @@
   padding: 30px 34px;
   overflow: hidden;
   border: 0;
-  border-radius: 28px;
+  border-radius: 12px;
   color: var(--support-cream);
   background: var(--support-ink);
   font-family: var(--font-ui);

@@ -131,6 +131,7 @@ test("Ko-fi support stays in a responsive About card, not the sidebar", async ()
   assert.match(css, /\.support-confetti\s*\{[^}]*position: fixed;[^}]*overflow: hidden;[^}]*pointer-events: none;/);
   assert.doesNotMatch(css, /support-avatar-float|Bricolage|fonts\.googleapis/);
   assert.match(css, /\.support-card\s*\{[^}]*width: 100%;[^}]*font-family: var\(--font-ui\);/);
+  assert.match(css, /\.support-card\s*\{[^}]*border-radius: 12px;/);
   assert.doesNotMatch(css.match(/\.support-card\s*\{[^}]*\}/)?.[0], /max-width:/);
   assert.match(about, /class="support-copy"/);
   assert.match(about, /class="support-live"/);
