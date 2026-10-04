@@ -5,7 +5,7 @@
     enabled: true,
     scope: "body",
     siteRules: [],
-    uiStyle: "classic",
+    theme: "light",
     textScale: 100,
     lineHeight: 0,
     letterSpacing: 0
@@ -116,9 +116,7 @@
       enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
       scope: value.scope === "all" ? "all" : defaults.scope,
       siteRules,
-      uiStyle: ["lexend", "modern"].includes(value.uiStyle)
-        ? "lexend"
-        : defaults.uiStyle,
+      theme: value.theme === "dark" ? "dark" : defaults.theme,
       textScale: clampNumber(value.textScale, defaults.textScale, 80, 140),
       lineHeight: (value.lineHeight === 0 || value.lineHeight === "0")
         ? 0

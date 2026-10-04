@@ -13,6 +13,8 @@ Open the extension from your browser's toolbar. Choose **Body text** to change
 paragraphs, links, labels, and controls, or **Body and headings** to include
 headings too. The spacing options let you add more room between letters.
 
+The popup and settings page use the Lexend interface, with light and dark themes.
+
 Use **Pause here** to keep the current site's font. Use the switch at the top
 of the popup to turn Lexend off everywhere. You can also pause or resume the
 current site with `Ctrl+Shift+L` (`Command+Shift+L` on macOS).
