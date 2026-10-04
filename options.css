@@ -57,6 +57,8 @@ main {
   width: min(920px, 100%);
   margin: 24px auto 0;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .page-attribution a {
@@ -184,8 +186,7 @@ section + section {
   min-width: 0;
 }
 
-.appearance-link,
-.appearance-disclaimer {
+.appearance-link {
   display: none;
 }
 
@@ -1184,19 +1185,6 @@ input::placeholder {
 :root .appearance-control input:checked + .appearance-switch-track .appearance-switch-thumb {
   background: var(--accent);
   transform: translateX(26px);
-}
-
-:root .appearance-disclaimer {
-  display: block;
-  width: 100%;
-  max-width: 70ch;
-  margin: 26px 0 0;
-  padding-top: 18px;
-  border-top: 1px solid rgb(255 255 255 / 35%);
-  color: var(--on-accent);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.65;
 }
 
 :root .readability-title-row {

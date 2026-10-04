@@ -119,6 +119,18 @@ test("quote selection returns an entry from the shared collection", () => {
   assert.ok(quotes.all.includes(quotes.random()));
 });
 
+test("About owns the disclaimer and links donations to the project's Ko-fi page", async () => {
+  const [options, about] = await Promise.all([read("options.html"), read("about.html")]);
+  assert.doesNotMatch(options, /independent, unofficial extension/);
+  assert.match(options, /href="about\.html"/);
+  assert.match(about, /independent, unofficial extension/);
+  assert.match(about, /href="https:\/\/ko-fi\.com\/costeer"/);
+  assert.match(about, /id="donate-link"/);
+  assert.match(about, /href="options\.html\?section=appearance-panel"/);
+  assert.match(about, /src="about\.js"/);
+  for (const asset of ["about.js", "about.css"]) await access(join(root, asset));
+});
+
 test("site rules migrate and resolve by specificity", () => {
   let settings = settingsApi.normalizeSettings({
     disabledSites: ["Example.com"],

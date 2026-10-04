@@ -1,0 +1,99 @@
+.about-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.about-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: min(1160px, 100%);
+  margin: 0 auto 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.about-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: .015em;
+}
+
+.about-back-link {
+  display: inline-block;
+  min-height: 44px;
+  margin-bottom: 16px;
+}
+
+.about-page .settings-panel {
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.about-block + .about-block {
+  margin-top: 32px;
+  padding-top: 28px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.about-block h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: .015em;
+}
+
+.about-block p {
+  max-width: 70ch;
+  margin: 0;
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 16px;
+}
+
+.about-links a,
+.about-back-link {
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+
+.about-links a:hover,
+.about-back-link:hover {
+  text-underline-offset: 5px;
+}
+
+.donate-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  margin-top: 20px;
+  padding: 10px 24px;
+  border: 1px solid var(--accent);
+  border-radius: var(--ui-radius);
+  color: var(--on-accent);
+  background: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.donate-button:hover {
+  box-shadow: 0 0 0 3px var(--accent-tint);
+  transform: translateY(-1px);
+}
+
+.donate-button:active {
+  transform: translateY(1px);
+}
+
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  .about-back-link {
+    display: none;
+  }
+}

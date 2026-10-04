@@ -54,7 +54,10 @@
   );
   const settingsPanels = [...document.querySelectorAll(".settings-panel")];
   const settingsNavigation = [...document.querySelectorAll("[data-settings-panel]")];
-  let selectedSettingsPanel = "readability-panel";
+  const requestedSettingsPanel = new URLSearchParams(location.search).get("section");
+  let selectedSettingsPanel = settingsPanels.some((panel) => panel.id === requestedSettingsPanel)
+    ? requestedSettingsPanel
+    : "readability-panel";
 
   const renderSettingsNavigation = () => {
     settingsPanels.forEach((panel) => {
