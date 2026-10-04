@@ -162,7 +162,7 @@ test("support stars stay decorative and the departing arrow returns as a hammer 
   assert.match(about, /class="support-stars" aria-hidden="true"/);
   assert.equal((about.match(/class="support-sparkle"/g) ?? []).length, 5);
   assert.equal((about.match(/class="support-shooting-star"/g) ?? []).length, 5);
-  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.06;[^}]*pointer-events: none;/);
+  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.35;[^}]*pointer-events: none;/);
   assert.match(css, /\.support-card:hover \.support-stars\s*\{\s*opacity: \.8;/);
   assert.match(css, /\.support-constellation::before\s*\{[^}]*opacity: \.65;/);
   assert.match(about, /class="support-constellation"/);
