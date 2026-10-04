@@ -1,8 +1,6 @@
 :root body.about-page {
   min-height: 100vh;
   min-height: 100dvh;
-  /* Leave room to scroll all content clear of the floating support button. */
-  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
 .about-page-header {
@@ -71,15 +69,12 @@
 }
 
 .donate-button {
-  position: fixed;
-  z-index: 10;
-  left: max(20px, env(safe-area-inset-left, 0px));
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   min-height: 52px;
+  margin-top: 20px;
   padding: 10px 20px;
   border: 0;
   border-radius: 999px;
@@ -110,7 +105,8 @@
 }
 
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  .about-back-link {
+  .about-back-link,
+  .donate-button {
     display: none;
   }
 }
