@@ -145,16 +145,16 @@ test("mobile settings fill the viewport and use a non-interactive receipt edge",
   assert.match(css, /\.readability-title-row\s*\{[^}]*flex-wrap: wrap;/);
 });
 
-test("mobile About navigation is in the header and Appearance is renamed", async () => {
+test("mobile About is in the header and the desktop tab remains Appearance", async () => {
   const options = await read("options.html");
   for (const page of ["options.html", "about.html"]) {
     const html = await read(page);
     const header = html.match(/<header\b[\s\S]*?<\/header>/)?.[0];
     assert.ok(header, `${page} has a header`);
     assert.match(header, /class="mobile-about-link" href="about\.html"/);
-    assert.doesNotMatch(html, />\s*Appearance\s*</);
     const nav = html.match(/<nav class="desktop-settings-nav"[\s\S]*?<\/nav>/)?.[0];
-    assert.match(nav, /Lexend for the Web/);
+    assert.match(nav, />\s*Appearance\s*</);
+    assert.doesNotMatch(nav, /Lexend for the Web/);
   }
   assert.match(options, /<h2 id="appearance-title">Lexend for the Web<\/h2>/);
   assert.doesNotMatch(options.match(/<footer\b[\s\S]*?<\/footer>/)?.[0], /mobile-about-link|href="about\.html"/);
