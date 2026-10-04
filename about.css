@@ -82,22 +82,124 @@
 }
 
 .support-card {
-  display: block;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(86px, .55fr);
+  align-items: center;
+  gap: 32px 16px;
+  container-type: inline-size;
+  isolation: isolate;
   width: 100%;
   max-width: 660px;
   margin-top: 32px;
+  padding: clamp(20px, 5vw, 40px);
   overflow: hidden;
   border: 0;
   border-radius: 16px;
   color: #fff;
-  background: #64409c;
+  background:
+    radial-gradient(ellipse at 90% 15%, #95869e80, transparent 65%),
+    radial-gradient(ellipse at 0% 100%, #99968090, transparent 60%),
+    #64409c;
   text-decoration: none;
+  transition: transform 280ms var(--motion-ease);
 }
 
-.support-card img {
-  display: block;
-  width: 100%;
+.support-card-title {
+  font-size: clamp(28px, 8cqw, 48px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: .01em;
+  transition: transform 400ms var(--motion-ease);
+}
+
+.support-card-footer {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font-size: clamp(16px, 4.4cqw, 26px);
+  line-height: 1.4;
+}
+
+.support-card-footer > span:not(.support-card-arrow) {
+  overflow-wrap: anywhere;
+}
+
+.support-coffee {
+  flex: 0 0 auto;
+  width: clamp(30px, 6.8cqw, 42px);
   height: auto;
+}
+
+.support-coffee-heart {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 400ms var(--motion-ease);
+}
+
+.support-card-arrow {
+  margin-left: auto;
+  transition: transform 400ms var(--motion-ease);
+}
+
+.support-orb {
+  position: relative;
+  justify-self: end;
+  width: min(100%, 160px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 5px solid #180c2e;
+  border-radius: 50%;
+  background: #030208;
+  box-shadow: 0 0 24px #ac83ff55;
+}
+
+.support-orb::before,
+.support-orb::after {
+  position: absolute;
+  content: "";
+  border-radius: 50%;
+}
+
+.support-orb::before {
+  inset: 3px;
+  background: conic-gradient(from 30deg, #5435ea, #ffa8ff, #6630dd, #09032c, #413fff, #f493ff, #5435ea);
+  filter: blur(2px);
+}
+
+.support-orb::after {
+  inset: 13px;
+  background: radial-gradient(circle at 70% 85%, #171130, #000 65%);
+  box-shadow: 0 0 10px 3px #150735, inset 0 0 8px #000;
+}
+
+.support-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.support-confetti-piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 12px;
+  background: #fff;
+}
+
+.support-confetti-piece:nth-child(4n + 1) { background: #ffd36d; }
+.support-confetti-piece:nth-child(4n + 2) { background: #ff98d7; }
+.support-confetti-piece:nth-child(4n + 3) { background: #a1ebff; }
+.support-confetti-piece:nth-child(3n) { border-radius: 50%; }
+.support-confetti-piece:nth-child(5n) {
+  width: 14px;
+  height: 14px;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
 }
 
 .support-card:is(:hover, :focus-visible) {
@@ -106,6 +208,43 @@
 
 .support-card:active {
   transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .support-card:is(:hover, :focus-visible) .support-card-title {
+    transform: translateX(4px);
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-coffee-heart {
+    transform: scale(1.16);
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-card-arrow {
+    transform: translate(3px, -3px);
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-orb {
+    animation: support-orb-float 2s ease-in-out infinite;
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-orb::before {
+    animation: support-orb-glow 3s linear infinite;
+  }
+
+  @keyframes support-orb-float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-6px) scale(1.04); }
+  }
+
+  @keyframes support-orb-glow {
+    to { transform: rotate(360deg); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-card:is(:hover, :focus-visible, :active) {
+    transform: none;
+  }
 }
 
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {

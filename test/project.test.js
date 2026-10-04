@@ -118,10 +118,11 @@ test("About owns the disclaimer and links donations to the project's Ko-fi page"
 test("Ko-fi support uses desktop navigation and a responsive About card", async () => {
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
   assert.match(about, /aria-label="Support costeer on Ko-fi \(opens in a new tab\)"/);
-  assert.match(about, /src="assets\/kofi-support\.jpg"/);
-  assert.match(about, /width="1200"\s+height="600"/);
-  assert.match(about, /alt="Support costeer — ko-fi\.com\/costeer"/);
-  await access(join(root, "assets/kofi-support.jpg"));
+  assert.match(about, /class="support-card-title">Support<br \/>costeer<\/span>/);
+  assert.match(about, /class="support-orb" aria-hidden="true"/);
+  assert.match(about, /class="support-confetti" aria-hidden="true"/);
+  assert.match(about, /<span>ko-fi\.com\/costeer<\/span>/);
+  assert.doesNotMatch(about, /<img\b|kofi-support\.jpg/);
   assert.doesNotMatch(about, /Support development|If this extension helps you|Donations are entirely optional/);
   assert.match(about, /<main>[\s\S]*id="donate-link"[\s\S]*<\/main>/);
   assert.doesNotMatch(css, /position:\s*fixed/);
@@ -129,6 +130,8 @@ test("Ko-fi support uses desktop navigation and a responsive About card", async 
   assert.doesNotMatch(css, /\.support-card\s*\{[^}]*display: none;/);
   assert.doesNotMatch(css, /url\(["']?https?:/);
   assert.doesNotMatch(about, /class="donate-button"/);
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)/);
+  assert.match(css, /\.support-confetti\s*\{[^}]*pointer-events: none;/);
   for (const page of ["about.html", "options.html", "popup.html"]) {
     assert.doesNotMatch(await read(page), /<script\b[^>]*src=["']https?:\/\//i);
   }
