@@ -42,7 +42,7 @@ test("hover rerenders retain converted typography before paint and preserve new 
       const sample = () => {
         if (__sampleFrames) __frames.push(...["home","balances","description"].map(id=>{
           const css=getComputedStyle(document.getElementById(id));
-          return {id,family:css.fontFamily,size:parseFloat(css.fontSize)};
+          return {id,family:css.fontFamily,size:parseFloat(css.fontSize),phase:globalThis.__phase};
         }));
         requestAnimationFrame(sample);
       };
@@ -65,6 +65,7 @@ test("hover rerenders retain converted typography before paint and preserve new 
     await page.waitForTimeout(150);
     await page.evaluate(()=>{__frames=[];__sampleFrames=true;});
     for (let i=0;i<5;i++) {
+      await page.evaluate(i=>{globalThis.__phase=`pointer cycle ${i}`;},i);
       await page.locator("#collapse").hover();
       // Frameworks can rewrite inline styles again while an existing tooltip
       // remains mounted; that style-only batch used to wait 100ms to recover.
@@ -83,6 +84,7 @@ test("hover rerenders retain converted typography before paint and preserve new 
       assert.ok(Math.abs((await page.locator("#home").evaluate(e=>parseFloat(getComputedStyle(e).fontSize)))-17.6)<.02);
     }
     await page.evaluate(()=>{
+      globalThis.__phase="continuous inline writes";
       globalThis.__styleLoop=setInterval(()=>{
         document.getElementById("home").style.cssText="font-family:Georgia!important;font-size:18px!important;background-color:rgb(240, 244, 248)";
       },16);
@@ -92,7 +94,7 @@ test("hover rerenders retain converted typography before paint and preserve new 
     await page.waitForFunction(()=>__state().healthy&&!__state().pending);
     const frames = await page.evaluate(()=>{__sampleFrames=false;return __frames;});
     assert.ok(frames.length>20,"native pointer cycles sampled multiple painted frames");
-    assert.ok(frames.every(frame=>frame.family.includes("Lexend")),"every painted sidebar and page frame retains converted typography");
+    assert.ok(frames.every(frame=>frame.family.includes("Lexend")),`every painted sidebar and page frame retains converted typography: ${JSON.stringify(frames.filter(frame=>!frame.family.includes("Lexend")))}`);
     assert.deepEqual(warnings,[]);
     // Pausing immediately after another author write must restore that new
     // baseline even before the deferred global geometry refresh executes.
