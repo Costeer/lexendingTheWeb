@@ -17,6 +17,14 @@
     const particleCount = 16;
     const maxParticles = 64;
 
+    const moveLight = (event) => {
+      if (reducedMotion.matches || event.pointerType === "touch") return;
+      const bounds = supportCard.getBoundingClientRect();
+      supportCard.style.setProperty("--support-mx", `${event.clientX - bounds.left}px`);
+      supportCard.style.setProperty("--support-my", `${event.clientY - bounds.top}px`);
+    };
+    supportCard.addEventListener("pointermove", moveLight);
+
     const celebrate = (event) => {
       if (reducedMotion.matches || event.pointerType === "touch") return;
       const cardBounds = supportCard.getBoundingClientRect();

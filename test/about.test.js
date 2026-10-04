@@ -50,12 +50,14 @@ function openSupport({ reducedMotion = false, focusVisible = true } = {}) {
   const listeners = new Map();
   const particles = new Set();
   const animations = [];
+  const light = new Map();
   const motion = {
     matches: reducedMotion,
     addEventListener(type, listener) { this.onChange = listener; }
   };
   const layer = { append(piece) { particles.add(piece); } };
   const card = {
+    style: { setProperty: (name, value) => light.set(name, value) },
     matches: (selector) => selector === ":focus-visible" && focusVisible,
     getBoundingClientRect: () => ({ left: 100, top: 40, width: 660, height: 300 }),
     addEventListener(type, listener) { listeners.set(type, listener); }
@@ -85,7 +87,7 @@ function openSupport({ reducedMotion = false, focusVisible = true } = {}) {
     console
   });
   return {
-    particles, animations, motion,
+    particles, animations, motion, light,
     trigger: (type, event = {}) => listeners.get(type)({ type, ...event }),
     finish: () => animations.forEach((animation) => animation.onfinish())
   };
@@ -108,6 +110,19 @@ test("support confetti starts at the cursor on every entry without a cooldown", 
   assert.match(support.animations[16].keyframes[0].transform, /^translate\(600px, 280px\)/);
   support.finish();
   assert.equal(support.particles.size, 0);
+});
+
+test("the supplied support widget's light follows the pointer without emitting more confetti", () => {
+  const support = openSupport();
+  support.trigger("pointermove", { pointerType: "mouse", clientX: 220, clientY: 130 });
+  assert.equal(support.light.get("--support-mx"), "120px");
+  assert.equal(support.light.get("--support-my"), "90px");
+  assert.equal(support.particles.size, 0);
+  support.trigger("pointermove", { pointerType: "touch", clientX: 350, clientY: 250 });
+  assert.equal(support.light.get("--support-mx"), "120px");
+  support.motion.matches = true;
+  support.trigger("pointermove", { pointerType: "mouse", clientX: 350, clientY: 250 });
+  assert.equal(support.light.get("--support-my"), "90px");
 });
 
 test("rapid support re-entry keeps a bounded particle count without skipping bursts", () => {

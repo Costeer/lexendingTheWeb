@@ -82,70 +82,178 @@
 }
 
 .support-card {
+  --support-mx: 70%;
+  --support-my: 30%;
+  --support-ink: #14101f;
+  --support-lilac: #cdbcff;
+  --support-ember: #ff5e5b;
+  --support-cream: #f6f1ff;
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(86px, .55fr);
+  display: flex;
   align-items: center;
-  gap: 32px 16px;
-  container-type: inline-size;
+  justify-content: space-between;
+  gap: 20px;
   isolation: isolate;
   width: 100%;
-  max-width: 660px;
+  max-width: 520px;
   margin-top: 32px;
-  padding: clamp(20px, 5vw, 40px);
+  padding: 30px 34px;
   overflow: hidden;
   border: 0;
-  border-radius: 16px;
-  color: #fff;
-  background:
-    radial-gradient(ellipse at 90% 15%, #95869e80, transparent 65%),
-    radial-gradient(ellipse at 0% 100%, #99968090, transparent 60%),
-    #64409c;
+  border-radius: 28px;
+  color: var(--support-cream);
+  background: var(--support-ink);
+  font-family: var(--font-ui);
   text-decoration: none;
-  transition: background-color 220ms ease;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 8%) inset, 0 18px 40px -18px rgb(60 20 140 / 55%);
+  transition: transform 450ms cubic-bezier(.2, .8, .2, 1), box-shadow 450ms;
 }
 
-.support-card-title {
-  font-size: clamp(28px, 8cqw, 48px);
-  font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: .01em;
+.support-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: radial-gradient(380px circle at var(--support-mx) var(--support-my), rgb(122 69 224 / 55%), transparent 65%);
+  opacity: .45;
+  transition: opacity 400ms;
 }
 
-.support-card-footer {
+.support-copy {
   display: flex;
-  grid-column: 1 / -1;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 22px;
   min-width: 0;
-  font-size: clamp(16px, 4.4cqw, 26px);
+}
+
+:root .support-card .support-card-title {
+  margin: 0;
+  color: var(--support-cream);
+  font-size: clamp(30px, 7vw, 40px);
+  font-weight: 800;
+  line-height: .98;
+  letter-spacing: -.035em;
+}
+
+.support-handle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--support-lilac);
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1.4;
 }
 
-.support-card-footer > span:not(.support-card-arrow) {
+.support-handle > span:last-child {
   overflow-wrap: anywhere;
 }
 
+.support-cup {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+
 .support-kofi-logo {
-  flex: 0 0 auto;
-  width: clamp(30px, 6.8cqw, 42px);
-  height: auto;
+  display: block;
+  width: 30px;
+  height: 30px;
+  transform-origin: 50% 90%;
+  transition: transform 350ms cubic-bezier(.3, 1.6, .5, 1);
+}
+
+.support-steam {
+  position: absolute;
+  top: -10px;
+  width: 30px;
+  height: 30px;
+  overflow: visible;
+}
+
+.support-steam path {
+  stroke: var(--support-lilac);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  fill: none;
+  opacity: 0;
+  transform-origin: center;
+}
+
+.support-orb {
+  position: relative;
+  flex: none;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
 }
 
 .support-card-arrow {
-  margin-left: auto;
-  transition: transform 220ms var(--motion-ease);
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  z-index: 2;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--support-ember);
+  box-shadow: 0 0 0 4px var(--support-ink);
+  transition: transform 400ms cubic-bezier(.2, .8, .2, 1), background 300ms;
+}
+
+.support-card-arrow svg {
+  width: 18px;
+  height: 18px;
+  stroke: #fff;
+  stroke-width: 2.4;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .support-avatar {
+  position: absolute;
+  inset: -5px;
   display: block;
-  justify-self: end;
-  width: min(100%, 160px);
-  height: auto;
-  aspect-ratio: 1;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  max-width: none;
   border-radius: 50%;
   object-fit: cover;
-  background: #030208;
+  background: #000;
+  transition: opacity 550ms ease, transform 800ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.support-live {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(.85) rotate(-60deg);
+  transition: opacity 550ms ease, transform 800ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.support-live::before {
+  position: absolute;
+  inset: -5px;
+  content: "";
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #5b2fd0, #c9b6ff, #7a45e0, #2a1470, #5b2fd0);
+  filter: blur(.5px);
+  transition: filter 400ms;
+}
+
+.support-live::after {
+  position: absolute;
+  inset: 3px;
+  content: "";
+  border-radius: 50%;
+  background: #000;
+  box-shadow: inset 0 0 18px rgb(122 69 224 / 55%);
 }
 
 .support-confetti {
@@ -173,23 +281,111 @@
   border-radius: 50%;
 }
 
-.support-card:is(:hover, :focus-visible) {
-  background-color: #704ba7;
+.support-card:is(:hover, :focus-visible)::before {
+  opacity: 1;
 }
 
-.support-card:active {
-  background-color: #573585;
+.support-card:is(:hover, :focus-visible) {
+  transform: translateY(-4px);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 12%) inset, 0 28px 50px -18px rgb(90 40 200 / 75%);
+}
+
+:root .support-card:focus-visible {
+  outline: 3px solid var(--support-lilac);
+  outline-offset: 4px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .support-card:is(:hover, :focus-visible) .support-avatar {
+    opacity: 0;
+    transform: scale(.85) rotate(60deg);
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-live {
+    opacity: 1;
+    transform: none;
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-live::before {
+    animation: support-ring-spin 2.2s linear infinite;
+    filter: blur(7px) saturate(1.4);
+  }
+
   .support-card:is(:hover, :focus-visible) .support-card-arrow {
-    transform: translate(2px, -2px);
+    transform: scale(1.18) rotate(8deg);
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-card-arrow svg {
+    animation: support-arrow-shoot 550ms cubic-bezier(.5, 0, .2, 1);
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-steam path {
+    animation: support-cup-steam 1.6s ease-in-out infinite;
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-steam path:nth-child(2) {
+    animation-delay: 350ms;
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-kofi-logo {
+    transform: rotate(-8deg);
+  }
+
+  @keyframes support-ring-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes support-arrow-shoot {
+    0% { transform: translate(0, 0); }
+    45% { transform: translate(16px, -16px); opacity: 0; }
+    46% { transform: translate(-16px, 16px); opacity: 0; }
+    100% { transform: translate(0, 0); opacity: 1; }
+  }
+
+  @keyframes support-cup-steam {
+    0% { opacity: 0; transform: translateY(3px); }
+    40% { opacity: .9; }
+    100% { opacity: 0; transform: translateY(-6px); }
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .support-card,
+  .support-card *,
+  .support-card::before,
+  .support-card *::before,
+  .support-card *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .support-card:is(:hover, :focus-visible) {
+    transform: none;
+  }
+
   .support-confetti {
     display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .support-card { padding: 24px 22px; }
+  .support-orb { width: 90px; height: 90px; }
+}
+
+@media (max-width: 360px) {
+  .support-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    gap: 22px 12px;
+  }
+  .support-copy { display: contents; }
+  .support-handle { grid-column: 1 / -1; }
+  .support-orb {
+    grid-column: 2;
+    grid-row: 1;
+    width: 72px;
+    height: 72px;
   }
 }
 
