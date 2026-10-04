@@ -127,7 +127,9 @@ test("Ko-fi support uses desktop navigation and a responsive About card", async 
   assert.doesNotMatch(about, /kofi-support\.jpg|support-coffee-heart|support-orb|<img\b[^>]*src="https?:/);
   assert.doesNotMatch(about, /Support development|If this extension helps you|Donations are entirely optional/);
   assert.match(about, /<main>[\s\S]*id="donate-link"[\s\S]*<\/main>/);
-  assert.doesNotMatch(css, /position:\s*fixed/);
+  assert.doesNotMatch(css.match(/\.support-card\s*\{[^}]*\}/)?.[0], /position:\s*fixed/);
+  assert.match(css, /\.support-confetti\s*\{[^}]*position: fixed;[^}]*overflow: hidden;[^}]*pointer-events: none;/);
+  assert.doesNotMatch(css, /support-avatar-float|animation:[^;]*infinite/);
   assert.match(css, /\.support-card\s*\{[^}]*width: 100%;[^}]*max-width: 660px;[^}]*color: #fff;/);
   assert.doesNotMatch(css, /\.support-card\s*\{[^}]*display: none;/);
   assert.doesNotMatch(css, /url\(["']?https?:/);

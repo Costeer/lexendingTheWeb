@@ -10,40 +10,46 @@
   applyTheme();
 
   const supportCard = document.getElementById("donate-link");
-  const confetti = supportCard?.querySelector(".support-confetti");
-  const avatar = supportCard?.querySelector(".support-avatar");
-  if (confetti && avatar && globalThis.matchMedia) {
+  const confetti = document.getElementById("support-confetti");
+  if (supportCard && confetti && globalThis.matchMedia) {
     const reducedMotion = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
-    const animations = new Set();
-    let lastBurst = -Infinity;
+    const animations = new Map();
+    const particleCount = 16;
+    const maxParticles = 64;
 
     const celebrate = (event) => {
-      if (reducedMotion.matches || event.pointerType === "touch"
-          || animations.size || performance.now() - lastBurst < 1200) return;
-      lastBurst = performance.now();
+      if (reducedMotion.matches || event.pointerType === "touch") return;
       const cardBounds = supportCard.getBoundingClientRect();
-      const avatarBounds = avatar.getBoundingClientRect();
-      const x = avatarBounds.left + avatarBounds.width / 2 - cardBounds.left;
-      const y = avatarBounds.top + avatarBounds.height / 2 - cardBounds.top;
+      const pointerEntry = event.type === "pointerenter";
+      const x = pointerEntry ? event.clientX : cardBounds.left + cardBounds.width / 2;
+      const y = pointerEntry ? event.clientY : cardBounds.top + cardBounds.height / 2;
 
-      for (let index = 0; index < 28; index += 1) {
+      // Every entry gets a burst, even while earlier particles are still falling.
+      // Retire the oldest particles if rapid re-entry reaches the visual budget.
+      while (animations.size > maxParticles - particleCount) {
+        const [animation, piece] = animations.entries().next().value;
+        animations.delete(animation);
+        piece.remove();
+        animation.cancel();
+      }
+
+      for (let index = 0; index < particleCount; index += 1) {
         const piece = document.createElement("span");
         piece.className = "support-confetti-piece";
         confetti.append(piece);
-        const angle = (index / 28) * Math.PI * 2;
-        const distance = 50 + Math.random() * Math.min(cardBounds.width * .55, 240);
-        const dx = Math.cos(angle) * distance;
-        const dy = Math.sin(angle) * distance;
-        const spin = (Math.random() - .5) * 720;
-        const animation = piece.animate([
-          { transform: `translate(${x}px, ${y}px) rotate(0deg) scale(.4)`, opacity: 0 },
-          { transform: `translate(${x + dx * .55}px, ${y + dy * .55}px) rotate(${spin * .5}deg) scale(1)`, opacity: 1, offset: .25 },
-          { transform: `translate(${x + dx}px, ${y + dy + 100}px) rotate(${spin}deg) scale(.6)`, opacity: 0 }
-        ], {
-          duration: 1000 + Math.random() * 400,
-          easing: "cubic-bezier(.15, .65, .35, 1)"
+        const dx = (Math.random() - .5) * 160;
+        const dy = -55 - Math.random() * 45;
+        const spin = (Math.random() - .5) * 180;
+        const keyframes = [0, .2, .45, .7, 1].map((time) => ({
+          transform: `translate(${x + dx * time}px, ${y + dy * time + 180 * time * time}px) translate(-50%, -50%) rotate(${spin * time}deg)`,
+          opacity: time < .55 ? 1 : (1 - time) / .45,
+          offset: time
+        }));
+        const animation = piece.animate(keyframes, {
+          duration: 650 + Math.random() * 200,
+          easing: "linear"
         });
-        animations.add(animation);
+        animations.set(animation, piece);
         const remove = () => {
           piece.remove();
           animations.delete(animation);
@@ -54,10 +60,16 @@
     };
 
     supportCard.addEventListener("pointerenter", celebrate);
-    supportCard.addEventListener("focus", celebrate);
+    supportCard.addEventListener("focus", (event) => {
+      if (supportCard.matches(":focus-visible")) celebrate(event);
+    });
     reducedMotion.addEventListener("change", () => {
       if (reducedMotion.matches) {
-        for (const animation of animations) animation.cancel();
+        for (const [animation, piece] of animations) {
+          piece.remove();
+          animation.cancel();
+        }
+        animations.clear();
       }
     });
   }

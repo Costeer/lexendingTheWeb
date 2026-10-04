@@ -102,7 +102,7 @@
     radial-gradient(ellipse at 0% 100%, #99968090, transparent 60%),
     #64409c;
   text-decoration: none;
-  transition: transform 280ms var(--motion-ease);
+  transition: background-color 220ms ease;
 }
 
 .support-card-title {
@@ -110,7 +110,6 @@
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: .01em;
-  transition: transform 400ms var(--motion-ease);
 }
 
 .support-card-footer {
@@ -131,12 +130,11 @@
   flex: 0 0 auto;
   width: clamp(30px, 6.8cqw, 42px);
   height: auto;
-  transition: transform 400ms var(--motion-ease);
 }
 
 .support-card-arrow {
   margin-left: auto;
-  transition: transform 400ms var(--motion-ease);
+  transition: transform 220ms var(--motion-ease);
 }
 
 .support-avatar {
@@ -151,9 +149,9 @@
 }
 
 .support-confetti {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 1;
+  z-index: 10;
   overflow: hidden;
   pointer-events: none;
 }
@@ -162,55 +160,36 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 8px;
-  height: 12px;
+  width: 5px;
+  height: 8px;
   background: #fff;
 }
 
 .support-confetti-piece:nth-child(4n + 1) { background: #ffd36d; }
 .support-confetti-piece:nth-child(4n + 2) { background: #ff98d7; }
 .support-confetti-piece:nth-child(4n + 3) { background: #a1ebff; }
-.support-confetti-piece:nth-child(3n) { border-radius: 50%; }
-.support-confetti-piece:nth-child(5n) {
-  width: 14px;
-  height: 14px;
-  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
+.support-confetti-piece:nth-child(3n) {
+  height: 5px;
+  border-radius: 50%;
 }
 
 .support-card:is(:hover, :focus-visible) {
-  transform: translateY(-2px);
+  background-color: #704ba7;
 }
 
 .support-card:active {
-  transform: translateY(1px);
+  background-color: #573585;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .support-card:is(:hover, :focus-visible) .support-card-title {
-    transform: translateX(4px);
-  }
-
-  .support-card:is(:hover, :focus-visible) .support-kofi-logo {
-    transform: translateY(-2px);
-  }
-
   .support-card:is(:hover, :focus-visible) .support-card-arrow {
-    transform: translate(3px, -3px);
-  }
-
-  .support-card:is(:hover, :focus-visible) .support-avatar {
-    animation: support-avatar-float 2s ease-in-out infinite;
-  }
-
-  @keyframes support-avatar-float {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-6px) scale(1.04); }
+    transform: translate(2px, -2px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .support-card:is(:hover, :focus-visible, :active) {
-    transform: none;
+  .support-confetti {
+    display: none;
   }
 }
 
