@@ -1,6 +1,8 @@
-.about-page {
+:root body.about-page {
   min-height: 100vh;
   min-height: 100dvh;
+  /* Leave room to scroll all content clear of the floating support button. */
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
 .about-page-header {
@@ -69,23 +71,38 @@
 }
 
 .donate-button {
+  position: fixed;
+  z-index: 10;
+  left: max(20px, env(safe-area-inset-left, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
-  margin-top: 20px;
-  padding: 10px 24px;
-  border: 1px solid var(--accent);
-  border-radius: var(--ui-radius);
-  color: var(--on-accent);
-  background: var(--accent);
-  font-weight: 500;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: #d9534f;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.4;
   text-decoration: none;
 }
 
-.donate-button:hover {
-  box-shadow: 0 0 0 3px var(--accent-tint);
-  transform: translateY(-1px);
+.donate-icon {
+  width: 32px;
+  height: 28px;
+  flex: none;
+}
+
+.donate-heart {
+  fill: #d9534f;
+}
+
+.donate-button:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
 }
 
 .donate-button:active {
