@@ -5,6 +5,7 @@
   const settingsApi = globalThis.LexendSettings;
   const STYLE_ID = "lexend-the-web-styles";
   const FONT_STYLE_ID = "lexend-the-web-fonts";
+  const SYMBOLS_FAMILY = "Lexend Nerd Symbols";
   const TRANSITION_STYLE_ID = "lexend-the-web-transitions";
   const ownStyleIds = [STYLE_ID, FONT_STYLE_ID, TRANSITION_STYLE_ID];
   const styledRoots = new Set();
@@ -26,7 +27,7 @@
   const transitionRules = new Map();
   const transitionAttributes = ["data-lexend-transition", "data-lexend-before-transition", "data-lexend-after-transition"];
   const settledFontFaces = new WeakSet();
-  const settledLexendFaces = new Set();
+  const settledBundledFaces = new Set();
   let refreshTimer = null;
   let refreshUrgent = false;
   let refreshRevision = 0;
@@ -240,7 +241,16 @@
       unicode-range: ${range};
     }
   `)
-  ).join("\n");
+  ).join("\n") + `
+    @font-face {
+      font-family: "${SYMBOLS_FAMILY}";
+      src: url("${extension.runtime.getURL("assets/fonts/nerd-fonts-symbols.woff2")}") format("woff2");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      unicode-range: U+23FB-23FE,U+2630,U+2665,U+26A1,U+276C-2771,U+2B58,U+E000-F8FF,U+F0000-FFFFD,U+100000-10FFFD;
+    }
+  `;
 
   const createCss = (effective) => {
     if (!effective.active) return "";
@@ -562,9 +572,9 @@
         const mixedPseudo = containsPrivateGlyph(paintedContent) && !onlyPrivateGlyphs(paintedContent);
         pseudos.push({ pseudo, noTracking: /\p{Script=Arabic}/u.test(paintedContent), protected: protectedText || codeFont.test(pseudoStyle.fontFamily)
           || (!mixedPseudo && protectedFont(pseudoStyle)) || onlyPrivateGlyphs(paintedContent),
-          inScope, typography: readTypography(pseudoStyle) });
+          inScope, typography: { ...readTypography(pseudoStyle), symbols: !semanticProtection && !codeFont.test(pseudoStyle.fontFamily) && containsPrivateGlyph(paintedContent) } });
       }
-      const typography = readTypography(style);
+      const typography = { ...readTypography(style), symbols: !semanticProtection && !codeFont.test(style.fontFamily) && containsPrivateGlyph(text) };
       if (protectedText || target || pseudos.length || typography.transition !== null) measurements.push({
         element, protected: protectedText, target, noTracking: /\p{Script=Arabic}/u.test(text), typography, pseudos
       });
@@ -633,9 +643,12 @@
       // fixed label can lose its first character when tracking is applied.
       const spacing = !protectedText && settings.letterSpacing > 0
         ? noTracking ? "0px" : `${settings.letterSpacing}em` : values.spacing;
-      // Lexend handles supported prose; retain the original family's private-use
-      // icons and unsupported-script glyphs as the next font fallback.
-      const family = protectedText ? values.family : `"Lexend for the Web", ${values.family}`;
+      // Site fonts must resolve their own private-use icons before Nerd Fonts:
+      // unrelated icon sets can assign different artwork to the same codepoint.
+      // Semantic opt-outs and code keep their original families unchanged.
+      const fallback = `, "${SYMBOLS_FAMILY}"`;
+      const family = protectedText ? values.family + (values.symbols ? fallback : "")
+        : `"Lexend for the Web", ${values.family}${fallback}`;
       setProperty(element, `--lexend-${prefix}family`, family);
       setProperty(element, `--lexend-${prefix}size`, `${parseFloat(values.size) * scale}px`);
       setProperty(element, `--lexend-${prefix}line`, !protectedText && settings.lineHeight > 0 ? String(settings.lineHeight) : values.line);
@@ -930,13 +943,14 @@
       // metrics did not change; refreshing that face repeatedly creates a loop.
       let newMetrics = false;
       for (const face of event.fontfaces) {
-        if (face.family.replace(/["']/g, "") === "Lexend for the Web") {
+        const family = face.family.replace(/["']/g, "");
+        if (family === "Lexend for the Web" || family === SYMBOLS_FAMILY) {
           // CSS cascade updates can recreate FontFace wrapper identities for
           // the same immutable bundled source. Its subset and weight identify
           // those cached metrics across stylesheet activation changes.
-          const key = [face.style, face.weight, face.stretch, face.unicodeRange].join(";");
-          if (settledLexendFaces.has(key)) continue;
-          settledLexendFaces.add(key);
+          const key = [family, face.style, face.weight, face.stretch, face.unicodeRange].join(";");
+          if (settledBundledFaces.has(key)) continue;
+          settledBundledFaces.add(key);
         } else {
           if (settledFontFaces.has(face)) continue;
           settledFontFaces.add(face);

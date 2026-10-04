@@ -111,10 +111,13 @@ test("typography preserves protected content and refreshes atomic inherited base
     assert.ok(Math.abs(converted.parent.size - 22) < 0.02);
     assert.ok(Math.abs(converted.relative.size - 26.4) < 0.02, "nested em text is scaled once");
     assert.ok(Math.abs(converted["shadow-text"].size - 19.8) < 0.02);
-    assert.deepEqual(await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id,__metrics(id)])), protectedIds), baseline);
+    const protectedWithFallback = { ...baseline, "unknown-glyph": {
+      ...baseline["unknown-glyph"], family: `${baseline["unknown-glyph"].family}, "Lexend Nerd Symbols"`
+    } };
+    assert.deepEqual(await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id,__metrics(id)])), protectedIds), protectedWithFallback);
     assert.deepEqual(await page.evaluate(() => __metrics("pseudo","::before")), baselinePseudo);
-    assert.deepEqual(await page.evaluate(() => __metrics("unknown-pseudo","::before")), baselineUnknownPseudo);
-    assert.deepEqual(await page.evaluate(() => __metrics("unknown-alt-pseudo","::after")),baselineAlternativePseudo,"accessible alternative content does not corrupt a pure painted icon");
+    assert.deepEqual(await page.evaluate(() => __metrics("unknown-pseudo","::before")), { ...baselineUnknownPseudo, family: `${baselineUnknownPseudo.family}, "Lexend Nerd Symbols"` });
+    assert.deepEqual(await page.evaluate(() => __metrics("unknown-alt-pseudo","::after")), { ...baselineAlternativePseudo, family: `${baselineAlternativePseudo.family}, "Lexend Nerd Symbols"` },"accessible alternative content does not corrupt a pure painted icon");
     assert.match((await page.evaluate(() => __metrics("mixed-alt-pseudo","::after"))).family,/Lexend for the Web.*ArbitraryTypeface/,"painted mixed caption including slash still converts");
     assert.match((await page.evaluate(() => __metrics("mixed-glyph"))).family,/Lexend for the Web.*ArbitraryTypeface/);
     assert.equal(await page.locator("#badge").evaluate((element) => element.getBoundingClientRect().height),badgeHeight);

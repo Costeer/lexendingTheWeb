@@ -12,6 +12,8 @@ A Chrome and Firefox extension that replaces website typography with
 - Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
 - Import, export, and sync settings through browser storage.
 - Keep code, mathematical notation, SVGs, and common icon fonts unchanged.
+- Supply missing Nerd Font icons with a bundled symbols fallback, after the
+  website's original fonts.
 - Adapt newly clipped text, overlapping labels, photo captions, and growing
   dialogs using measured geometry rather than website-specific rules.
 
@@ -95,3 +97,6 @@ Store copy, screenshots, and submission notes live under `store/`. See the
 
 Source code is released under the [MIT License](LICENSE). Lexend is distributed
 under the [SIL Open Font License 1.1](assets/fonts/LICENSE).
+The bundled Nerd Fonts symbols fallback includes its
+[license](assets/fonts/LICENSE-NERD-FONTS) and
+[source and glyph attributions](assets/fonts/README-NERD-FONTS.md).

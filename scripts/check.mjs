@@ -8,7 +8,8 @@ const requiredIcons = [16, 32, 48, 128];
 const requiredFonts = [
   "lexend-latin-wght-normal.woff2",
   "lexend-latin-ext-wght-normal.woff2",
-  "lexend-vietnamese-wght-normal.woff2"
+  "lexend-vietnamese-wght-normal.woff2",
+  "nerd-fonts-symbols.woff2"
 ];
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 
@@ -52,8 +53,13 @@ for (const target of targets) {
 
   for (const font of requiredFonts) {
     await access(join(root, "assets/fonts", font));
+    if (!manifest.web_accessible_resources.some(({ resources }) => resources.includes(`assets/fonts/${font}`))) {
+      throw new Error(`${target}: ${font} is not accessible to page font declarations`);
+    }
   }
 }
+
+await access(join(root, "assets/fonts/LICENSE-NERD-FONTS"));
 
 for (const page of ["popup", "options"]) {
   const html = await readFile(join(root, `${page}.html`), "utf8");
