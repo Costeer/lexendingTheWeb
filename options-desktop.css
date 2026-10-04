@@ -1,5 +1,6 @@
 .desktop-settings-header,
-.desktop-settings-nav {
+.desktop-settings-nav,
+.mobile-about-link {
   display: none;
 }
 
@@ -60,11 +61,36 @@
     gap: 12px 20px;
   }
 
-  :root .settings-page .about-page-header {
+  :root .settings-page .desktop-settings-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
     width: 100%;
     margin: 0;
-    padding: 16px max(20px, env(safe-area-inset-right, 0px)) 16px max(20px, env(safe-area-inset-left, 0px));
+    padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px));
+    border-bottom: 1px solid var(--ui-border);
     background: var(--surface);
+  }
+
+  :root .settings-page .desktop-settings-header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: .015em;
+  }
+
+  :root .settings-page .mobile-about-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-left: auto;
+    padding: 0 4px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    text-underline-offset: 3px;
   }
 
   :root .settings-page .page-attribution {
@@ -103,10 +129,6 @@
     font-weight: 500;
     line-height: 1.2;
     letter-spacing: .015em;
-  }
-
-  .page-attribution .mobile-about-link {
-    display: none;
   }
 
   .settings-layout {
