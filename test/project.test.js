@@ -118,7 +118,8 @@ test("Ko-fi support uses desktop navigation and an inline mobile button", async 
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
   assert.match(about, /<span>Support me<\/span>/);
   assert.match(about, /aria-label="Support me on Ko-fi \(opens in a new tab\)"/);
-  assert.match(about, /<h3>Support development<\/h3>\s*<p>[^<]+<\/p>\s*<a\s+id="donate-link"/);
+  assert.doesNotMatch(about, /Support development|If this extension helps you|Donations are entirely optional/);
+  assert.match(about, /<main>[\s\S]*id="donate-link"[\s\S]*<\/main>/);
   assert.doesNotMatch(css, /position:\s*fixed/);
   assert.match(css, /\.donate-button\s*\{[^}]*margin-top: 20px;/);
   assert.match(css, /@media \(min-width: 900px\) and \(hover: hover\) and \(pointer: fine\)\s*\{\s*\.about-back-link,\s*\.donate-button\s*\{\s*display: none;/);
@@ -166,6 +167,17 @@ test("settings navigation keeps scrollbar space and selected label metrics stabl
   assert.ok(selectedStyle, "selected sidebar navigation has a style");
   assert.match(selectedStyle, /border-color: var\(--accent\);/);
   assert.doesNotMatch(selectedStyle, /font-weight|font-size|padding|border-width/);
+});
+
+test("desktop support animation is subtle, occasional, and motion-preference aware", async () => {
+  const css = await read("options-desktop.css");
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.desktop-settings-nav \.sidebar-support svg\s*\{[^}]*animation: support-heart-pulse 32s ease-in-out infinite;/);
+  assert.match(css, /\.sidebar-support:is\(:hover, :focus-visible\) svg\s*\{\s*animation: none;/);
+  const animation = css.match(/@keyframes support-heart-pulse\s*\{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(animation);
+  assert.match(animation, /0%, 94%, 100%\s*\{\s*transform: scale\(1\);/);
+  assert.match(animation, /97%\s*\{\s*transform: scale\(1\.12\);/);
+  assert.doesNotMatch(animation, /rotate|font-size|width|height|padding|margin/);
 });
 
 test("site rules migrate and resolve by specificity", () => {
