@@ -79,6 +79,7 @@ test("popup and settings pages expose their core controls", async () => {
     "letter-spacing",
     "add-rule",
     "rule-list",
+    "toggle-rule-list",
     "export-settings",
     "import-settings",
     "retry-save"

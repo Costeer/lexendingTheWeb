@@ -383,6 +383,17 @@
                 </div>
 
                 <div id="rule-list" class="rule-list"></div>
+                <button
+                    id="toggle-rule-list"
+                    class="rule-list-toggle"
+                    type="button"
+                    aria-controls="rule-list"
+                    aria-expanded="false"
+                    hidden
+                >
+                    <span id="toggle-rule-list-label">Show all rules</span>
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
                 <p id="search-empty" class="search-empty" hidden>
                     No site rules match this search.
                 </p>
