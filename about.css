@@ -32,12 +32,6 @@
   line-height: 1.7;
 }
 
-.about-block + .about-block {
-  margin-top: 32px;
-  padding-top: 28px;
-  border-top: 1px solid var(--ui-border);
-}
-
 .about-block h3 {
   margin: 0 0 12px;
   font-size: 18px;

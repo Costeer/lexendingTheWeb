@@ -193,6 +193,27 @@
     stroke-linejoin: round;
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .desktop-settings-nav .sidebar-support svg {
+      /* One small swell of the heart, with roughly 30 seconds of stillness. */
+      animation: support-heart-pulse 32s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    .desktop-settings-nav .sidebar-support:is(:hover, :focus-visible) svg {
+      animation: none;
+    }
+  }
+
+  @keyframes support-heart-pulse {
+    0%, 94%, 100% {
+      transform: scale(1);
+    }
+    97% {
+      transform: scale(1.12);
+    }
+  }
+
   :root .settings-layout main {
     width: 100%;
     min-width: 0;
