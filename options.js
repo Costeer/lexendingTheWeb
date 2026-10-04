@@ -49,6 +49,41 @@
   const shortcutInstructions = document.querySelector("#shortcut-instructions");
   const toast = document.querySelector("#toast");
   const toastMessage = document.querySelector("#toast-message");
+  const desktopSettingsLayout = matchMedia(
+    "(min-width: 900px) and (hover: hover) and (pointer: fine)"
+  );
+  const settingsPanels = [...document.querySelectorAll(".settings-panel")];
+  const settingsNavigation = [...document.querySelectorAll("[data-settings-panel]")];
+  let selectedSettingsPanel = "readability-panel";
+
+  const renderSettingsNavigation = () => {
+    settingsPanels.forEach((panel) => {
+      panel.hidden = desktopSettingsLayout.matches && panel.id !== selectedSettingsPanel;
+    });
+    settingsNavigation.forEach((button) => {
+      if (button.dataset.settingsPanel === selectedSettingsPanel) {
+        button.setAttribute("aria-current", "page");
+      } else {
+        button.removeAttribute("aria-current");
+      }
+    });
+  };
+
+  settingsNavigation.forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedSettingsPanel = button.dataset.settingsPanel;
+      renderSettingsNavigation();
+      const heading = document.querySelector(`#${selectedSettingsPanel} h2`);
+      heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    });
+  });
+
+  desktopSettingsLayout.addEventListener("change", () => {
+    renderSettingsNavigation();
+    renderPreview();
+  });
+  renderSettingsNavigation();
 
   let settings = settingsApi.normalizeSettings();
   let failedSettings = null;
@@ -119,7 +154,8 @@
   };
 
   const renderPreview = (readability = settings) => {
-    previewCopy.style.fontSize = `${14 * readability.textScale / 100}px`;
+    const baseSize = desktopSettingsLayout.matches ? 17 : 14;
+    previewCopy.style.fontSize = `${baseSize * readability.textScale / 100}px`;
     previewCopy.style.lineHeight = readability.lineHeight || PREVIEW_DEFAULT_LINE_HEIGHT;
     previewCopy.style.letterSpacing = `${readability.letterSpacing}em`;
   };
