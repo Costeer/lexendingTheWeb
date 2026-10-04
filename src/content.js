@@ -31,6 +31,10 @@
   let refreshUrgent = false;
   let refreshRevision = 0;
   let refreshing = false;
+  let retainedTypography = new WeakSet();
+  let retentionWrites = new WeakMap();
+  let retentionTimer = null;
+  let counterContext = null;
   let layout = null;
   let lastRefreshError = null;
   let warnedRefreshError = null;
@@ -392,6 +396,43 @@
     property.appliedValue = element.style.getPropertyValue(name);
     property.appliedPriority = element.style.getPropertyPriority(name);
   };
+  const retainOverwrittenTypography = (element) => {
+    const state = managedElements.get(element);
+    if (!state || !element.isConnected || retainedTypography.has(element)
+        || (retentionWrites.get(element) ?? 0) >= 32 || !isActive()) return;
+    let overwritten = false;
+    state.properties.forEach((property, name) => {
+      const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+      if (value === property.appliedValue && priority === property.appliedPriority) return;
+      // Hover rerenders can replace an entire style attribute. Keep the new
+      // author declaration as the next baseline, but restore our current
+      // typography before the browser paints the intervening native font.
+      property.value = value;
+      property.priority = priority;
+      if (property.appliedValue) element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+      else element.style.removeProperty(name);
+      overwritten = true;
+    });
+    if (overwritten) {
+      // Let the notification caused by our writes and its author feedback
+      // drain before releasing this element. A timer alone can run after other
+      // queued author tasks and wrongly suppress their independent updates.
+      retainedTypography.add(element);
+      retentionWrites.set(element, (retentionWrites.get(element) ?? 0) + 1);
+      queueMicrotask(() => queueMicrotask(() => retainedTypography.delete(element)));
+      // A hard task-budget also bounds authors that defer observer feedback
+      // through additional microtasks beyond the immediate notification turn.
+      if (retentionTimer === null) retentionTimer = setTimeout(() => {
+        retainedTypography = new WeakSet();
+        retentionWrites = new WeakMap();
+        retentionTimer = null;
+      }, 0);
+      setAttribute(element, "data-lexend-original-typography", JSON.stringify({
+        hadStyle: state.hadStyle,
+        properties: [...state.properties].map(([name, { value, priority }]) => [name, value, priority])
+      }));
+    }
+  };
   const recoverClonedTypography = (roots) => {
     // cloneNode copies inline overrides but not WeakMap/Map ownership. Carry a
     // small author-state record so cloned cards start from the page's baseline.
@@ -691,11 +732,11 @@
     styledRoots.add(root);
   };
   const observeRoots = () => {
-    observer.observe(document, { childList: true, subtree: true, characterData: true,
+    observer.observe(document, { childList: true, subtree: true, characterData: true, characterDataOldValue: true,
       attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
     styledRoots.forEach((root) => {
       if (root instanceof ShadowRoot) observer.observe(root, { childList: true, subtree: true,
-        characterData: true, attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+        characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
     });
   };
   const visitShadowRoots = (root) => {
@@ -711,6 +752,10 @@
     refreshUrgent = false;
     if (refreshing || !document.documentElement) return;
     refreshing = true;
+    if (retentionTimer !== null) clearTimeout(retentionTimer);
+    retentionTimer = null;
+    retainedTypography = new WeakSet();
+    retentionWrites = new WeakMap();
     observer.disconnect();
     let focusedElement = document.activeElement;
     while (focusedElement?.shadowRoot?.activeElement) focusedElement = focusedElement.shadowRoot.activeElement;
@@ -872,10 +917,64 @@
     refresh();
     notifyState();
   };
+  const fittingCounterMutation = (mutation) => {
+    let element, before, after;
+    if (mutation.type === "characterData") {
+      element = mutation.target.parentElement;
+      before = mutation.oldValue;
+      after = mutation.target.textContent;
+    } else if (mutation.type === "childList" && mutation.addedNodes.length && mutation.removedNodes.length
+        && [...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.nodeType === Node.TEXT_NODE)) {
+      element = mutation.target;
+      before = [...mutation.removedNodes].map((node) => node.textContent).join("");
+      after = [...mutation.addedNodes].map((node) => node.textContent).join("");
+    } else return false;
+    if (!element?.hasAttribute(TEXT_ATTRIBUTE) || !managedElements.has(element)
+        || typeof before !== "string" || before.length > 500 || before.length !== after.length
+        || !/[0-9]/.test(before) || before.replace(/[0-9]/g, "#") !== after.replace(/[0-9]/g, "#")) return false;
+    const typography = getComputedStyle(element);
+    if (typography.fontFeatureSettings !== "normal" || typography.fontVariationSettings !== "normal"
+        || typography.fontVariantNumeric.includes("proportional-nums")) return false;
+    counterContext ??= document.createElement("canvas").getContext("2d");
+    if (!counterContext) return false;
+    counterContext.font = typography.font || `${typography.fontStyle} ${typography.fontWeight} ${typography.fontSize} ${typography.fontFamily}`;
+    counterContext.fontKerning = typography.fontKerning;
+    if (Math.abs(counterContext.measureText(before).width - counterContext.measureText(after).width) > 0.01) return false;
+    // Numeric animations keep the same typography. Skip a global author-font
+    // restore only while the newly painted glyphs remain within every clip.
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const boxes = [...range.getClientRects()];
+    if (!boxes.length) return false;
+    let checkedTextColumn = false;
+    for (let current = element; current; current = composedParent(current)) {
+      const css = getComputedStyle(current), box = current.getBoundingClientRect();
+      if (css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0
+          || css.contentVisibility === "hidden" || css.clip !== "auto" || css.clipPath !== "none"
+          || parseInt(css.webkitLineClamp, 10) > 0) return false;
+      if (!checkedTextColumn && current.clientWidth > 0) {
+        if (boxes.some((text) => text.left < box.left - 2 || text.right > box.right + 2)) return false;
+        checkedTextColumn = true;
+      }
+      const clipsX = /^(hidden|clip|auto|scroll)$/.test(css.overflowX);
+      const clipsY = /^(hidden|clip|auto|scroll)$/.test(css.overflowY);
+      if (boxes.some((text) => clipsX && (text.left < box.left - 2 || text.right > box.right + 2)
+          || clipsY && (text.top < box.top - 2 || text.bottom > box.bottom + 2))) return false;
+    }
+    return true;
+  };
   const observer = new MutationObserver((mutations) => {
     const authored = mutations.filter((mutation) => !ownStyleIds.includes(mutation.target.id)
-      && !ownStyleIds.includes(mutation.target.parentElement?.id));
-    if (authored.length) invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"));
+      && !ownStyleIds.includes(mutation.target.parentElement?.id) && !fittingCounterMutation(mutation));
+    if (!authored.length) return;
+    const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
+      && mutation.attributeName === "style").map((mutation) => mutation.target));
+    if (changedStyles.size) {
+      observer.disconnect();
+      try { changedStyles.forEach(retainOverwrittenTypography); }
+      finally { observeRoots(); }
+    }
+    invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"));
   });
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;

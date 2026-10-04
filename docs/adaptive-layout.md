@@ -128,6 +128,21 @@ pending work and a completed refresh revision so screenshot agents can wait
 for repaired incoming text without treating the preceding acknowledgement as
 proof that the latest DOM update has finished.
 
+If an author hover rerender replaces owned inline typography, the mutation
+observer retains the current converted values before paint. The replacement
+declarations become the next author baseline and are restored on pause;
+unrelated author styles remain intact. Immediate retention drains the resulting
+observer notification and feedback before releasing each element, so queued
+independent author tasks recover without waiting for a timer. A finite write
+budget also stops feedback deferred through further microtasks, allowing
+ordinary tasks to progress.
+
+An already converted numeric counter can update without a full-page refresh
+when its formatting, character count, and measured text width stay the same
+and its glyphs still fit the text column and ancestor clips. Changed prose,
+new elements, wider numbers, line clamps, and uncertain font features continue
+through the full measurement and repair process.
+
 Measured outer heights are converted to the author's `box-sizing` before
 writing a minimum height, so content-box padding and borders are counted once.
 Originally absolute popups own their protruding text rather than enlarging
