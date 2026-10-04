@@ -13,7 +13,7 @@
     --ui-radius: 5px;
     --control-border: 1px solid var(--ui-border);
     --active-shadow: none;
-    padding: 44px 40px 32px;
+    padding: 28px 40px 32px;
     color: var(--ink);
     background: var(--surface);
     font-size: 16px;
@@ -22,28 +22,46 @@
 
   .desktop-settings-header {
     display: flex;
-    align-items: baseline;
-    gap: 24px;
+    align-items: center;
+    gap: 16px;
     width: min(1160px, 100%);
-    margin: 0 auto 48px;
-    padding-bottom: 24px;
+    margin: 0 auto 24px;
+    padding-bottom: 16px;
     border-bottom: 1px solid var(--ui-border);
   }
 
   .desktop-settings-header h1 {
     margin: 0;
-    font-size: 34px;
-    font-weight: 650;
+    font-size: 22px;
+    font-weight: 500;
     line-height: 1.2;
-    letter-spacing: -.025em;
+    letter-spacing: .015em;
   }
 
-  .desktop-settings-header h1 span {
+  .settings-wordmark {
+    display: grid;
+    flex: 0 0 auto;
+    width: 76px;
+    height: 34px;
+    padding: 0 12px;
+    overflow: hidden;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    color: var(--on-accent);
+    background: var(--accent);
+    box-shadow: none;
+    font-size: 18px;
     font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: width 460ms var(--motion-ease);
   }
 
-  .desktop-settings-label {
-    font-size: 23px;
+  .settings-wordmark:is(:hover, :focus) {
+    width: 154px;
   }
 
   .settings-layout {
