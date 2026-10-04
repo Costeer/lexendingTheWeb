@@ -227,6 +227,17 @@ test("settings navigation keeps scrollbar space and selected label metrics stabl
   assert.doesNotMatch(selectedStyle, /font-weight|font-size|padding|border-width/);
 });
 
+test("all extension interfaces bootstrap the theme before render-blocking stylesheets", async () => {
+  await access(join(root, "src/ui-theme.js"));
+  for (const page of ["options.html", "about.html", "popup.html"]) {
+    const html = await read(page);
+    const head = html.match(/<head>[\s\S]*?<\/head>/)?.[0];
+    const script = '<script src="src/ui-theme.js"></script>';
+    assert.ok(head.includes(script), `${page} uses a synchronous head script`);
+    assert.ok(head.indexOf(script) < head.indexOf('<link rel="stylesheet"'), `${page} applies the cached theme before CSS`);
+  }
+});
+
 test("sidebar press feedback animates only contents and keeps its hit area stable", async () => {
   const [optionsCss, desktopCss] = await Promise.all([read("options.css"), read("options-desktop.css")]);
   assert.match(optionsCss, /button:not\(:disabled\):not\(\[data-settings-panel\]\):active,/);

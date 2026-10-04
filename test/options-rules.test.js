@@ -5,6 +5,7 @@ import test from "node:test";
 import "../src/settings.js";
 
 const source = await readFile(new URL("../options.js", import.meta.url), "utf8");
+const themeSource = await readFile(new URL("../src/ui-theme.js", import.meta.url), "utf8");
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 class Element {
@@ -36,7 +37,7 @@ class Element {
   focus() {}
 }
 
-async function openSettings({ count = 6, desktop = false } = {}) {
+async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings } = {}) {
   const elements = new Map();
   const get = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new Element());
@@ -60,9 +61,11 @@ async function openSettings({ count = 6, desktop = false } = {}) {
   const media = { matches: desktop, addEventListener(name, listener) { this.listener = listener; } };
   const writes = [];
   const errors = [];
-  runInNewContext(source, {
+  const root = { dataset: {} };
+  const cache = new Map([["lexend-ui-theme", cachedTheme]]);
+  const context = {
     document: {
-      documentElement: { dataset: {} },
+      documentElement: root,
       querySelector: get,
       querySelectorAll(selector) {
         if (selector === ".settings-panel") return panels;
@@ -71,11 +74,16 @@ async function openSettings({ count = 6, desktop = false } = {}) {
       },
       createElement: () => new Element()
     },
+    localStorage: {
+      getItem: (key) => cache.get(key) ?? null,
+      setItem: (key, value) => cache.set(key, value)
+    },
     LexendSettings: globalThis.LexendSettings,
     LexendQuotes: { random: () => ({ text: "Preview", author: "Author", lang: "en", url: "https://example.com" }) },
     browser: { storage: {
       sync: {
         async get() {
+          if (getSettings) return getSettings();
           return { siteRules: Array.from({ length: count }, (_, index) => ({
             hostname: `site${index + 1}.example.com`, includeSubdomains: false, enabled: false
           })) };
@@ -90,15 +98,38 @@ async function openSettings({ count = 6, desktop = false } = {}) {
     URLSearchParams,
     URL,
     console: { error(...args) { errors.push(args); } }
-  });
+  };
+  runInNewContext(themeSource, context);
+  runInNewContext(source, context);
   await tick();
   assert.deepEqual(errors, []);
   return {
-    get, writes, panels, navigation,
+    get, writes, panels, navigation, root, cache,
     rows: () => get("#rule-list").children,
     resize(desktopMode) { media.matches = desktopMode; media.listener(); }
   };
 }
+
+test("settings retain the dark navigation cache while loading, then honor synced preferences", async () => {
+  let resolveSettings;
+  const pending = new Promise((resolve) => { resolveSettings = resolve; });
+  const page = await openSettings({ cachedTheme: "dark", getSettings: () => pending });
+  assert.equal(page.root.dataset.theme, "dark");
+  resolveSettings({ theme: "dark" });
+  await tick();
+  assert.equal(page.root.dataset.theme, "dark");
+  assert.equal(page.get("#dark-theme").checked, true);
+  page.get("#dark-theme").checked = false;
+  page.get("#dark-theme").emit("change");
+  assert.equal(page.root.dataset.theme, "light");
+  assert.equal(page.cache.get("lexend-ui-theme"), "light");
+  await tick();
+  assert.equal(page.writes.at(-1).theme, "light");
+
+  const stale = await openSettings({ cachedTheme: "dark", getSettings: async () => ({ theme: "light" }) });
+  assert.equal(stale.root.dataset.theme, "light", "the cache does not override synced settings");
+  assert.equal(stale.cache.get("lexend-ui-theme"), "light");
+});
 
 test("rapid sidebar selections leave only the latest category selected and visible", async () => {
   const page = await openSettings({ desktop: true });

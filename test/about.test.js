@@ -5,13 +5,19 @@ import test from "node:test";
 import "../src/settings.js";
 
 const source = await readFile(new URL("../about.js", import.meta.url), "utf8");
+const themeSource = await readFile(new URL("../src/ui-theme.js", import.meta.url), "utf8");
 
-async function openAbout(get) {
+async function openAbout(get, { cachedTheme } = {}) {
   const root = { dataset: {} };
+  const cache = new Map(cachedTheme ? [["lexend-ui-theme", cachedTheme]] : []);
   let onChanged;
   const errors = [];
-  runInNewContext(source, {
+  const context = {
     document: { documentElement: root, getElementById: () => null },
+    localStorage: {
+      getItem: (key) => cache.get(key) ?? null,
+      setItem: (key, value) => cache.set(key, value)
+    },
     LexendSettings: globalThis.LexendSettings,
     browser: {
       storage: {
@@ -20,9 +26,11 @@ async function openAbout(get) {
       }
     },
     console: { error(...args) { errors.push(args); } }
-  });
+  };
+  runInNewContext(themeSource, context);
+  runInNewContext(source, context);
   await new Promise((resolve) => setImmediate(resolve));
-  return { root, onChanged, errors };
+  return { root, cache, onChanged, errors };
 }
 
 test("About loads the saved theme and follows only synced theme changes", async () => {
@@ -44,6 +52,23 @@ test("About remains readable when stored preferences cannot be loaded", async ()
   const { root, errors } = await openAbout(async () => { throw new Error("Storage unavailable"); });
   assert.equal(root.dataset.theme, "light");
   assert.equal(errors.length, 1);
+});
+
+test("About keeps the cached dark theme while synced settings load and on a failed read", async () => {
+  let resolveSettings;
+  const pending = new Promise((resolve) => { resolveSettings = resolve; });
+  const page = await openAbout(() => pending, { cachedTheme: "dark" });
+  assert.equal(page.root.dataset.theme, "dark", "startup must not reset the head script's theme");
+  resolveSettings({ theme: "dark" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(page.root.dataset.theme, "dark");
+  page.onChanged({ theme: { newValue: "light" } }, "sync");
+  assert.equal(page.cache.get("lexend-ui-theme"), "light", "navigation cache follows the saved theme");
+
+  const failed = await openAbout(async () => { throw new Error("Storage unavailable"); }, { cachedTheme: "dark" });
+  assert.equal(failed.root.dataset.theme, "dark");
+  assert.equal(failed.cache.get("lexend-ui-theme"), "dark");
+  assert.equal(failed.errors.length, 1);
 });
 
 function openSupport({ reducedMotion = false, focusVisible = true } = {}) {

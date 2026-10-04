@@ -1,6 +1,6 @@
 # Privacy Policy for Lexend for the Web
 
-Last updated: September 22, 2026
+Last updated: October 4, 2026
 
 The developer of Lexend for the Web does not collect, receive, sell, or share
 personal data. The extension processes visible website text locally and stores
@@ -21,6 +21,10 @@ These settings are saved with the browser's synchronized extension storage.
 Depending on the user's browser configuration, the browser vendor may sync the
 settings between signed-in browser profiles. Lexend for the Web does not operate a
 server and cannot access the user's browser-sync account.
+
+The popup and settings pages also keep a local copy of the interface theme so
+it can be applied before pages are painted. This cache stays in the browser and
+is not sent to the developer.
 
 Users can change or delete individual hostname rules from the extension's
 settings page. They can also clear all saved rules, reset the remaining
