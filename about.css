@@ -95,7 +95,6 @@
   gap: 20px;
   isolation: isolate;
   width: 100%;
-  max-width: 520px;
   margin-top: 32px;
   padding: 30px 34px;
   overflow: hidden;
@@ -118,6 +117,81 @@
   opacity: .45;
   transition: opacity 400ms;
 }
+
+.support-stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  opacity: .5;
+  pointer-events: none;
+}
+
+.support-stars::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  opacity: .45;
+  background:
+    radial-gradient(circle at 12% 16%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 28% 76%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 36% 30%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 48% 62%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 58% 17%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 67% 82%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 77% 44%, #fff 0 .7px, transparent 1.3px),
+    radial-gradient(circle at 93% 72%, #fff 0 .7px, transparent 1.3px);
+}
+
+.support-sparkle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--support-lilac);
+  opacity: .2;
+}
+
+.support-sparkle::before,
+.support-sparkle::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  content: "";
+  background: var(--support-lilac);
+  transform: translate(-50%, -50%);
+}
+
+.support-sparkle::before { width: 7px; height: 1px; }
+.support-sparkle::after { width: 1px; height: 7px; }
+.support-sparkle:nth-child(1) { top: 24%; left: 24%; }
+.support-sparkle:nth-child(2) { top: 68%; left: 41%; }
+.support-sparkle:nth-child(3) { top: 38%; left: 59%; }
+.support-sparkle:nth-child(4) { top: 15%; left: 76%; }
+.support-sparkle:nth-child(5) { top: 83%; left: 88%; }
+
+.support-shooting-star {
+  position: absolute;
+  top: 22%;
+  left: 34%;
+  width: 56px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--support-lilac));
+  opacity: 0;
+}
+
+.support-shooting-star::after {
+  position: absolute;
+  right: 0;
+  top: -1px;
+  width: 2px;
+  height: 2px;
+  content: "";
+  border-radius: 50%;
+  background: #fff;
+}
+
+.support-shooting-star:last-child { top: 65%; left: 58%; }
 
 .support-copy {
   display: flex;
@@ -206,6 +280,7 @@
 }
 
 .support-card-arrow svg {
+  grid-area: 1 / 1;
   width: 18px;
   height: 18px;
   stroke: #fff;
@@ -213,6 +288,18 @@
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.support-arrow-return {
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-16px, 16px);
 }
 
 .support-avatar {
@@ -296,6 +383,24 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .support-sparkle {
+    animation: support-star-twinkle 8s ease-in-out infinite;
+  }
+
+  .support-sparkle:nth-child(2) { animation-duration: 11s; animation-delay: -4s; }
+  .support-sparkle:nth-child(3) { animation-duration: 9s; animation-delay: -6s; }
+  .support-sparkle:nth-child(4) { animation-duration: 12s; animation-delay: -2s; }
+  .support-sparkle:nth-child(5) { animation-duration: 10s; animation-delay: -7s; }
+
+  .support-shooting-star {
+    animation: support-star-shoot 12s linear infinite;
+  }
+
+  .support-shooting-star:last-child {
+    animation-duration: 17s;
+    animation-delay: -6s;
+  }
+
   .support-card:is(:hover, :focus-visible) .support-avatar {
     opacity: 0;
     transform: scale(.85) rotate(60deg);
@@ -315,8 +420,12 @@
     transform: scale(1.18) rotate(8deg);
   }
 
-  .support-card:is(:hover, :focus-visible) .support-card-arrow svg {
-    animation: support-arrow-shoot 550ms cubic-bezier(.5, 0, .2, 1);
+  .support-card:is(:hover, :focus-visible) .support-arrow-outbound {
+    animation: support-arrow-shoot 550ms cubic-bezier(.5, 0, .2, 1) both;
+  }
+
+  .support-card:is(:hover, :focus-visible) .support-arrow-return {
+    animation: support-symbol-return 550ms cubic-bezier(.5, 0, .2, 1) both;
   }
 
   .support-card:is(:hover, :focus-visible) .support-steam path {
@@ -336,10 +445,25 @@
   }
 
   @keyframes support-arrow-shoot {
-    0% { transform: translate(0, 0); }
-    45% { transform: translate(16px, -16px); opacity: 0; }
-    46% { transform: translate(-16px, 16px); opacity: 0; }
+    0% { transform: translate(0, 0); opacity: 1; }
+    45%, 100% { transform: translate(16px, -16px); opacity: 0; }
+  }
+
+  @keyframes support-symbol-return {
+    0%, 45% { transform: translate(-16px, 16px); opacity: 0; }
     100% { transform: translate(0, 0); opacity: 1; }
+  }
+
+  @keyframes support-star-twinkle {
+    0%, 70%, 100% { opacity: .15; transform: scale(.75); }
+    78% { opacity: .5; transform: scale(1); }
+    85% { opacity: .2; transform: scale(.85); }
+  }
+
+  @keyframes support-star-shoot {
+    0%, 86% { opacity: 0; transform: translate(-35px, -20px) rotate(25deg); }
+    87% { opacity: .5; }
+    93%, 100% { opacity: 0; transform: translate(100px, 45px) rotate(25deg); }
   }
 
   @keyframes support-cup-steam {
