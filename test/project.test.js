@@ -136,10 +136,12 @@ test("Ko-fi support uses desktop navigation and a responsive About card", async 
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
   assert.match(about, /aria-label="Support costeer on Ko-fi \(opens in a new tab\)"/);
   assert.match(about, /class="support-card-title">Support<br \/>costeer<\/span>/);
-  assert.match(about, /class="support-orb" aria-hidden="true"/);
+  assert.match(about, /class="support-avatar" src="assets\/costeer-avatar\.png" width="320" height="320" alt=""/);
+  assert.match(about, /class="support-kofi-logo" src="assets\/kofi-logo\.avif" width="1024" height="1024" alt=""/);
+  for (const asset of ["costeer-avatar.png", "kofi-logo.avif"]) await access(join(root, "assets", asset));
   assert.match(about, /class="support-confetti" aria-hidden="true"/);
   assert.match(about, /<span>ko-fi\.com\/costeer<\/span>/);
-  assert.doesNotMatch(about, /<img\b|kofi-support\.jpg/);
+  assert.doesNotMatch(about, /kofi-support\.jpg|support-coffee-heart|support-orb|<img\b[^>]*src="https?:/);
   assert.doesNotMatch(about, /Support development|If this extension helps you|Donations are entirely optional/);
   assert.match(about, /<main>[\s\S]*id="donate-link"[\s\S]*<\/main>/);
   assert.doesNotMatch(css, /position:\s*fixed/);

@@ -11,8 +11,8 @@
 
   const supportCard = document.getElementById("donate-link");
   const confetti = supportCard?.querySelector(".support-confetti");
-  const orb = supportCard?.querySelector(".support-orb");
-  if (confetti && orb && globalThis.matchMedia) {
+  const avatar = supportCard?.querySelector(".support-avatar");
+  if (confetti && avatar && globalThis.matchMedia) {
     const reducedMotion = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
     const animations = new Set();
     let lastBurst = -Infinity;
@@ -22,9 +22,9 @@
           || animations.size || performance.now() - lastBurst < 1200) return;
       lastBurst = performance.now();
       const cardBounds = supportCard.getBoundingClientRect();
-      const orbBounds = orb.getBoundingClientRect();
-      const x = orbBounds.left + orbBounds.width / 2 - cardBounds.left;
-      const y = orbBounds.top + orbBounds.height / 2 - cardBounds.top;
+      const avatarBounds = avatar.getBoundingClientRect();
+      const x = avatarBounds.left + avatarBounds.width / 2 - cardBounds.left;
+      const y = avatarBounds.top + avatarBounds.height / 2 - cardBounds.top;
 
       for (let index = 0; index < 28; index += 1) {
         const piece = document.createElement("span");

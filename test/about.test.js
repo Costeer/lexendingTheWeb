@@ -58,9 +58,11 @@ function openSupport({ reducedMotion = false } = {}) {
   const layer = { append(piece) { particles.add(piece); } };
   const card = {
     querySelector(selector) {
-      return selector === ".support-confetti" ? layer : {
+      if (selector === ".support-confetti") return layer;
+      if (selector === ".support-avatar") return {
         getBoundingClientRect: () => ({ left: 400, top: 80, width: 160, height: 160 })
       };
+      return null;
     },
     getBoundingClientRect: () => ({ left: 100, top: 40, width: 660, height: 300 }),
     addEventListener(type, listener) { listeners.set(type, listener); }

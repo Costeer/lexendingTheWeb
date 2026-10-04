@@ -127,15 +127,10 @@
   overflow-wrap: anywhere;
 }
 
-.support-coffee {
+.support-kofi-logo {
   flex: 0 0 auto;
   width: clamp(30px, 6.8cqw, 42px);
   height: auto;
-}
-
-.support-coffee-heart {
-  transform-box: fill-box;
-  transform-origin: center;
   transition: transform 400ms var(--motion-ease);
 }
 
@@ -144,35 +139,15 @@
   transition: transform 400ms var(--motion-ease);
 }
 
-.support-orb {
-  position: relative;
+.support-avatar {
+  display: block;
   justify-self: end;
   width: min(100%, 160px);
+  height: auto;
   aspect-ratio: 1;
-  overflow: hidden;
-  border: 5px solid #180c2e;
   border-radius: 50%;
+  object-fit: cover;
   background: #030208;
-  box-shadow: 0 0 24px #ac83ff55;
-}
-
-.support-orb::before,
-.support-orb::after {
-  position: absolute;
-  content: "";
-  border-radius: 50%;
-}
-
-.support-orb::before {
-  inset: 3px;
-  background: conic-gradient(from 30deg, #5435ea, #ffa8ff, #6630dd, #09032c, #413fff, #f493ff, #5435ea);
-  filter: blur(2px);
-}
-
-.support-orb::after {
-  inset: 13px;
-  background: radial-gradient(circle at 70% 85%, #171130, #000 65%);
-  box-shadow: 0 0 10px 3px #150735, inset 0 0 8px #000;
 }
 
 .support-confetti {
@@ -215,29 +190,21 @@
     transform: translateX(4px);
   }
 
-  .support-card:is(:hover, :focus-visible) .support-coffee-heart {
-    transform: scale(1.16);
+  .support-card:is(:hover, :focus-visible) .support-kofi-logo {
+    transform: translateY(-2px);
   }
 
   .support-card:is(:hover, :focus-visible) .support-card-arrow {
     transform: translate(3px, -3px);
   }
 
-  .support-card:is(:hover, :focus-visible) .support-orb {
-    animation: support-orb-float 2s ease-in-out infinite;
+  .support-card:is(:hover, :focus-visible) .support-avatar {
+    animation: support-avatar-float 2s ease-in-out infinite;
   }
 
-  .support-card:is(:hover, :focus-visible) .support-orb::before {
-    animation: support-orb-glow 3s linear infinite;
-  }
-
-  @keyframes support-orb-float {
+  @keyframes support-avatar-float {
     0%, 100% { transform: translateY(0) scale(1); }
     50% { transform: translateY(-6px) scale(1.04); }
-  }
-
-  @keyframes support-orb-glow {
-    to { transform: rotate(360deg); }
   }
 }
 
