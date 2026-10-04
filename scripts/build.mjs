@@ -14,6 +14,9 @@ const sharedFiles = [
   "options.css",
   "options-desktop.css",
   "options.js",
+  "about.html",
+  "about.css",
+  "about.js",
   "src",
   "assets"
 ];

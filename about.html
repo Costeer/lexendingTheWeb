@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About Lexend for the Web</title>
+    <link rel="stylesheet" href="shared.css" />
+    <link rel="stylesheet" href="options.css" />
+    <link rel="stylesheet" href="options-desktop.css" />
+    <link rel="stylesheet" href="about.css" />
+  </head>
+  <body class="settings-page about-page">
+    <header class="desktop-settings-header about-page-header">
+      <a
+        class="settings-wordmark lexend-wordmark"
+        href="https://www.lexend.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Visit the Lexend website"
+      >
+        <span class="lxnd-word" aria-hidden="true">
+          <span class="lxnd-letter">L</span>
+          <span class="lxnd-letter lxnd-letter-insert">E</span>
+          <span class="lxnd-letter">X</span>
+          <span class="lxnd-letter lxnd-letter-insert">E</span>
+          <span class="lxnd-letter">N</span>
+          <span class="lxnd-letter">D</span>
+        </span>
+      </a>
+      <h1>Settings</h1>
+    </header>
+
+    <div class="settings-layout">
+      <nav class="desktop-settings-nav" aria-label="Settings categories">
+        <a href="options.html?section=readability-panel">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16M12 5v14M8 19h8" /></svg>
+          Readability
+        </a>
+        <a href="options.html?section=rules-panel">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z" /></svg>
+          Site rules
+        </a>
+        <a href="options.html?section=appearance-panel">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z" /></svg>
+          Appearance
+        </a>
+        <a href="options.html?section=tools-panel">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 4v6h8V4M8 20v-6h8v6" /></svg>
+          Backup and shortcut
+        </a>
+        <a href="about.html" aria-current="page">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg>
+          About
+        </a>
+      </nav>
+
+      <main>
+        <section class="settings-panel" aria-labelledby="about-title">
+          <a class="about-back-link" href="options.html">← Back to settings</a>
+          <div class="section-heading">
+            <h2 id="about-title">About</h2>
+            <p class="helper">
+              Lexend for the Web makes websites easier to read with Lexend,
+              adjustable text size, and more comfortable spacing.
+            </p>
+          </div>
+
+          <div class="about-block">
+            <h3>Independent project</h3>
+            <p id="project-disclaimer">
+              This is an independent, unofficial extension. It is not affiliated
+              with, endorsed by, or sponsored by Lexend, Google Fonts, or their
+              creators.
+            </p>
+            <div class="about-links">
+              <a href="https://www.lexend.com/" target="_blank" rel="noopener noreferrer">About Lexend ↗</a>
+              <a href="https://github.com/Costeer/lexendingTheWeb" target="_blank" rel="noopener noreferrer">Source code ↗</a>
+            </div>
+          </div>
+
+          <div class="about-block">
+            <h3>Support development</h3>
+            <p>If this extension helps you, you can support the project on Ko-fi. Donations are entirely optional.</p>
+            <a
+              id="donate-link"
+              class="donate-button"
+              href="https://ko-fi.com/costeer"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Donate on Ko-fi (opens in a new tab)"
+            >Donate ↗</a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="src/settings.js"></script>
+    <script src="about.js"></script>
+  </body>
+</html>

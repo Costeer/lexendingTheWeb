@@ -120,6 +120,32 @@ input[type="radio"] {
   justify-content: center;
 }
 
+.settings-wordmark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 34px;
+  padding: 0 12px;
+  overflow: hidden;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: none;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: width 460ms var(--motion-ease);
+}
+
+.settings-wordmark:is(:hover, :focus) {
+  width: 154px;
+}
+
 .lxnd-letter {
   display: inline-grid;
   width: .72em;

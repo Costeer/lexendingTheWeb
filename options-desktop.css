@@ -38,30 +38,8 @@
     letter-spacing: .015em;
   }
 
-  .settings-wordmark {
-    display: grid;
-    flex: 0 0 auto;
-    width: 76px;
-    height: 34px;
-    padding: 0 12px;
-    overflow: hidden;
-    place-items: center;
-    border: 0;
-    border-radius: 0;
-    color: var(--on-accent);
-    background: var(--accent);
-    box-shadow: none;
-    font-size: 18px;
-    font-weight: 400;
-    line-height: 1;
-    letter-spacing: 0;
-    text-decoration: none;
-    white-space: nowrap;
-    transition: width 460ms var(--motion-ease);
-  }
-
-  .settings-wordmark:is(:hover, :focus) {
-    width: 154px;
+  .page-attribution .mobile-about-link {
+    display: none;
   }
 
   .settings-layout {
@@ -81,7 +59,7 @@
     gap: 6px;
   }
 
-  .desktop-settings-nav button {
+  .desktop-settings-nav :is(button, a) {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -96,13 +74,14 @@
     font-weight: 400;
     line-height: 1.5;
     text-align: left;
+    text-decoration: none;
   }
 
-  .desktop-settings-nav button:hover {
+  .desktop-settings-nav :is(button, a):hover {
     border-color: var(--ui-border);
   }
 
-  .desktop-settings-nav button[aria-current="page"] {
+  .desktop-settings-nav :is(button, a)[aria-current="page"] {
     border-color: var(--accent);
     font-weight: 550;
   }
@@ -374,17 +353,6 @@
   :root .settings-layout .appearance-control input:checked + .appearance-switch-track .appearance-switch-thumb {
     background: var(--on-accent);
     transform: translateX(26px);
-  }
-
-  :root .settings-layout .appearance-disclaimer {
-    display: block;
-    max-width: 70ch;
-    margin: 24px 0 0;
-    padding: 0;
-    border: 0;
-    color: var(--ink);
-    font-size: 15px;
-    line-height: 1.7;
   }
 
   :root .settings-layout .add-rule {
