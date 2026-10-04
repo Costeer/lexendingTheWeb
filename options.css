@@ -1114,32 +1114,6 @@ input::placeholder {
   line-height: 1.7;
 }
 
-:root .appearance-link {
-  display: inline-block;
-  margin-top: 12px;
-  color: var(--on-accent);
-  font-size: 16px;
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-}
-
-:root .appearance-link:hover {
-  color: var(--on-accent);
-  text-underline-offset: 5px;
-}
-
-:root .appearance-link-word {
-  display: inline-block;
-  letter-spacing: 0;
-  transition: letter-spacing 320ms var(--motion-ease);
-}
-
-:root .appearance-link:is(:hover, :focus-visible) .appearance-link-word {
-  letter-spacing: .14em;
-}
-
 :root .appearance-control {
   justify-content: flex-start;
   margin-top: 26px;

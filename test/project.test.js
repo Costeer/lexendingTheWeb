@@ -173,8 +173,21 @@ test("mobile About is in the header and the desktop tab remains Appearance", asy
     assert.match(nav, />\s*Appearance\s*</);
     assert.doesNotMatch(nav, /Lexend for the Web/);
   }
-  assert.match(options, /<h2 id="appearance-title">Lexend for the Web<\/h2>/);
+  assert.match(options, /<h2 id="appearance-title">Appearance<\/h2>/);
   assert.doesNotMatch(options.match(/<footer\b[\s\S]*?<\/footer>/)?.[0], /mobile-about-link|href="about\.html"/);
+});
+
+test("Appearance contains theme settings while About owns the project introduction", async () => {
+  const [options, about, aboutCss] = await Promise.all([read("options.html"), read("about.html"), read("about.css")]);
+  const appearance = options.match(/<section id="appearance-panel"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(appearance);
+  assert.match(appearance, /id="dark-theme"/);
+  assert.match(appearance, /aria-describedby="appearance-description"/);
+  assert.doesNotMatch(appearance, /<a\b|Lexend for the Web|clearer, more readable interface/);
+  assert.match(about, /<h2 id="about-title">Lexend for the Web<\/h2>/);
+  assert.match(about, /The extension uses Lexend for a clearer, more readable interface\./);
+  assert.match(about, /class="about-lexend-link" href="https:\/\/www\.lexend\.com\/"/);
+  assert.match(aboutCss, /\.about-lexend-link:is\(:hover, :focus-visible\) \.about-lexend-word\s*\{\s*letter-spacing: \.14em;/);
 });
 
 test("settings navigation keeps scrollbar space and selected label metrics stable", async () => {
