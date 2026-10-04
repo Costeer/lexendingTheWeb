@@ -158,6 +158,7 @@ test("mobile settings fill the viewport and use a non-interactive receipt edge",
   assert.match(css, /:root body\.settings-page\s*\{[^}]*min-height: 100dvh;[^}]*padding: 0;/);
   assert.match(css, /\.settings-layout main\s*\{[^}]*flex: 1;[^}]*width: 100%;[^}]*overflow: visible;/);
   assert.match(css, /main::after\s*\{[^}]*linear-gradient\(135deg, var\(--surface\)[^}]*linear-gradient\(225deg, var\(--surface\)[^}]*pointer-events: none;/);
+  assert.match(css, /\.readability-title-row\s*\{[^}]*flex-wrap: wrap;/);
 });
 
 test("site rules migrate and resolve by specificity", () => {
