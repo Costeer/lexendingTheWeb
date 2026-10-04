@@ -530,7 +530,7 @@ fieldset:disabled {
   font-size: 14px;
   font-weight: 400;
   letter-spacing: .12em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .switch-track {
@@ -612,7 +612,7 @@ fieldset:disabled {
   font-size: 13px;
   font-weight: 400;
   letter-spacing: .14em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .choice-card {
@@ -733,7 +733,7 @@ fieldset:disabled {
   font-size: 13px;
   font-weight: 400;
   letter-spacing: .12em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :root[data-ui-style="lexend"] .restricted-note {
