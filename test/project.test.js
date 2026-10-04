@@ -178,8 +178,10 @@ test("support stars stay decorative and the departing arrow returns as a hammer 
   const [about, css] = await Promise.all([read("about.html"), read("about.css")]);
   assert.match(about, /class="support-stars" aria-hidden="true"/);
   assert.equal((about.match(/class="support-sparkle"/g) ?? []).length, 5);
-  assert.equal((about.match(/class="support-shooting-star"/g) ?? []).length, 2);
-  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.5;[^}]*pointer-events: none;/);
+  assert.equal((about.match(/class="support-shooting-star"/g) ?? []).length, 5);
+  assert.match(css, /\.support-stars\s*\{[^}]*opacity: \.8;[^}]*pointer-events: none;/);
+  assert.match(css, /\.support-stars::before\s*\{[^}]*opacity: \.65;/);
+  assert.match(css, /animation: support-star-shoot 8s linear infinite;/);
   assert.match(css, /@keyframes support-star-twinkle/);
   assert.match(css, /@keyframes support-star-shoot/);
   assert.match(about, /class="support-arrow-outbound"/);
