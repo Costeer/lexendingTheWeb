@@ -1,0 +1,2136 @@
+{
+  "completedSites": 7,
+  "distinctRoutes": 21,
+  "methodology": [
+    "T3 collaborative browser only. Separate tab_8, then tab_a. Snapshot before interaction; focused click first, guarded DOM click of the observed actual link when focused click failed. Beyond-homepage navigation used real internal links.",
+    "Runtime/font/CSS injected after navigation, extension storage/messaging mocked. Not an installed-extension/document_start test. Startup clone/parsing hooks could force fallback earlier in a true installation, so CSS-mode savings are conditional.",
+    "Two alternating samples of800ms scroll per route; each measurement compares observer baseline and automatic implementation in the same live document. Natural mutations can differ between samples. Zero-vs-zero means no measured steady-state gain.",
+    "All retained comparisons verify expected URL and3 font buffers. Original React interior comparisons predate explicit FontFace readiness checks; React homepage was revalidated with new helper and regular/bold font-ready true. All other pages use helper with FontFace validation true.",
+    "Later helper removes only duplicate Lexend FONT_FACE_RULE CSSOM entries to avoid data-font CSP conflicts while preloaded bundled binary FontFace objects supply actual glyphs; applied equally to both variants.",
+    "Two preview clients intermittently routed tab IDs to divergent page state, varying viewport1280x800 vs1536x960. Mismatches were discarded and navigation retried. This limits cross-site timing comparisons; paired samples remain within a single evaluate/document.",
+    "At least one interior screenshot visually reviewed per site. Protected code inspected on real articles. Screenshots were viewed through preview_snapshot image results; no image artifact retained.",
+    "Final cached /tmp/lexend-site-audit.js53320bytes includes scan-race and pause/resume-hook fixes. From MDN Specificity onward used scan-race fix; Astro Configuration and Vite use53320byte helper. Earlier settled-page comparisons remain valid but predate those race-specific changes."
+  ],
+  "findings": [
+    "No auto-only visual or functional regression observed in sampled navigation/controls.",
+    "React homepage4 H2 news-card headings inherit Lexend under both observer and auto body-only modes. Explicit off/baseline/auto font comparison retained; pre-existing behavior, not a new regression.",
+    "Vue Introduction11px horizontal overflow reproduces identically with extension off, observer, and auto; not caused by new implementation.",
+    "Svelte begins CSS in after-load homepage test then switches to fallback on SPA Docs navigation with0 shadow roots, confirming conservative detector behavior affects real frameworks.",
+    "MDN uses28/37/121 open shadow roots across tested routes. Specificity includes protected syntax-highlighted code spans in the407 shadow-text denominator;45 samples styled does not mean remaining362 are missed ordinary text. Screenshot shows protected code readable.",
+    "Next.js uses1 open NEXT-ROUTE-ANNOUNCER shadow root across all routes; runtime remains shadow mode even though visible content is ordinary HTML.",
+    "React Search open/Escape: baseline2 callbacks/61visits/~2.6ms discovery versus auto0; single interaction, not whole-page latency claim. Astro Search shows60visits/~0.6ms vs0 but lazy loading differs, so treat as illustrative avoided discovery only."
+  ],
+  "sites": [
+    {
+      "site": "react.dev",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 50,
+            "bodyStyled": 50,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "React 19.3"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "The React Foundation: A New Home for React Hosted by the Lin"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "Additional Vulnerabilities in RSC"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "Vulnerability in React Server Components"
+              }
+            ],
+            "elements": 1846,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "React",
+            "url": "https://react.dev/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.7,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.9,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2480,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Quick Start – React",
+            "url": "https://react.dev/learn"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 817.9,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 4,
+              "discoveryMs": 1.1,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0.3,
+              "mode": "observer-baseline",
+              "records": 9,
+              "sample": 1,
+              "tasks": 4,
+              "version": "observer",
+              "visits": 85
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2949,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "runs": [
+            {
+              "callbacks": 2,
+              "discoveryMs": 0.5,
+              "elapsedMs": 801.6,
+              "maxTaskMs": 0.2,
+              "mode": "observer-baseline",
+              "records": 6,
+              "sample": 0,
+              "tasks": 2,
+              "version": "observer",
+              "visits": 24
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.3,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Homepage Learn React -> Quick Start -> Thinking in React through actual links",
+        "Scrolled all pages; opened Search and dismissed Escape on interior article in both modes",
+        "Read code samples with preserved Source Code Pro"
+      ],
+      "interactionMeasurement": {
+        "observer": {
+          "callbacks": 2,
+          "discoveryMs": 2.600000001490116,
+          "maxTaskMs": 1.3999999985098839,
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2925,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "observer-baseline",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "records": 2,
+          "tasks": 2,
+          "version": "observer",
+          "visits": 61
+        },
+        "auto": {
+          "callbacks": 0,
+          "discoveryMs": 0,
+          "maxTaskMs": 0,
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2924,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "records": 0,
+          "tasks": 0,
+          "version": "auto",
+          "visits": 0
+        }
+      },
+      "visual": "Quick Start interior screenshot reviewed: readable headings, sidebar/body, no overflow. Source Code Pro preserved in code. Four homepage H2 news headings inherit Lexend in both observer baseline and auto; verified off/observer/auto explicitly. This is pre-existing body-scope inheritance, not auto-only regression.",
+      "headingComparison": {
+        "auto": [
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Create user interfaces from components"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Write components with code and markup"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "3 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Add interactivity wherever you need it"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "5 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Go full-stack with a framework"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "19 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Use the best from every platform"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Upgrade when the future is ready"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "React 19.3"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "The React Foundation: A New Home for React Hosted by the Linux Foundation"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "Additional Vulnerabilities in RSC"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "Vulnerability in React Server Components"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Join a community of millions"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Welcome to the React community"
+          }
+        ],
+        "observer": [
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Create user interfaces from components"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Write components with code and markup"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "3 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Add interactivity wherever you need it"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "5 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Go full-stack with a framework"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "19 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Use the best from every platform"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Upgrade when the future is ready"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "React 19.3"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "The React Foundation: A New Home for React Hosted by the Linux Foundation"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "Additional Vulnerabilities in RSC"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "parent": "DIV",
+            "text": "Vulnerability in React Server Components"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Join a community of millions"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Welcome to the React community"
+          }
+        ],
+        "off": [
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Create user interfaces from components"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Write components with code and markup"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "3 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Add interactivity wherever you need it"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "5 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Go full-stack with a framework"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "SECTION",
+            "text": "19 Videos"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Use the best from every platform"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Upgrade when the future is ready"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "React 19.3"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "The React Foundation: A New Home for React Hosted by the Linux Foundation"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Additional Vulnerabilities in RSC"
+          },
+          {
+            "font": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Vulnerability in React Server Components"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Join a community of millions"
+          },
+          {
+            "font": "\"Optimistic Display\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "parent": "DIV",
+            "text": "Welcome to the React community"
+          }
+        ]
+      },
+      "revalidation": [
+        {
+          "page": {
+            "bodySamples": 50,
+            "bodyStyled": 50,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "React 19.3"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "The React Foundation: A New Home for React Hosted by the Lin"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "Additional Vulnerabilities in RSC"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Optimistic Text\", -apple-system, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+                "tag": "H2",
+                "text": "Vulnerability in React Server Components"
+              }
+            ],
+            "elements": 1846,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "React",
+            "url": "https://react.dev/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 807.8,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 807.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 810.1,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 806.8,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "routeCount": 3,
+      "performanceInterpretation": "Most settled scroll samples were zero-vs-zero. Any nonzero observer counts avoided by CSS are discovery work only, not page-load or whole-page responsiveness measurements."
+    },
+    {
+      "site": "developer.mozilla.org",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 53,
+            "bodyStyled": 53,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "Inter, sans-serif",
+                "tag": "A",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "Inter, sans-serif",
+                "tag": "A",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "Inter, sans-serif",
+                "tag": "A",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "Inter, sans-serif",
+                "tag": "A",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "Inter, sans-serif",
+                "tag": "A",
+                "text": ""
+              }
+            ],
+            "elements": 736,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 28,
+            "shadowStyled": 11,
+            "shadowText": 11,
+            "title": "MDN Web Docs",
+            "url": "https://developer.mozilla.org/en-US/"
+          },
+          "runs": [
+            {
+              "callbacks": 3,
+              "discoveryMs": 1.7,
+              "elapsedMs": 802.3,
+              "maxTaskMs": 1.6,
+              "mode": "observer-baseline",
+              "records": 4,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 21
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.1,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.1,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.2,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 5001,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 37,
+            "shadowStyled": 17,
+            "shadowText": 17,
+            "title": "CSS: Cascading Style Sheets | MDN",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/CSS"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 5259,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 121,
+            "shadowStyled": 45,
+            "shadowText": 407,
+            "title": "Specificity - CSS | MDN",
+            "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Cascade/Specificity"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Homepage CSS text link -> CSS documentation -> Specificity link",
+        "CSS navigation dropdown opened and Escape dismissed",
+        "Four viewport scroll steps per comparison on each route"
+      ],
+      "visual": "CSS interior screenshot reviewed: readable body and headings, left navigation, right TOC and icons visible, no horizontal overflow. Existing shadow roots all discovered; 11/11 then17/17 visible shadow text samples styled. Code samples remain monospace. No attributable breakage observed. Mostly 0-vs-0 steady state; one homepage delayed mutation is not proof of a gain because both use shadow observers. Specificity interior screenshot shows readable monospace code blocks and intact TOC;121 roots,45/407 shadow text styled because many span samples are protected syntax-highlighted code.",
+      "routeCount": 3,
+      "performanceInterpretation": "Existing shadow DOM requires observers; isolated differences in naturally occurring mutations are not controlled performance gains."
+    },
+    {
+      "site": "nextjs.org",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 21,
+            "bodyStyled": 21,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "GeistSans, \"GeistSans Fallback\"",
+                "tag": "DIV",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "GeistSans, \"GeistSans Fallback\"",
+                "tag": "DIV",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "GeistSans, \"GeistSans Fallback\"",
+                "tag": "DIV",
+                "text": ""
+              }
+            ],
+            "elements": 2641,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 1,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Next.js by Vercel - The React Framework",
+            "url": "https://nextjs.org/"
+          },
+          "runs": [
+            {
+              "callbacks": 3,
+              "discoveryMs": 0.8,
+              "elapsedMs": 825.8,
+              "maxTaskMs": 0.3,
+              "mode": "observer-baseline",
+              "records": 20,
+              "sample": 0,
+              "tasks": 3,
+              "version": "observer",
+              "visits": 12
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 846.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.8,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "GeistSans, \"GeistSans Fallback\"",
+                "tag": "DIV",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "GeistSans, \"GeistSans Fallback\"",
+                "tag": "DIV",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "GeistSans, \"GeistSans Fallback\"",
+                "tag": "DIV",
+                "text": ""
+              }
+            ],
+            "elements": 5602,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 1,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Next.js Docs | Next.js",
+            "url": "https://nextjs.org/docs"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 4822,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 1,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Getting Started: Installation | Next.js",
+            "url": "https://nextjs.org/docs/app/getting-started/installation"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 808.7,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 2,
+              "discoveryMs": 0.2,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0.1,
+              "mode": "shadow",
+              "records": 2,
+              "sample": 1,
+              "tasks": 2,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Homepage Docs link -> documentation -> Installation via sidebar",
+        "Opened version select and Escape dismissed",
+        "Scrolled each route"
+      ],
+      "visual": "Docs and Installation interior screenshots reviewed; body/sidebar/TOC and consent controls intact; no overflow. One shadow root is NEXT-ROUTE-ANNOUNCER (accessibility announcer). Sampled code stays Geist Mono. No auto-only breakage; no sustained discovery reduction measured.",
+      "routeCount": 3,
+      "performanceInterpretation": "Existing shadow DOM requires observers; isolated differences in naturally occurring mutations are not controlled performance gains."
+    },
+    {
+      "site": "vuejs.org",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 53,
+            "bodyStyled": 53,
+            "changedProtected": [],
+            "elements": 783,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Vue.js - The Progressive JavaScript Framework | Vue.js",
+            "url": "https://vuejs.org/"
+          },
+          "runs": [
+            {
+              "callbacks": 3,
+              "discoveryMs": 1,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0.5,
+              "mode": "observer-baseline",
+              "records": 44,
+              "sample": 0,
+              "tasks": 2,
+              "version": "observer",
+              "visits": 87
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1249,
+            "horizontalOverflow": 11,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Introduction | Vue.js",
+            "url": "https://vuejs.org/guide/introduction.html"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1672,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Quick Start | Vue.js",
+            "url": "https://vuejs.org/guide/quick-start.html"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.4,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.5,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 1,
+              "discoveryMs": 1,
+              "elapsedMs": 802.8,
+              "maxTaskMs": 1,
+              "mode": "observer-baseline",
+              "records": 1,
+              "sample": 1,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Homepage Get Started -> Introduction -> Quick Start through actual links",
+        "Dismissed composition API hint using Got it",
+        "Scrolled all routes"
+      ],
+      "visual": "Introduction screenshot reviewed: readable article, code, sidebar and icons. 11px horizontal overflow reproduced identically with extension off, observer baseline, and auto; site/layout issue, not auto regression. Header Inter and code monospace preserved.",
+      "comparison": {
+        "auto": {
+          "code": "ui-monospace, \"SF Mono\", SFMono-Regular, Menlo, Monaco, \"Cascadia Mono\", Consolas, \"Liberation Mono\", \"Noto Sans Mono\", \"DejaVu Sans Mono\", \"Roboto Mono\", \"Courier New\", monospace",
+          "h1": "\"Inter var experimental\", \"Inter var\", Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Fira Sans\", \"Droid Sans\", \"Helvetica Neue\", sans-serif",
+          "overflow": 11
+        },
+        "observer": {
+          "code": "ui-monospace, \"SF Mono\", SFMono-Regular, Menlo, Monaco, \"Cascadia Mono\", Consolas, \"Liberation Mono\", \"Noto Sans Mono\", \"DejaVu Sans Mono\", \"Roboto Mono\", \"Courier New\", monospace",
+          "h1": "\"Inter var experimental\", \"Inter var\", Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Fira Sans\", \"Droid Sans\", \"Helvetica Neue\", sans-serif",
+          "overflow": 11
+        },
+        "off": {
+          "code": "ui-monospace, \"SF Mono\", SFMono-Regular, Menlo, Monaco, \"Cascadia Mono\", Consolas, \"Liberation Mono\", \"Noto Sans Mono\", \"DejaVu Sans Mono\", \"Roboto Mono\", \"Courier New\", monospace",
+          "h1": "\"Inter var experimental\", \"Inter var\", Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Fira Sans\", \"Droid Sans\", \"Helvetica Neue\", sans-serif",
+          "overflow": 11
+        }
+      },
+      "routeCount": 3,
+      "performanceInterpretation": "Most settled scroll samples were zero-vs-zero. Any nonzero observer counts avoided by CSS are discovery work only, not page-load or whole-page responsiveness measurements."
+    },
+    {
+      "site": "svelte.dev",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 6,
+            "bodyStyled": 6,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              }
+            ],
+            "elements": 412,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Svelte • Web development for the rest of us",
+            "url": "https://svelte.dev/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 803.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 803.2,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.1,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 7,
+            "bodyStyled": 7,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              }
+            ],
+            "elements": 242,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "fallback",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Docs • Svelte",
+            "url": "https://svelte.dev/docs"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801,
+              "maxTaskMs": 0,
+              "mode": "fallback",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801,
+              "maxTaskMs": 0,
+              "mode": "fallback",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              }
+            ],
+            "elements": 590,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "fallback",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Overview • Svelte Docs",
+            "url": "https://svelte.dev/docs/svelte/overview"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "fallback",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.2,
+              "maxTaskMs": 0,
+              "mode": "fallback",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Homepage Docs -> Docs landing -> Svelte reference via actual links",
+        "Docs navigation submenu opened through pointer click",
+        "Toggled dark mode twice on reference",
+        "Scrolled all routes"
+      ],
+      "visual": "Documentation landing screenshot reviewed: original serif headings retained, body Lexend readable, menu and mask/SVG icons visible. No overflow. Auto conservatively switches css->fallback after SPA navigation despite0 roots; no steady-state gain measured on interior routes. Code sampled monospace. No attributable breakage.",
+      "routeCount": 3,
+      "performanceInterpretation": "No steady-state reduction measured; conservative fallback is triggered during real SPA navigation."
+    },
+    {
+      "site": "docs.astro.build",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1402,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Getting started | Docs",
+            "url": "https://docs.astro.build/en/getting-started/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.5,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.3,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.2,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2408,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Install Astro | Docs",
+            "url": "https://docs.astro.build/en/install-and-setup/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.2,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 887.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1893,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Configuration overview | Docs",
+            "url": "https://docs.astro.build/en/guides/configuring-astro/"
+          },
+          "runs": [
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.3,
+              "elapsedMs": 800.8,
+              "maxTaskMs": 0.2,
+              "mode": "observer-baseline",
+              "records": 1,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.3,
+              "elapsedMs": 811.9,
+              "maxTaskMs": 0.2,
+              "mode": "observer-baseline",
+              "records": 1,
+              "sample": 1,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Getting started -> Installation -> Configuration overview through real sidebar links",
+        "Search button mounted Search docs input; pressed Escape in observer and auto. Lazy loading differed between samples.",
+        "Scrolled all routes"
+      ],
+      "interactionMeasurement": {
+        "observer": {
+          "callbacks": 2,
+          "discoveryMs": 0.599999999627471,
+          "maxTaskMs": 0.39999999944120646,
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1895,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "observer-baseline",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Configuration overview | Docs",
+            "url": "https://docs.astro.build/en/guides/configuring-astro/"
+          },
+          "records": 3,
+          "tasks": 2,
+          "version": "observer",
+          "visits": 60
+        },
+        "auto": {
+          "callbacks": 0,
+          "discoveryMs": 0,
+          "maxTaskMs": 0,
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1955,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Configuration overview | Docs",
+            "url": "https://docs.astro.build/en/guides/configuring-astro/"
+          },
+          "records": 0,
+          "tasks": 0,
+          "version": "auto",
+          "visits": 0
+        },
+        "note": "Single Search open/Escape sequence; lazy loading differed between samples, so visit reduction shows avoided discovery but not equal-work UI latency."
+      },
+      "visual": "Installation screenshot reviewed: original headings, code monospace, body readable, sidebars and TOC aligned, no overflow. No auto-only breakage observed. Configuration scroll generated1 callback/0.3ms in each observer sample vs0 auto.",
+      "routeCount": 3,
+      "performanceInterpretation": "Most settled scroll samples were zero-vs-zero. Any nonzero observer counts avoided by CSS are discovery work only, not page-load or whole-page responsiveness measurements."
+    },
+    {
+      "site": "vite.dev",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 55,
+            "bodyStyled": 55,
+            "changedProtected": [],
+            "elements": 664,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Vite | Next Generation Frontend Tooling",
+            "url": "https://vite.dev/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1281,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Getting Started | Vite",
+            "url": "https://vite.dev/guide/"
+          },
+          "runs": [
+            {
+              "callbacks": 2,
+              "discoveryMs": 0,
+              "elapsedMs": 807.2,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 17,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 812.5,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 3142,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Features | Vite",
+            "url": "https://vite.dev/guide/features"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        "Homepage Get Started -> Getting Started guide -> Features using sidebar",
+        "Clicked Resources control and pressed Escape; focused click succeeded, menu has no expanded ARIA nodes.",
+        "Scrolled all three routes"
+      ],
+      "visual": "Getting Started interior screenshot reviewed: readable typography, header navigation, TOC, speaker icon and sidebar; no overflow, code stays monospace. No auto-only visual or functional issue observed. Mostly zero-vs-zero steady-state; no measurable page-load gain claimed.",
+      "routeCount": 3,
+      "performanceInterpretation": "Most settled scroll samples were zero-vs-zero. Any nonzero observer counts avoided by CSS are discovery work only, not page-load or whole-page responsiveness measurements."
+    }
+  ]
+}

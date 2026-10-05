@@ -5,9 +5,6 @@
   const settingsApi = globalThis.LexendSettings;
   const STYLE_ID = "lexend-the-web-styles";
   const FONT_FAMILY = '"Lexend for the Web", sans-serif';
-  const DETECTOR_STATE_EVENT = "lexend-shadow-state-v1";
-  const SHADOW_ATTACHED_EVENT = "lexend-shadow-attached-v1";
-  const DETECTOR_PROBE_EVENT = "lexend-shadow-probe-v1";
   const styledRoots = new Map();
   const pendingNodes = new Set();
   const MAX_PENDING_NODES = 256;
@@ -20,10 +17,6 @@
   let settings = settingsApi.normalizeSettings();
   let effective = { active: false, scope: settings.scope };
   let documentCss = "";
-  let documentSheet;
-  let documentSheetCss = "";
-  let documentUsesSheet = false;
-  let canShareDocumentSheet = true;
   let shadowCss = "";
   let shadowSheet;
   let canShareSheet = typeof CSSStyleSheet === "function"
@@ -33,10 +26,6 @@
   let scheduledScan = null;
   let needsPrune = false;
   let observing = false;
-  let detectorReady = false;
-  let forceDiscovery = false;
-  let shadowSeen = false;
-  let bootstrapping = document.readyState === "loading";
   let loaded = false;
   let lastNotifiedState;
   let renderKey;
@@ -47,11 +36,6 @@
     "pre *",
     "code",
     "code *",
-    // CodeMirror renders source as divs/spans rather than semantic code tags.
-    ".CodeMirror",
-    ".CodeMirror *",
-    ".cm-editor",
-    ".cm-editor *",
     "kbd",
     "kbd *",
     "samp",
@@ -222,10 +206,6 @@
 
     if (isShadowRoot && canShareSheet && !state.style) {
       try {
-        if (!shadowSheet) {
-          shadowSheet = new CSSStyleSheet();
-          shadowSheet.replaceSync(shadowCss);
-        }
         if (!root.adoptedStyleSheets.includes(shadowSheet)) {
           root.adoptedStyleSheets = [...root.adoptedStyleSheets, shadowSheet];
         }
@@ -246,52 +226,6 @@
     } else if (state.style.textContent !== css) {
       state.style.textContent = css;
     }
-  };
-
-  const applyDocumentStyles = () => {
-    if (canShareSheet && canShareDocumentSheet) {
-      try {
-        documentSheet ??= new CSSStyleSheet();
-        if (documentSheetCss !== documentCss) {
-          documentSheet.replaceSync(documentCss);
-          documentSheetCss = documentCss;
-        }
-        if (!document.adoptedStyleSheets.includes(documentSheet)) {
-          document.adoptedStyleSheets = [...document.adoptedStyleSheets, documentSheet];
-        }
-        documentUsesSheet = true;
-        return;
-      } catch {
-        // Cache compartment/adoption failures instead of retrying for every
-        // page mutation. A previously adopted sheet must not override fallback CSS.
-        canShareDocumentSheet = false;
-        try {
-          document.adoptedStyleSheets = document.adoptedStyleSheets.filter((sheet) => sheet !== documentSheet);
-        } catch {}
-      }
-    }
-    // A DOM style needs the observer to repair removal/replacement by the site.
-    documentUsesSheet = false;
-    if (document.documentElement) applyToRoot(document.documentElement);
-  };
-
-  const observeDocument = () => {
-    if (observing || !effective.active) return;
-    observer.observe(document, { childList: true, subtree: true });
-    observing = true;
-  };
-
-  const getDiscoveryMode = () => {
-    if (!effective.active) return "paused";
-    if (shadowSeen) return "shadow";
-    if (forceDiscovery || !detectorReady || !documentUsesSheet) return "fallback";
-    return observing ? "discovering" : "css";
-  };
-
-  const enableDiscovery = (node = document.documentElement) => {
-    if (!effective.active) return;
-    observeDocument();
-    if (node) queueScan(node);
   };
 
   const scheduleScan = () => {
@@ -336,7 +270,7 @@
       pruneRoots();
       needsPrune = false;
     }
-    applyDocumentStyles();
+    if (document.documentElement) applyToRoot(document.documentElement);
 
     const stopAt = performance.now() + SCAN_BUDGET_MS;
     let visited = 0;
@@ -373,8 +307,6 @@
       scannedNodes.add(element);
       const shadow = element.shadowRoot;
       if (shadow) {
-        shadowSeen = true;
-        observeDocument();
         applyToRoot(shadow);
         scanStack.push({
           root: shadow,
@@ -385,13 +317,7 @@
       }
     }
     if (pendingNodes.size || scanStack.length || needsPrune) scheduleScan();
-    else {
-      scannedNodes = new WeakSet();
-      if (!bootstrapping && detectorReady && !forceDiscovery && !shadowSeen && documentUsesSheet) {
-        observer.disconnect();
-        observing = false;
-      }
-    }
+    else scannedNodes = new WeakSet();
   };
 
   const cancelScans = () => {
@@ -432,14 +358,6 @@
       cancelScans();
       // Clear first: even sheets retained by disconnected hosts must stop styling.
       try { shadowSheet?.replaceSync(""); } catch {}
-      try {
-        documentSheet?.replaceSync("");
-        documentSheetCss = "";
-        if (documentSheet) {
-          document.adoptedStyleSheets = document.adoptedStyleSheets.filter((sheet) => sheet !== documentSheet);
-        }
-      } catch {}
-      documentUsesSheet = false;
       styledRoots.forEach((state, root) => {
         state.observer?.disconnect();
         state.style?.remove();
@@ -454,21 +372,22 @@
     } else {
       documentCss = createCss(effective, false);
       shadowCss = createCss(effective, true);
-      if (canShareSheet && shadowSheet) {
+      if (canShareSheet) {
         try {
+          shadowSheet ??= new CSSStyleSheet();
           shadowSheet.replaceSync(shadowCss);
         } catch {
           canShareSheet = false;
         }
       }
-      applyDocumentStyles();
-      // Page frameworks may replace a native hook while the extension is
-      // paused. Recheck before a resumed document can return to CSS-only mode.
-      if (!wasActive) probeDetector();
-      if (!wasActive || shadowSeen || forceDiscovery || !detectorReady || !documentUsesSheet) observeDocument();
+      if (!observing) {
+        observer.observe(document, { childList: true, subtree: true });
+        observing = true;
+      }
       pruneRoots();
       styledRoots.forEach((_state, root) => applyToRoot(root));
       if (document.documentElement) {
+        applyToRoot(document.documentElement);
         // Readability changes update existing roots without rediscovering the DOM.
         if (!wasActive) queueScan(document.documentElement);
       }
@@ -479,15 +398,13 @@
 
   const handleMutations = (mutations) => {
     if (!effective.active) return;
-    if (!documentUsesSheet) applyDocumentStyles();
+    if (document.documentElement && !styledRoots.has(document.documentElement)) {
+      applyToRoot(document.documentElement);
+    }
 
     mutations.forEach(({ target, addedNodes, removedNodes }) => {
       // Replacing our own CSS creates text-node records, not new shadow hosts.
       if (target.id === STYLE_ID) return;
-      // A component may replace all children after attaching its root. Repair
-      // the style fallback without relying on a subsequent host insertion.
-      const state = styledRoots.get(target);
-      if (state?.style && !state.style.parentNode && target.isConnected) applyToRoot(target);
       if (removedNodes.length) {
         needsPrune = true;
         scheduleScan();
@@ -497,42 +414,6 @@
   };
 
   const observer = new MutationObserver(handleMutations);
-
-  document.addEventListener(DETECTOR_STATE_EVENT, (event) => {
-    if (event.detail === "ready") {
-      if (!detectorReady) {
-        detectorReady = true;
-        enableDiscovery();
-      }
-    } else if (["shadow", "watch", "fallback"].includes(event.detail)) {
-      if (event.detail === "shadow") shadowSeen = true;
-      else forceDiscovery = true;
-      // A native operation can add a root to a host already visited by an
-      // unfinished traversal. The conservative rescan must revisit that host.
-      scannedNodes = new WeakSet();
-      enableDiscovery();
-    }
-  });
-  document.addEventListener(SHADOW_ATTACHED_EVENT, (event) => {
-    const host = event.composedPath()[0];
-    if (!(host instanceof Element) || !host.shadowRoot) return;
-    shadowSeen = true;
-    scannedNodes.delete(host);
-    enableDiscovery(host);
-  }, true);
-
-  const probeDetector = () => document.dispatchEvent(new Event(DETECTOR_PROBE_EVENT));
-  document.addEventListener("DOMContentLoaded", () => {
-    bootstrapping = false;
-    probeDetector();
-    // Revisit hosts after parsing: declarative roots bypass attachShadow and
-    // may have appeared on a host that the early traversal already passed.
-    scannedNodes = new WeakSet();
-    enableDiscovery();
-  }, { once: true });
-  window.addEventListener("pageshow", probeDetector);
-  window.addEventListener("popstate", probeDetector);
-  probeDetector();
 
   const start = async () => {
     let stored;
@@ -573,8 +454,7 @@
       ready: loaded,
       active: effective.active,
       hostname: getEffectiveHostname(),
-      scope: effective.scope,
-      discoveryMode: getDiscoveryMode()
+      scope: effective.scope
     });
     return undefined;
   });

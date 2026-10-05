@@ -1,0 +1,2769 @@
+{
+  "auditor": "audit_shadow",
+  "status": "complete",
+  "siteCount": 7,
+  "measuredRouteCount": 22,
+  "method": "T3 collaborative preview ONLY. Latest local runtime and detector injected after page load with real packaged font buffers and mocked extension APIs. Four800ms natural scroll/idle windows alternate observer/auto/auto/observer; URLs and loadedFontBuffers3 plus font readiness checked. Inspected native controls in open roots; focused interactions preferred, DOM .click/input dispatch used on inspected controls when T3 selectors failed. No data published, submitted or account actions.",
+  "limitations": [
+    "Not an installed-extension/document_start or cross-browser test",
+    "Site samples cover selected meaningful flows, not every page or exhaustive application behavior",
+    "Some T3 client/screenshot state lag remained even under serialized access; mismatched-URL data excluded and control state verified by evaluate",
+    "Preview iframes audited only where navigated directly, otherwise explicitly noted as outside coverage",
+    "Mostly idle shadow-page runs cannot demonstrate improved real-world page speed; small unequal lazy-loading samples are not attributed speedups",
+    "Font coverage counter samples selected tags with getClientRects; slotted text and hidden duplicate labels require separate inspection"
+  ],
+  "findings": [
+    {
+      "severity": "found-and-fixed-existing-defect",
+      "site": "Lit",
+      "finding": "Live CodeMirror6 div/span editor text originally changed Roboto Mono→Lexend under old observer and automatic runtime. Runtime now excludes both .CodeMirror and .cm-editor subtrees; live retest preserves Roboto Mono while normal body/control text remains Lexend.",
+      "verification": {
+        "editor": [
+          {
+            "cls": "cm-line",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "div",
+            "text": "import {html, css, LitElement} from 'lit';"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "import"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "{"
+          },
+          {
+            "cls": "tok-variableName tok-definition",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "html"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": ","
+          },
+          {
+            "cls": "tok-variableName tok-definition",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "css"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": ","
+          },
+          {
+            "cls": "tok-variableName tok-definition",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "LitElement"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "}"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "from"
+          },
+          {
+            "cls": "tok-string",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "'lit'"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": ";"
+          },
+          {
+            "cls": "cm-line",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "div",
+            "text": "export class SimpleGreeting extends LitElement {"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "export"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "class"
+          }
+        ],
+        "inspect": {
+          "bodySamples": 44,
+          "bodyStyled": 44,
+          "changedProtected": [
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H1",
+              "text": "Examples"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Basics"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Reactive properties"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Template concepts"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Directives"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Managing Data"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "@lit/react"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "@lit-labs/motion"
+            }
+          ],
+          "elements": 273,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "shadow",
+          "openShadowRoots": 97,
+          "shadowStyled": 6,
+          "shadowText": 97,
+          "title": "Playground – Lit",
+          "url": "https://lit.dev/playground/"
+        },
+        "labels": [
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "text": "JS TS"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "text": "Search"
+          }
+        ]
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-lit-dev-muv19y2l-53459db0.png"
+    },
+    {
+      "severity": "existing-styling-limitation",
+      "site": "Material Web",
+      "finding": "Headings change Google Sans→Lexend under both observer and auto. Visible controls work;14uncovered shadow samples are hidden duplicate labels."
+    },
+    {
+      "severity": "automation-limitation",
+      "site": "Web Awesome",
+      "finding": "Dialog opens, but synthetic close test inconsistent even extension off. Cannot attribute to new mode."
+    }
+  ],
+  "sites": [
+    {
+      "site": "Shoelace",
+      "host": "shoelace.style",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2635,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 278,
+            "shadowStyled": 5,
+            "shadowText": 5,
+            "title": "Input",
+            "url": "https://shoelace.style/components/input"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Type local name demo input",
+              "result": {
+                "font": "\"Lexend for the Web\", sans-serif",
+                "nativeValue": "Lexend audit",
+                "value": "Lexend audit"
+              }
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-shoelace-style-muv0k1bg-a215c8e6.png"
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2597,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 185,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Dialog",
+            "url": "https://shoelace.style/components/dialog"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-shoelace-style-muv0ksbo-0d1b3a8b.png",
+          "controls": [
+            "Opened demo dialog (open=true confirmed), inspected screenshot and Escape dismissal"
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1522,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 180,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Checkbox",
+            "url": "https://shoelace.style/components/checkbox"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Toggle first checkbox using its native shadow input",
+              "result": {
+                "after": true,
+                "before": false,
+                "font": "\"Lexend for the Web\", sans-serif",
+                "label": "Checkbox"
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Three actual component documentation routes reached through sidebar links. All selected shadow mode with real open roots. No protected font changes or page overflow in measured view.",
+        "Idle scroll samples did no discovery work in either implementation; no real-world speed claim for these already-shadow pages.",
+        "T3 focused typing failed; inspected native shadow input was exercised with local input event dispatch and value confirmation."
+      ]
+    },
+    {
+      "site": "Web Awesome",
+      "host": "webawesome.com",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2644,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 611,
+            "shadowStyled": 1,
+            "shadowText": 1,
+            "title": "Dialog | Web Awesome",
+            "url": "https://webawesome.com/docs/components/dialog/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 804.1,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.2,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Open/close native demo dialog; necessary-only cookie choice",
+              "result": {
+                "closed": false,
+                "cookieOpen": true,
+                "opened": true
+              }
+            },
+            {
+              "action": "Rechecked with actual native buttons inside custom controls",
+              "result": {
+                "closed": false,
+                "cookieClosed": true,
+                "inspect": {
+                  "bodySamples": 100,
+                  "bodyStyled": 100,
+                  "changedProtected": [],
+                  "elements": 2646,
+                  "horizontalOverflow": 0,
+                  "lexendBoldReady": true,
+                  "lexendFontReady": true,
+                  "loadedFontBuffers": 3,
+                  "mode": "shadow",
+                  "openShadowRoots": 611,
+                  "shadowStyled": 1,
+                  "shadowText": 1,
+                  "title": "Dialog | Web Awesome",
+                  "url": "https://webawesome.com/docs/components/dialog/"
+                },
+                "opened": true
+              }
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-webawesome-com-muv0mld5-5e505e32.png"
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2898,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 695,
+            "shadowStyled": 12,
+            "shadowText": 12,
+            "title": "Input | Web Awesome",
+            "url": "https://webawesome.com/docs/components/input/"
+          },
+          "runs": [
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.5,
+              "elapsedMs": 805.6,
+              "maxTaskMs": 0.4,
+              "mode": "observer-baseline",
+              "records": 4,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 4
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.1,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0.1,
+              "mode": "shadow",
+              "records": 3,
+              "sample": 1,
+              "tasks": 1,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Enter text into native input within live component",
+              "result": {
+                "font": "\"Lexend for the Web\", sans-serif",
+                "nativeValue": "Lexend audit",
+                "value": "Lexend audit"
+              }
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 1876,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 564,
+            "shadowStyled": 1,
+            "shadowText": 1,
+            "title": "Checkbox | Web Awesome",
+            "url": "https://webawesome.com/docs/components/checkbox/"
+          },
+          "runs": [
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.2,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0.2,
+              "mode": "observer-baseline",
+              "records": 2,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 1
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.1,
+              "elapsedMs": 805.2,
+              "maxTaskMs": 0.1,
+              "mode": "shadow",
+              "records": 1,
+              "sample": 1,
+              "tasks": 1,
+              "version": "auto",
+              "visits": 12
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Toggle live checkbox native input",
+              "result": {
+                "after": true,
+                "before": false,
+                "label": "I agree to the terms and conditions"
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Actual main-document component roots; automatic mode shadow across three routes.",
+        "Tiny sporadic natural mutations occurred (4 visits baseline vs0 auto one sample), but unequal activity and mostly idle runs do not establish performance improvement.",
+        "Basic dialog opens. Synthetic native Close action inconsistent: off remained open, observer closed, auto remained open in final sequential check. No automatic-mode regression or successful closure is claimed. Cookie necessary-only, input and checkbox actions worked."
+      ],
+      "dialogBaselineParity": [
+        {
+          "closed": false,
+          "opened": true,
+          "version": "off"
+        },
+        {
+          "closed": true,
+          "opened": true,
+          "version": "observer"
+        },
+        {
+          "closed": false,
+          "opened": true,
+          "version": "auto"
+        }
+      ]
+    },
+    {
+      "site": "Spectrum Web Components",
+      "host": "spectrum-web-components.adobe.com",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 97,
+            "changedProtected": [],
+            "elements": 1624,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 30,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "components-button--docs",
+            "url": "https://spectrum-web-components.adobe.com/iframe.html?id=components-button--docs&viewMode=docs"
+          },
+          "runs": [
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.5,
+              "elapsedMs": 976.9,
+              "maxTaskMs": 0.4,
+              "mode": "observer-baseline",
+              "records": 12,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 180
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-spectrum-web-components-adobe-com-muv0ql2a-18ada7cf.png",
+          "controls": [
+            "Scrolled through button variants, sizes, pending/disabled examples; main-document SWC roots inspected"
+          ],
+          "sourceRoute": "https://spectrum-web-components.adobe.com/?path=/docs/components-button--docs",
+          "iframeNavigatedDirectly": true
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 97,
+            "changedProtected": [],
+            "elements": 1400,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 24,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "components-action-button--docs",
+            "url": "https://spectrum-web-components.adobe.com/iframe.html?id=components-action-button--docs&viewMode=docs"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.8,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "iframeNavigatedDirectly": true,
+          "controls": [
+            {
+              "action": "Expand code demo",
+              "result": {
+                "buttonNow": " Hide code",
+                "codePanels": 7,
+                "fonts": {
+                  "bodySamples": 100,
+                  "bodyStyled": 97,
+                  "changedProtected": [],
+                  "elements": 1403,
+                  "horizontalOverflow": 0,
+                  "lexendBoldReady": true,
+                  "lexendFontReady": true,
+                  "loadedFontBuffers": 3,
+                  "mode": "shadow",
+                  "openShadowRoots": 24,
+                  "shadowStyled": 0,
+                  "shadowText": 0,
+                  "title": "components-action-button--docs",
+                  "url": "https://spectrum-web-components.adobe.com/iframe.html?id=components-action-button--docs&viewMode=docs"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 97,
+            "changedProtected": [],
+            "elements": 1757,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 101,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "components-accordion--docs",
+            "url": "https://spectrum-web-components.adobe.com/iframe.html?id=components-accordion--docs&viewMode=docs"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "iframeNavigatedDirectly": true,
+          "controls": [
+            {
+              "action": "Expand actual shadow accordion header",
+              "result": {
+                "after": true,
+                "ariaExpanded": "true",
+                "before": false,
+                "contentFont": "\"Lexend for the Web\", sans-serif"
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Site now Storybook. Followed component tree links, then navigated exposed same-origin iframe URLs directly so roots and styles measured inside real demos.",
+        "Button/action/accordion docs have 24–101 open roots and select shadow mode. Code preserved; 3 body sample exclusions are Copy buttons inside code blocks. Idle except first Button sample rendering settling; no fair speed gain claim."
+      ]
+    },
+    {
+      "site": "Material Web",
+      "host": "material-web.dev",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 76,
+            "bodyStyled": 76,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H1",
+                "text": "Checkbox"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Interactive Demo"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Usage"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Accessibility"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Theming"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "API"
+              }
+            ],
+            "elements": 566,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 218,
+            "shadowStyled": 3,
+            "shadowText": 3,
+            "title": "Material Web - Checkbox",
+            "url": "https://material-web.dev/components/checkbox/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Toggle real Material checkbox",
+              "result": {
+                "after": true,
+                "before": false
+              }
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-material-web-dev-muv0t34d-11b08e3a.png"
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H1",
+                "text": "Dialogs"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Interactive Demo"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Usage"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Accessibility"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Theming"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "API"
+              }
+            ],
+            "elements": 857,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 221,
+            "shadowStyled": 3,
+            "shadowText": 3,
+            "title": "Material Web - Dialogs",
+            "url": "https://material-web.dev/components/dialog/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Open navigation drawer through Material icon button",
+              "result": {
+                "drawerHtml": "<nav-drawer page-title=\"Dialogs\" has-toc=\"\"><top-app-bar slot=\"top-app-bar\" baseuri=\"/\"></top-app-bar><section slot=\"toc\"><div class=\"toc\"><ol><li><a href=\"#interactive-demo\">Inter",
+                "inspect": {
+                  "bodySamples": 100,
+                  "bodyStyled": 100,
+                  "changedProtected": [
+                    {
+                      "after": "\"Lexend for the Web\", sans-serif",
+                      "before": "\"Google Sans\", Roboto, system-ui",
+                      "tag": "H1",
+                      "text": "Dialogs"
+                    },
+                    {
+                      "after": "\"Lexend for the Web\", sans-serif",
+                      "before": "\"Google Sans\", Roboto, system-ui",
+                      "tag": "H2",
+                      "text": "Interactive Demo"
+                    },
+                    {
+                      "after": "\"Lexend for the Web\", sans-serif",
+                      "before": "\"Google Sans\", Roboto, system-ui",
+                      "tag": "H2",
+                      "text": "Usage"
+                    },
+                    {
+                      "after": "\"Lexend for the Web\", sans-serif",
+                      "before": "\"Google Sans\", Roboto, system-ui",
+                      "tag": "H2",
+                      "text": "Accessibility"
+                    },
+                    {
+                      "after": "\"Lexend for the Web\", sans-serif",
+                      "before": "\"Google Sans\", Roboto, system-ui",
+                      "tag": "H2",
+                      "text": "Theming"
+                    },
+                    {
+                      "after": "\"Lexend for the Web\", sans-serif",
+                      "before": "\"Google Sans\", Roboto, system-ui",
+                      "tag": "H2",
+                      "text": "API"
+                    }
+                  ],
+                  "elements": 857,
+                  "horizontalOverflow": 0,
+                  "lexendBoldReady": true,
+                  "lexendFontReady": true,
+                  "loadedFontBuffers": 3,
+                  "mode": "shadow",
+                  "openShadowRoots": 221,
+                  "shadowStyled": 3,
+                  "shadowText": 3,
+                  "title": "Material Web - Dialogs",
+                  "url": "https://material-web.dev/components/dialog/"
+                }
+              }
+            }
+          ],
+          "headingBaseline": {
+            "out": [
+              {
+                "version": "off",
+                "h1": "\"Google Sans\", Roboto, system-ui",
+                "protected": 0
+              },
+              {
+                "version": "observer",
+                "h1": "\"Lexend for the Web\", sans-serif",
+                "protected": 6
+              },
+              {
+                "version": "auto",
+                "h1": "\"Lexend for the Web\", sans-serif",
+                "protected": 6
+              }
+            ]
+          }
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H1",
+                "text": "Text field"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Types"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Interactive Demo"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Usage"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Accessibility"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Google Sans\", Roboto, system-ui",
+                "tag": "H2",
+                "text": "Filled text field"
+              }
+            ],
+            "elements": 2237,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 306,
+            "shadowStyled": 28,
+            "shadowText": 42,
+            "title": "Material Web - Text field",
+            "url": "https://material-web.dev/components/text-field/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            {
+              "action": "Type safe text into Material text field",
+              "result": {
+                "font": "\"Lexend for the Web\", sans-serif",
+                "native": "Lexend demo",
+                "value": "Lexend demo"
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Actual main-document roots 218–306, menus/checkbox/text-field interacted. Interactive Dialog playground iframe was not injected; counts are surrounding documentation/component UI only.",
+        "Headings inherit changed font on all routes; observer and auto both show same effect, pause restores Google Sans. Existing styling limitation, not introduced by CSS fast path. No layout overflow or broken icons observed.",
+        "14 unstyled shadow-text samples are Material hidden duplicate floating/resting labels (class label hidden), while visible input text is Lexend. Coarse getClientRects-only inspector counts these duplicates."
+      ],
+      "uncoveredShadowText": [
+        {
+          "cls": "label  hidden resting ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Outlined"
+        },
+        {
+          "cls": "label  hidden resting ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Filled"
+        },
+        {
+          "cls": "label  hidden resting ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Title"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Name*"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Comments"
+        },
+        {
+          "cls": "label  hidden resting ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Dollar amount"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Username"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Password"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Vertical resize"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Favorite food"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Password"
+        },
+        {
+          "cls": "label  hidden floating ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Username"
+        },
+        {
+          "cls": "label  hidden resting ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-outlined-field",
+          "tag": "SPAN",
+          "text": "Label"
+        },
+        {
+          "cls": "label  hidden resting ",
+          "font": "\"Google Sans\", Roboto, system-ui",
+          "root": "md-filled-field",
+          "tag": "SPAN",
+          "text": "Label"
+        }
+      ]
+    },
+    {
+      "site": "Lit",
+      "host": "lit.dev",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 27,
+            "bodyStyled": 27,
+            "changedProtected": [],
+            "elements": 560,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 76,
+            "shadowStyled": 5,
+            "shadowText": 5,
+            "title": "Lit",
+            "url": "https://lit.dev/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.8,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            "Inspected live home example and documentation/playground navigation"
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 96,
+            "bodyStyled": 96,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "Contents"
+              }
+            ],
+            "elements": 706,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 63,
+            "shadowStyled": 5,
+            "shadowText": 5,
+            "title": "Getting Started – Lit",
+            "url": "https://lit.dev/docs/getting-started/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            "Scrolled code samples, followed navigation into interactive playground"
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 44,
+            "bodyStyled": 44,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H1",
+                "text": "Examples"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "Basics"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "Reactive properties"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "Template concepts"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "Directives"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "Managing Data"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "@lit/react"
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Open Sans\", sans-serif",
+                "tag": "H2",
+                "text": "@lit-labs/motion"
+              }
+            ],
+            "elements": 273,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 97,
+            "shadowStyled": 79,
+            "shadowText": 79,
+            "title": "Playground – Lit",
+            "url": "https://lit.dev/playground/"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.8,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-lit-dev-muv0wtlt-6e66010f.png",
+          "controls": [
+            {
+              "action": "Toggle playground TypeScript/JavaScript tab",
+              "result": {
+                "after": "JS TS ",
+                "before": "JS TS ",
+                "counters": {
+                  "callbacks": 3,
+                  "discoveryMs": 0.2999999998137355,
+                  "maxTaskMs": 0.20000000018626451,
+                  "page": {
+                    "bodySamples": 44,
+                    "bodyStyled": 44,
+                    "changedProtected": [
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H1",
+                        "text": "Examples"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "Basics"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "Reactive properties"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "Template concepts"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "Directives"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "Managing Data"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "@lit/react"
+                      },
+                      {
+                        "after": "\"Lexend for the Web\", sans-serif",
+                        "before": "\"Open Sans\", sans-serif",
+                        "tag": "H2",
+                        "text": "@lit-labs/motion"
+                      }
+                    ],
+                    "elements": 273,
+                    "horizontalOverflow": 0,
+                    "lexendBoldReady": true,
+                    "lexendFontReady": true,
+                    "loadedFontBuffers": 3,
+                    "mode": "shadow",
+                    "openShadowRoots": 97,
+                    "shadowStyled": 97,
+                    "shadowText": 97,
+                    "title": "Playground – Lit",
+                    "url": "https://lit.dev/playground/"
+                  },
+                  "records": 172,
+                  "tasks": 2,
+                  "version": "auto",
+                  "visits": 62
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Playground editor/menu web components have97roots, all79 sampled shadow texts styled; language toggle executes and mutation discovery continues.",
+        "Rendered Hello World output is in a separate playground.lit.dev iframe and not included in main-document root/style coverage.",
+        "Found-and-fixed existing styling defect: CodeMirror6 .cm-editor div/span editor text previously changed Roboto Mono→Lexend in both observer and auto. After runtime exclusions added, actual line divs and syntax-token spans retain Roboto Mono; body44/44 and normal buttons still Lexend. Coarse shadowStyled drops97→6 because91code-editor samples are now correctly excluded. Inherited heading changes remain existing scope behavior."
+      ],
+      "baselineParity": [
+        {
+          "changedProtected": 0,
+          "editor": [
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "import {html, css, LitElement} from 'lit';"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "export class SimpleGreeting extends LitElement {"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "static styles = css`p { color: blue }`;"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "static properties = {"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "name: {type: String},"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "};"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "constructor() {"
+            },
+            {
+              "font": "\"Roboto Mono\", monospace",
+              "tag": "div",
+              "text": "super();"
+            }
+          ],
+          "heading": "\"Open Sans\", sans-serif",
+          "version": "off"
+        },
+        {
+          "changedProtected": 8,
+          "editor": [
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "import {html, css, LitElement} from 'lit';"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "export class SimpleGreeting extends LitElement {"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "static styles = css`p { color: blue }`;"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "static properties = {"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "name: {type: String},"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "};"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "constructor() {"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "super();"
+            }
+          ],
+          "heading": "\"Lexend for the Web\", sans-serif",
+          "version": "observer"
+        },
+        {
+          "changedProtected": 8,
+          "editor": [
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "import {html, css, LitElement} from 'lit';"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "export class SimpleGreeting extends LitElement {"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "static styles = css`p { color: blue }`;"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "static properties = {"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "name: {type: String},"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "};"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "constructor() {"
+            },
+            {
+              "font": "\"Lexend for the Web\", sans-serif",
+              "tag": "div",
+              "text": "super();"
+            }
+          ],
+          "heading": "\"Lexend for the Web\", sans-serif",
+          "version": "auto"
+        }
+      ],
+      "fixVerification": {
+        "editor": [
+          {
+            "cls": "cm-line",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "div",
+            "text": "import {html, css, LitElement} from 'lit';"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "import"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "{"
+          },
+          {
+            "cls": "tok-variableName tok-definition",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "html"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": ","
+          },
+          {
+            "cls": "tok-variableName tok-definition",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "css"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": ","
+          },
+          {
+            "cls": "tok-variableName tok-definition",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "LitElement"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "}"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "from"
+          },
+          {
+            "cls": "tok-string",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "'lit'"
+          },
+          {
+            "cls": "tok-punctuation",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": ";"
+          },
+          {
+            "cls": "cm-line",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "div",
+            "text": "export class SimpleGreeting extends LitElement {"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "export"
+          },
+          {
+            "cls": "tok-keyword",
+            "font": "\"Roboto Mono\", monospace",
+            "tag": "span",
+            "text": "class"
+          }
+        ],
+        "inspect": {
+          "bodySamples": 44,
+          "bodyStyled": 44,
+          "changedProtected": [
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H1",
+              "text": "Examples"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Basics"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Reactive properties"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Template concepts"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Directives"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "Managing Data"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "@lit/react"
+            },
+            {
+              "after": "\"Lexend for the Web\", sans-serif",
+              "before": "\"Open Sans\", sans-serif",
+              "tag": "H2",
+              "text": "@lit-labs/motion"
+            }
+          ],
+          "elements": 273,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "shadow",
+          "openShadowRoots": 97,
+          "shadowStyled": 6,
+          "shadowText": 97,
+          "title": "Playground – Lit",
+          "url": "https://lit.dev/playground/"
+        },
+        "labels": [
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "text": "JS TS"
+          },
+          {
+            "font": "\"Lexend for the Web\", sans-serif",
+            "text": "Search"
+          }
+        ]
+      },
+      "fixScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-lit-dev-muv19y2l-53459db0.png"
+    },
+    {
+      "site": "Vaadin",
+      "host": "vaadin.com",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 4498,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 15,
+            "shadowStyled": 12,
+            "shadowText": 12,
+            "title": "Checkbox component | Vaadin components",
+            "url": "https://vaadin.com/docs/latest/components/checkbox"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.3,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0.2,
+              "mode": "shadow",
+              "records": 30,
+              "sample": 0,
+              "tasks": 1,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 4,
+              "discoveryMs": 0.4,
+              "elapsedMs": 812.2,
+              "maxTaskMs": 0.1,
+              "mode": "shadow",
+              "records": 46,
+              "sample": 1,
+              "tasks": 3,
+              "version": "auto",
+              "visits": 223
+            },
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.5,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0.4,
+              "mode": "observer-baseline",
+              "records": 2,
+              "sample": 1,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 16
+            }
+          ],
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-vaadin-com-muv0yc8m-586b3900.png",
+          "controls": [
+            {
+              "action": "Toggle lazily loaded React/Vaadin checkbox",
+              "result": {
+                "after": true,
+                "before": false,
+                "font": "-apple-system, BlinkMacSystemFont, Roboto, \"Segoe UI\", Helvetica, Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\"",
+                "label": "I accept the terms and conditions"
+              }
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 4732,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Dialog component | Vaadin components",
+            "url": "https://vaadin.com/docs/latest/components/dialog"
+          },
+          "runs": [
+            {
+              "callbacks": 3,
+              "discoveryMs": 0.7,
+              "elapsedMs": 884.9,
+              "maxTaskMs": 0.3,
+              "mode": "observer-baseline",
+              "records": 5,
+              "sample": 0,
+              "tasks": 2,
+              "version": "observer",
+              "visits": 70
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 801.4,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            "Navigated docs sidebar; scrolled to expose lazy dialogs; actual main-document roots grew from0 to8"
+          ],
+          "limitation": "First live dialog example lives in iframe; measured separately at iframe URL"
+        },
+        {
+          "page": {
+            "bodySamples": 0,
+            "bodyStyled": 0,
+            "changedProtected": [],
+            "elements": 100,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 11,
+            "shadowStyled": 2,
+            "shadowText": 2,
+            "title": "",
+            "url": "https://vaadin.com/docs/latest/example?embed=dialog-basic-wc.js&import=component/dialog/dialog-basic.ts,component/dialog/react/dialog-basic.tsx&theme=lumo"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.6,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "iframeNavigatedDirectly": true,
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-vaadin-com-muv107m8-09b32e10.png",
+          "controls": [
+            {
+              "action": "Cancel/reopen local dialog and type without submitting",
+              "result": {
+                "cancelClosed": true,
+                "initialOpen": true,
+                "inputValue": "Lexend local",
+                "inspect": {
+                  "bodySamples": 0,
+                  "bodyStyled": 0,
+                  "changedProtected": [],
+                  "elements": 100,
+                  "horizontalOverflow": 0,
+                  "lexendBoldReady": true,
+                  "lexendFontReady": true,
+                  "loadedFontBuffers": 3,
+                  "mode": "shadow",
+                  "openShadowRoots": 11,
+                  "shadowStyled": 2,
+                  "shadowText": 2,
+                  "title": "",
+                  "url": "https://vaadin.com/docs/latest/example?embed=dialog-basic-wc.js&import=component/dialog/dialog-basic.ts,component/dialog/react/dialog-basic.tsx&theme=lumo"
+                },
+                "reopened": true
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Checkbox demos lazily attach real shadow roots in main document; fonts confirmed on12/12 sampled shadow text.",
+        "Dialog docs also use iframe: followed public iframe src directly and audited real dialog roots. Cancel, reopen and type work; no Add submitted.",
+        "Natural lazy loading differs across sample windows; total-work numbers cannot support a speed comparison on this site."
+      ]
+    },
+    {
+      "site": "Ionic",
+      "host": "ionicframework.com",
+      "pages": [
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 4090,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "ion-checkbox: Ionic App Checkbox to Select Multiple Options",
+            "url": "https://ionicframework.com/docs/api/checkbox"
+          },
+          "runs": [
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.4,
+              "elapsedMs": 858.5,
+              "maxTaskMs": 0.3,
+              "mode": "observer-baseline",
+              "records": 2,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 20
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 811.9,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.7,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            "Scrolled API docs; inspected preview iframe links"
+          ],
+          "limitation": "No main-document roots; actual components audited separately at public demo iframe URLs"
+        },
+        {
+          "page": {
+            "bodySamples": 0,
+            "bodyStyled": 0,
+            "changedProtected": [],
+            "elements": 18,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 2,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Checkbox",
+            "url": "https://ionicframework.com/docs/usage/v9/checkbox/basic/demo.html?ionic:mode=md"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "iframeNavigatedDirectly": true,
+          "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-ionicframework-com-muv11gvj-19e098e7.png",
+          "controls": [
+            {
+              "action": "Toggle component checkbox",
+              "result": {
+                "checked": true,
+                "hostFont": "\"Lexend for the Web\", sans-serif",
+                "labelFont": "\"Lexend for the Web\", sans-serif"
+              }
+            }
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 8741,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "ion-input: Custom Input With Styling and CSS Properties",
+            "url": "https://ionicframework.com/docs/api/input"
+          },
+          "runs": [
+            {
+              "callbacks": 1,
+              "discoveryMs": 0.3,
+              "elapsedMs": 871.4,
+              "maxTaskMs": 0.3,
+              "mode": "observer-baseline",
+              "records": 1,
+              "sample": 0,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 10
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.5,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 802.2,
+              "maxTaskMs": 0,
+              "mode": "css",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.9,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "controls": [
+            "Sidebar navigation Checkbox→Input; inspected documentation and public preview links"
+          ]
+        },
+        {
+          "page": {
+            "bodySamples": 5,
+            "bodyStyled": 5,
+            "changedProtected": [],
+            "elements": 70,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "shadow",
+            "openShadowRoots": 6,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Input",
+            "url": "https://ionicframework.com/docs/usage/v9/input/basic/demo.html?ionic:mode=md"
+          },
+          "runs": [
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.5,
+              "maxTaskMs": 0,
+              "mode": "shadow",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "elapsedMs": 800.4,
+              "maxTaskMs": 0,
+              "mode": "observer-baseline",
+              "records": 0,
+              "sample": 1,
+              "tasks": 0,
+              "version": "observer",
+              "visits": 0
+            }
+          ],
+          "iframeNavigatedDirectly": true,
+          "controls": [
+            {
+              "action": "Type into Ionic demo input",
+              "result": {
+                "font": "\"Lexend for the Web\", sans-serif",
+                "native": "Lexend audit",
+                "value": "Lexend audit"
+              }
+            }
+          ]
+        }
+      ],
+      "notes": [
+        "Documentation pages have0 main-document roots and automatically select CSS mode; real demo URLs have2 and6 roots and automatically select shadow mode.",
+        "Visited main docs through sidebar links and followed actual public preview iframe URLs directly. Ionic checkbox/input respond; labels and inputs use real Lexend fonts.",
+        "Docs first observer sample had10–20visits while auto samples had0; activity tiny and settling-dependent. No page-speed claim."
+      ]
+    }
+  ],
+  "failedAttempts": [
+    {
+      "url": "https://spectrum-web-components.adobe.com/components/button/",
+      "reason": "404 old URL; replaced by current Storybook route and direct public iframe docs"
+    }
+  ]
+}

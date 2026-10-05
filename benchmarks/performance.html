@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Lexend performance and compatibility harness</title>
+<style>
+  body { font: 16px system-ui; max-width: 1000px; margin: 30px auto; }
+  button { padding: 10px; margin-right: 10px; }
+  pre { white-space: pre-wrap; }
+  iframe { width: 900px; height: 300px; }
+</style>
+<h1>Lexend performance and compatibility harness</h1>
+<p>Runs the baseline and working copy in fresh frames with mocked extension APIs and real browser DOM/CSS. Timing includes discovery and style updates; counters measure extension work. This does not measure installed extension overhead.</p>
+<button id="bench">Run benchmarks</button><button id="checks">Run compatibility checks</button><button id="automatic">Run automatic mode checks</button>
+<pre id="results" aria-live="polite"></pre>
+<div id="frames"></div>
+<script src="/benchmarks/performance.js"></script>
+</html>

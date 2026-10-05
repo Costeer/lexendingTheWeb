@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-05",
+  "coverage": {
+    "websites": 21,
+    "distinctRoutes": 64,
+    "fontRecheckedInteriors": 8,
+    "scope": "Representative routes and controls; not an exhaustive website crawl"
+  },
+  "verification": {
+    "command": "npm run verify:firefox",
+    "unitTestsPassed": 72,
+    "unitTestsFailed": 0,
+    "staticChecks": "passed",
+    "chromePackage": "built",
+    "firefoxPackage": "built",
+    "firefoxLint": {
+      "errors": 0,
+      "notices": 0,
+      "warnings": 0
+    },
+    "diffWhitespaceCheck": "passed"
+  },
+  "browser": {
+    "checks": [
+      "CSS-only mutations and targeted late-root wake-up: passed",
+      "shadow attachment during unfinished startup discovery: passed",
+      "initial declarative shadow DOM: passed",
+      "dynamic declarative shadow DOM: passed",
+      "native clone behavior and conservative fallback: passed",
+      "missing detector fallback: passed",
+      "hook replacement while paused and resume fallback: passed",
+      "document-start manifest order and parser-created roots: passed"
+    ],
+    "url": "http://localhost:4174/?audit=final-2",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) T3Code(Nightly)/0.0.43-nightly.20260927.2365 Chrome/152.0.7977.130 Electron/44.4.2 Safari/537.36",
+    "compatibilityChecks": [
+      "shared: passed",
+      "fallback: passed",
+      "rejected-adoption: passed",
+      "storage startup race: passed",
+      "per-site pause: passed"
+    ],
+    "method": "Chromium T3 preview; real DOM/CSS and font buffers, mocked extension APIs. Live sites injected after load. Separate local fixture runs while the parser is active.",
+    "limits": [
+      "Does not validate installed-extension isolation, real document_start on live sites, or Firefox runtime.",
+      "Discovery counters/CPU do not measure whole-page speed or net hook overhead.",
+      "Original font-probe limitations, Kernel CSP asymmetry, and inconsistent Web Awesome dialog closing remain documented in the raw reports.",
+      "Live samples span successive runtime fixes; each report records provenance. Final fixtures and source hashes represent the final implementation."
+    ]
+  },
+  "sourceSha256": {
+    "src/content.js": "00ce6c4e08f315f93690c0482f558943ee148f4d3486e90e8ba95133e8a4d57a",
+    "src/shadow-detector.js": "f443a18035f27a31636cb8a9683aa4e74470057b55d64312c98642b5e74ab3c0",
+    "src/settings.js": "6fd3b8ce00cec5433a856bf6d0a2c157bdb6a9e755cad1404f8f871e06f61c42",
+    "manifests/manifest.chrome.json": "020b173cd569c65179c75c4228124783b2bcd6daa360c4427b6ee0b9c1787437",
+    "manifests/manifest.firefox.json": "80f5ce15c56d58ee7f392424ec49e047064c87d3a96900f359d3a7ff85b3d699",
+    "benchmarks/baselines/content-observer.js": "b03d8d66221aadbaaddde857c07f70989934c60c2b991d9967457d328a2a41c1",
+    "benchmarks/site-audit.template.js": "d4caa5c70c5e9e24179e03c74a1d418e0a8296e0398932a0566ffb1121f7de24",
+    "benchmarks/performance.js": "4848f8fbfd3c9ed58f9bb6b76043a4ff0ff4e68f8ef930e4ee30a0f4f6c44593",
+    "docs/audits/ordinary-sites.json": "96f9a584a0fb52de1d1664afb45a5f507589843150ed09538e70fefc1f8e4109",
+    "docs/audits/dynamic-sites.json": "ec999387424f20e54b6b5742244c6148e4064abcdf25ae340902e825e4898644",
+    "docs/audits/shadow-sites.json": "cc432d1aef06c5531516597d3ad465ac66215130c20ba008bcfe08b237abfecb",
+    "docs/audits/font-rechecks.json": "0c2e1dcc155c1cab3b3c6e629ecfa99536a9cae5d299192538bc1940cb7abf85"
+  }
+}

@@ -1,0 +1,1269 @@
+{
+  "status": "complete",
+  "purpose": "Final actual-glyph validation and paired control/navigation rechecks after discovering that loadedFontBuffers and computed-family coverage alone did not prove glyph rendering.",
+  "provenance": {
+    "probeSha256": "98bb1cab2960f727b7733e8d1d9d744209a10825e3115fba6a7237c32d388e50",
+    "probeGeneratedBy": "scripts/make-site-audit.mjs",
+    "probeTemplate": "benchmarks/site-audit.template.js",
+    "browser": "T3 collaborative preview, fresh tab_b, exclusive ownership",
+    "fontCorrection": "Both variants remove only duplicate Lexend CSS @font-face rules after launch and use preloaded real bundled FontFace buffers. Explicit regular400 and bold700 document.fonts.check results are retained.",
+    "relationToEarlierAudits": "This supplements ordinary-sites.json and dynamic-sites.json. Original raw rows remain unchanged and may reflect fallback-font rendering. The corrected comparisons here supersede original interior comparisons for the listed URLs only; original other routes retain that limitation."
+  },
+  "summary": {
+    "interiorSitesRechecked": 8,
+    "pairedScrollingRuns": 32,
+    "actualFonts": "All8 auto interior checks regular/bold ready; all8 baseline fonts ready, but Kernel baseline style application is CSP-blocked as detailed below.",
+    "visual": "Fresh auto and baseline screenshots inspected on all8 interiors. No auto-only functional/layout regression observed. Kernel baseline typography cannot be compared equivalently because CSP blocks its injected DOM stylesheet.",
+    "reactSearch": "With true regular/bold fonts in all4 trials, both observer trials visit61nodes and use0.5ms/1.6ms discovery CPU. Both auto trials use0nodes/0CPU. Search opens and Escape closes on every trial.",
+    "svelteTradeoff": "Fresh-home Docs SPA transition adds218discovery visits under auto (241vs23) because first conservative signal triggers full scan. No timing gain claimed."
+  },
+  "limitations": [
+    "After-load MAIN-world injection with mocked extension APIs; does not validate installed-extension document_start, isolated-world bridge or Firefox behavior.",
+    "Each refreshed interior has two alternating800ms scrolling trials per mode. Static zero-counter trials do not establish a user-visible speedup.",
+    "Kernel baseline DOM<style> insertion is blocked by pageCSP (sheet:null and console refusal), even though buffered fonts load. Auto constructed sheet applies; unequal typography invalidates an equivalent-layout baseline comparison there.",
+    "Short discovery CPU values are noisy and exclude overall browser layout/paint/network/page-script work.",
+    "Only representative pages and controls were inspected."
+  ],
+  "pages": [
+    {
+      "site": "Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/White-headed_fruit_dove",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 1654,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "White-headed fruit dove - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/White-headed_fruit_dove"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-en-wikipedia-org-muv1b1dt-0366ad3b.png",
+      "visual": "Body clearly Lexend; serif heading preserved; article/sidebar/infobox readable with no overlap.",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-en-wikipedia-org-muv1b1w2-be32b217.png",
+      "baselineFontVerification": {
+        "lexendFontReady": true,
+        "lexendBoldReady": true,
+        "bodyStyled": 100,
+        "bodySamples": 100,
+        "observedIn": "start('observer') result before paired baseline screenshot"
+      }
+    },
+    {
+      "site": "Hacker News",
+      "url": "https://news.ycombinator.com/item?id=49953495",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 11742,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Run Qwen 3.8 Flash Next (125B) on consumer hardware (RTX 4090) at 100T/s | Hacker News",
+          "url": "https://news.ycombinator.com/item?id=49953495"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 100,
+        "bodyStyled": 100,
+        "changedProtected": [],
+        "elements": 11743,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "Run Qwen 3.8 Flash Next (125B) on consumer hardware (RTX 4090) at 100T/s | Hacker News",
+        "url": "https://news.ycombinator.com/item?id=49953495"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-news-ycombinator-com-muv1bnpb-d1aaa73b.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-news-ycombinator-com-muv1bpga-795f9241.png",
+      "visual": "Actual Lexend renders in both versions. Discussion indentation, links and controls intact; code block retains monospace; no overflow."
+    },
+    {
+      "site": "Python documentation",
+      "url": "https://docs.python.org/3/tutorial/interpreter.html",
+      "comparison": {
+        "page": {
+          "bodySamples": 56,
+          "bodyStyled": 56,
+          "changedProtected": [],
+          "elements": 582,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "2. Using the Python Interpreter — Python 3.14.8 documentation",
+          "url": "https://docs.python.org/3/tutorial/interpreter.html"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 56,
+        "bodyStyled": 56,
+        "changedProtected": [],
+        "elements": 583,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "2. Using the Python Interpreter — Python 3.14.8 documentation",
+        "url": "https://docs.python.org/3/tutorial/interpreter.html"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-docs-python-org-muv1c7ow-1c2fd109.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-docs-python-org-muv1c7zk-3d6c1513.png",
+      "visual": "Confirmed regular/bold glyph readiness. Body and sidebar readable; headings retain native face, shell/Python tokens retain monospace; same layout in both modes."
+    },
+    {
+      "site": "Debian",
+      "url": "https://www.debian.org/support",
+      "comparison": {
+        "page": {
+          "bodySamples": 44,
+          "bodyStyled": 44,
+          "changedProtected": [],
+          "elements": 194,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Debian -- User Support",
+          "url": "https://www.debian.org/support"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 44,
+        "bodyStyled": 44,
+        "changedProtected": [],
+        "elements": 195,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "Debian -- User Support",
+        "url": "https://www.debian.org/support"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-debian-org-muv1cppo-3edf89a5.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-debian-org-muv1cpy8-a2abcffa.png",
+      "visual": "Actual Lexend regular/bold ready; support text, links and callout remain readable with intact margins; both modes visually match."
+    },
+    {
+      "site": "RFC Editor",
+      "url": "https://www.rfc-editor.org/series/rfc/",
+      "comparison": {
+        "page": {
+          "bodySamples": 84,
+          "bodyStyled": 84,
+          "changedProtected": [],
+          "elements": 419,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "What Is an RFC? | RFC Editor",
+          "url": "https://www.rfc-editor.org/series/rfc/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 1,
+            "discoveryMs": 0.3,
+            "elapsedMs": 801.5,
+            "maxTaskMs": 0.3,
+            "mode": "observer-baseline",
+            "records": 1,
+            "sample": 1,
+            "tasks": 1,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 84,
+        "bodyStyled": 84,
+        "changedProtected": [],
+        "elements": 422,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "What Is an RFC? | RFC Editor",
+        "url": "https://www.rfc-editor.org/series/rfc/"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-rfc-editor-org-muv1d3fw-459a4e2d.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-rfc-editor-org-muv1d3rn-e970720a.png",
+      "visual": "Actual Lexend regular/bold ready. Article, top navigation and right section list readable; no overflow or auto-specific visual difference."
+    },
+    {
+      "site": "Project Gutenberg",
+      "url": "https://www.gutenberg.org/ebooks/1342",
+      "comparison": {
+        "page": {
+          "bodySamples": 38,
+          "bodyStyled": 38,
+          "changedProtected": [],
+          "elements": 353,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Pride and Prejudice by Jane Austen | Project Gutenberg",
+          "url": "https://www.gutenberg.org/ebooks/1342"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.4,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 38,
+        "bodyStyled": 38,
+        "changedProtected": [],
+        "elements": 354,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "Pride and Prejudice by Jane Austen | Project Gutenberg",
+        "url": "https://www.gutenberg.org/ebooks/1342"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-gutenberg-org-muv1dp81-5cc0efd3.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-gutenberg-org-muv1dpjv-30e3b9db.png",
+      "visual": "Actual Lexend regular/bold ready. Book description, reader button, format list, header links intact; no layout difference between modes."
+    },
+    {
+      "site": "Kernel.org",
+      "url": "https://www.kernel.org/category/faq.html",
+      "comparison": {
+        "page": {
+          "bodySamples": 55,
+          "bodyStyled": 55,
+          "changedProtected": [],
+          "elements": 205,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "The Linux Kernel Archives - FAQ",
+          "url": "https://www.kernel.org/category/faq.html"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 55,
+        "bodyStyled": 0,
+        "changedProtected": [],
+        "elements": 206,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "The Linux Kernel Archives - FAQ",
+        "url": "https://www.kernel.org/category/faq.html"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-kernel-org-muv1e2r6-8afa15b6.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-kernel-org-muv1e2za-e544fd0e.png",
+      "visual": "Automatic mode renders true Lexend with preserved condensed headings, readable paragraphs and no overflow. Baseline typography differs because injected DOM style is CSP-blocked in this MAIN-world mock.",
+      "limitations": [
+        "Baseline injected <style> has sheet:null; console explicitly reports style-src/default-src CSP rejection. Buffered fonts are ready but no baseline Lexend CSS applies (0/55 body samples). Thus this route's scrolling results are discovery counts under unequal typography and not a like-for-like layout comparison. Installed extension isolated-world behavior is untested."
+      ]
+    },
+    {
+      "site": "React",
+      "url": "https://react.dev/learn/thinking-in-react",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 2924,
+          "horizontalOverflow": 0,
+          "lexendBoldReady": true,
+          "lexendFontReady": true,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Thinking in React – React",
+          "url": "https://react.dev/learn/thinking-in-react"
+        },
+        "runs": [
+          {
+            "callbacks": 2,
+            "discoveryMs": 0.8,
+            "elapsedMs": 800.8,
+            "maxTaskMs": 0.4,
+            "mode": "observer-baseline",
+            "records": 2,
+            "sample": 0,
+            "tasks": 2,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "baselineInspect": {
+        "bodySamples": 100,
+        "bodyStyled": 100,
+        "changedProtected": [],
+        "elements": 2925,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "Thinking in React – React",
+        "url": "https://react.dev/learn/thinking-in-react"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-react-dev-muv1fak0-173faf42.png",
+      "baselineScreenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-react-dev-muv1fbl6-8ebff1fc.png",
+      "visual": "True Lexend regular/bold ready. Article and sidebar readable; heading native face retained; both modes visually match. Search dialog opened and Escape closed it successfully in all four alternating interaction trials.",
+      "searchInteraction": [
+        {
+          "version": "observer",
+          "ready": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2925,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "observer-baseline",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "open": {
+            "counters": {
+              "callbacks": 3,
+              "discoveryMs": 1.2000000001862645,
+              "maxTaskMs": 0.40000000037252903,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2987,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "observer-baseline",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 3,
+              "tasks": 3,
+              "version": "observer",
+              "visits": 61
+            },
+            "dialogs": [
+              {
+                "class": "DocSearch-Modal",
+                "role": null,
+                "visible": true
+              }
+            ],
+            "searchInput": true
+          },
+          "closed": {
+            "counters": {
+              "callbacks": 4,
+              "discoveryMs": 1.6000000005587935,
+              "maxTaskMs": 0.40000000037252903,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2925,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "observer-baseline",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 4,
+              "tasks": 4,
+              "version": "observer",
+              "visits": 61
+            },
+            "dialogVisible": false,
+            "searchInputVisible": false
+          }
+        },
+        {
+          "version": "auto",
+          "ready": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2924,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "open": {
+            "counters": {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "maxTaskMs": 0,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2986,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "css",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            "dialogs": [
+              {
+                "class": "DocSearch-Modal",
+                "role": null,
+                "visible": true
+              }
+            ],
+            "searchInput": true
+          },
+          "closed": {
+            "counters": {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "maxTaskMs": 0,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2924,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "css",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            "dialogVisible": false,
+            "searchInputVisible": false
+          }
+        },
+        {
+          "version": "auto",
+          "ready": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2924,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "open": {
+            "counters": {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "maxTaskMs": 0,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2986,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "css",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            "dialogs": [
+              {
+                "class": "DocSearch-Modal",
+                "role": null,
+                "visible": true
+              }
+            ],
+            "searchInput": true
+          },
+          "closed": {
+            "counters": {
+              "callbacks": 0,
+              "discoveryMs": 0,
+              "maxTaskMs": 0,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2924,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "css",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 0,
+              "tasks": 0,
+              "version": "auto",
+              "visits": 0
+            },
+            "dialogVisible": false,
+            "searchInputVisible": false
+          }
+        },
+        {
+          "version": "observer",
+          "ready": {
+            "bodySamples": 100,
+            "bodyStyled": 100,
+            "changedProtected": [],
+            "elements": 2925,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "observer-baseline",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Thinking in React – React",
+            "url": "https://react.dev/learn/thinking-in-react"
+          },
+          "open": {
+            "counters": {
+              "callbacks": 1,
+              "discoveryMs": 0.2999999998137355,
+              "maxTaskMs": 0.2999999998137355,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2987,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "observer-baseline",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 1,
+              "tasks": 1,
+              "version": "observer",
+              "visits": 61
+            },
+            "dialogs": [
+              {
+                "class": "DocSearch-Modal",
+                "role": null,
+                "visible": true
+              }
+            ],
+            "searchInput": true
+          },
+          "closed": {
+            "counters": {
+              "callbacks": 2,
+              "discoveryMs": 0.5,
+              "maxTaskMs": 0.2999999998137355,
+              "page": {
+                "bodySamples": 100,
+                "bodyStyled": 100,
+                "changedProtected": [],
+                "elements": 2925,
+                "horizontalOverflow": 0,
+                "lexendBoldReady": true,
+                "lexendFontReady": true,
+                "loadedFontBuffers": 3,
+                "mode": "observer-baseline",
+                "openShadowRoots": 0,
+                "shadowStyled": 0,
+                "shadowText": 0,
+                "title": "Thinking in React – React",
+                "url": "https://react.dev/learn/thinking-in-react"
+              },
+              "records": 2,
+              "tasks": 2,
+              "version": "observer",
+              "visits": 61
+            },
+            "dialogVisible": false,
+            "searchInputVisible": false
+          }
+        }
+      ]
+    }
+  ],
+  "svelteNavigation": {
+    "from": "https://svelte.dev/",
+    "to": "https://svelte.dev/docs",
+    "observer": {
+      "before": {
+        "bodySamples": 6,
+        "bodyStyled": 6,
+        "changedProtected": [
+          {
+            "after": "\"Lexend for the Web\", sans-serif",
+            "before": "\"Fira Sans\", -apple-system, sans-serif",
+            "tag": "SPAN",
+            "text": ""
+          },
+          {
+            "after": "\"Lexend for the Web\", sans-serif",
+            "before": "\"Fira Sans\", -apple-system, sans-serif",
+            "tag": "SPAN",
+            "text": ""
+          },
+          {
+            "after": "\"Lexend for the Web\", sans-serif",
+            "before": "\"Fira Sans\", -apple-system, sans-serif",
+            "tag": "SPAN",
+            "text": ""
+          }
+        ],
+        "elements": 413,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "observer-baseline",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "Svelte • Web development for the rest of us",
+        "url": "https://svelte.dev/"
+      },
+      "after": {
+        "auditPresent": true,
+        "counters": {
+          "callbacks": 5,
+          "discoveryMs": 0.7999999998137355,
+          "maxTaskMs": 0.40000000037252903,
+          "page": {
+            "bodySamples": 7,
+            "bodyStyled": 7,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              }
+            ],
+            "elements": 243,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "observer-baseline",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Docs • Svelte",
+            "url": "https://svelte.dev/docs"
+          },
+          "records": 18,
+          "tasks": 2,
+          "version": "observer",
+          "visits": 23
+        },
+        "url": "https://svelte.dev/docs"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-svelte-dev-muv1gq59-4ac895ca.png"
+    },
+    "auto": {
+      "before": {
+        "bodySamples": 6,
+        "bodyStyled": 6,
+        "changedProtected": [
+          {
+            "after": "\"Lexend for the Web\", sans-serif",
+            "before": "\"Fira Sans\", -apple-system, sans-serif",
+            "tag": "SPAN",
+            "text": ""
+          },
+          {
+            "after": "\"Lexend for the Web\", sans-serif",
+            "before": "\"Fira Sans\", -apple-system, sans-serif",
+            "tag": "SPAN",
+            "text": ""
+          },
+          {
+            "after": "\"Lexend for the Web\", sans-serif",
+            "before": "\"Fira Sans\", -apple-system, sans-serif",
+            "tag": "SPAN",
+            "text": ""
+          }
+        ],
+        "elements": 412,
+        "horizontalOverflow": 0,
+        "lexendBoldReady": true,
+        "lexendFontReady": true,
+        "loadedFontBuffers": 3,
+        "mode": "css",
+        "openShadowRoots": 0,
+        "shadowStyled": 0,
+        "shadowText": 0,
+        "title": "Svelte • Web development for the rest of us",
+        "url": "https://svelte.dev/"
+      },
+      "after": {
+        "auditPresent": true,
+        "counters": {
+          "callbacks": 4,
+          "discoveryMs": 0.20000000018626451,
+          "maxTaskMs": 0.10000000055879354,
+          "page": {
+            "bodySamples": 7,
+            "bodyStyled": 7,
+            "changedProtected": [
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              },
+              {
+                "after": "\"Lexend for the Web\", sans-serif",
+                "before": "\"Fira Sans\", -apple-system, sans-serif",
+                "tag": "SPAN",
+                "text": ""
+              }
+            ],
+            "elements": 242,
+            "horizontalOverflow": 0,
+            "lexendBoldReady": true,
+            "lexendFontReady": true,
+            "loadedFontBuffers": 3,
+            "mode": "fallback",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Docs • Svelte",
+            "url": "https://svelte.dev/docs"
+          },
+          "records": 16,
+          "tasks": 1,
+          "version": "auto",
+          "visits": 241
+        },
+        "url": "https://svelte.dev/docs"
+      },
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-svelte-dev-muv1hhfs-05105837.png"
+    },
+    "finding": "The conservative auto promotion performs a full-document discovery pass during this SPA transition:241 visits versus observer23,218 extra visits. CPU0.2ms versus0.8ms is below a useful timing confidence threshold and asynchronous page work was not controlled; no navigation-speed improvement is inferred.",
+    "method": "Separate fresh homepage loads per variant, inject same corrected font probe, start desired variant, verify regular/bold ready, reset discovery counters, click observed Docs link, capture counters after1200ms. Runtime survived SPA navigation. One paired transition only.",
+    "visual": "Both variants reached https://svelte.dev/docs with regular/bold Lexend ready, all7 sampled body nodes styled, no horizontal overflow and visually matching documentation page. Three empty decorative spans change computed font in both modes; no icon appearance break observed.",
+    "limitations": [
+      "This is one route transition per version with unequal possible asynchronous loads and browser cache state. Counted extension discovery work is useful; timing is not a page-navigation benchmark.",
+      "MAIN-world injected/mocked APIs, not installed extension.",
+      "Auto conservatively changes to fallback after native cloning/parsing. The added node visits are an observed performance tradeoff."
+    ]
+  }
+}

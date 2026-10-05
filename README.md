@@ -13,6 +13,8 @@ A Chrome and Firefox extension that replaces website typography with
 - Use `Ctrl+Shift+L` (`Command+Shift+L` on macOS) to toggle the current site.
 - Import, export, and sync settings through browser storage.
 - Keep code, mathematical notation, SVGs, and common icon fonts unchanged.
+- Automatically stop DOM discovery on ordinary pages, and wake it when open
+  shadow components appear. No site classification or extra setting is needed.
 
 The font files are bundled with the extension. It does not use analytics or
 send page content to a server.
@@ -31,6 +33,14 @@ npm run verify:firefox
 ```
 
 Browser-ready files are written to `dist/chrome` and `dist/firefox`.
+
+### Performance
+
+`npm run benchmark` serves a browser harness at `http://localhost:4174` to
+compare the working copy with `HEAD`; pass a Git reference to compare with
+another revision. It also runs DOM/CSS compatibility and automatic-mode checks. See the
+[automatic CSS-only mode explanation](docs/css-only-mode.md) for how pages
+automatically stop and resume DOM discovery.
 
 ### Load in Chrome
 

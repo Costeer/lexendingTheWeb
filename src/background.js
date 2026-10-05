@@ -14,17 +14,23 @@
       `assets/icons/icon${active ? "" : "-off"}-${size}.png`
     ])
   );
+  const icons = { active: iconPaths(true), paused: iconPaths(false) };
+  const tabStates = new Map();
 
   const setTabState = async (tabId, active) => {
     if (tabId === undefined) return;
+    if (tabStates.get(tabId) === active) return;
+    tabStates.set(tabId, active);
 
     await Promise.all([
-      extension.action.setIcon({ tabId, path: iconPaths(active) }),
+      extension.action.setIcon({ tabId, path: icons[active ? "active" : "paused"] }),
       extension.action.setTitle({
         tabId,
         title: `Lexend for the Web: ${active ? "active" : "paused"}`
       })
-    ]).catch(() => {});
+    ]).catch(() => {
+      if (tabStates.get(tabId) === active) tabStates.delete(tabId);
+    });
   };
 
   const updateAllTabs = async () => {
@@ -33,7 +39,7 @@
     );
 
     await Promise.all([
-      extension.action.setIcon({ path: iconPaths(settings.enabled) }),
+      extension.action.setIcon({ path: icons[settings.enabled ? "active" : "paused"] }),
       extension.action.setTitle({
         title: `Lexend for the Web: ${settings.enabled ? "active" : "paused"}`
       })
@@ -89,6 +95,10 @@
     if (changeInfo.status === "loading" || changeInfo.url) {
       setTabState(tabId, false);
     }
+  });
+
+  extension.tabs.onRemoved?.addListener((tabId) => {
+    tabStates.delete(tabId);
   });
 
   extension.storage.onChanged.addListener((changes, areaName) => {

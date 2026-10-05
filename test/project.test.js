@@ -26,6 +26,16 @@ test("browser manifests describe the same extension", async () => {
   }
 
   assert.deepEqual(chrome.permissions, ["storage"]);
+  for (const manifest of [chrome, firefox]) {
+    const isolated = manifest.content_scripts.find(({ js }) => js.includes("src/content.js"));
+    const detector = manifest.content_scripts.find(({ js }) => js.includes("src/shadow-detector.js"));
+    assert.ok(detector, "automatic discovery needs a page-world detector");
+    assert.equal(detector.world, "MAIN");
+    assert.equal(detector.run_at, "document_start");
+    for (const key of ["matches", "all_frames", "match_about_blank", "match_origin_as_fallback"]) {
+      assert.deepEqual(detector[key], isolated[key], `detector and isolated coverage agree: ${key}`);
+    }
+  }
   assert.equal(chrome.options_ui.page, "options.html");
   assert.equal(chrome.commands["toggle-current-site"].suggested_key.default,
     "Ctrl+Shift+L");

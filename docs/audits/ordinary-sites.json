@@ -1,0 +1,1766 @@
+{
+  "agent": "audit_ordinary",
+  "status": "complete",
+  "testedSites": 7,
+  "measuredRoutes": 21,
+  "siteNames": [
+    "Wikipedia",
+    "Hacker News",
+    "Python documentation",
+    "Debian",
+    "RFC Editor",
+    "Project Gutenberg",
+    "Kernel.org"
+  ],
+  "method": {
+    "browser": "T3 collaborative browser only",
+    "environment": "Real live website DOM, page scripts and safe navigation; extension APIs mocked; content and detector injected after load.",
+    "comparison": "Two alternating observer/auto 800ms scrolling samples per route; baseline/auto order alternates per sample.",
+    "metrics": "MutationObserver callbacks/records, TreeWalker node visits, scheduled tasks and discovery CPU. Does not measure total page load, whole-page CPU, input latency or installed-extension startup.",
+    "controls": "Followed real internal links, exercised menus, table of contents, search, comment collapse and disclosures; no accounts, messages, purchases or other external mutations.",
+    "fontProbe": "Three actual Lexend font buffers loaded. Computed-family coverage initially reported by probe is not sufficient to prove glyph loading; HN and Kernel CSS data URLs were blocked, so visual retests suppressed six mocked CSS @font-face declarations and used buffered faces."
+  },
+  "summary": {
+    "allAutomaticModes": "css",
+    "allObservedOpenRoots": 0,
+    "breakage": "No functional or layout regression observed on inspected routes/controls. Headings/code protected, no horizontal document overflow recorded. This is sampled coverage, not exhaustive website inspection.",
+    "performance": "20/21 routes had zero discovery CPU/callbacks/visits in both paths during measured scrolling, so no demonstrated steady-state speedup. One RFC article observer sample used 1.2ms and the other 0ms, versus auto both0. RFC search author expansion single comparison used observer1callback/4visits/0.2ms vs auto0, a real but small saved cost."
+  },
+  "exclusions": [
+    {
+      "url": "https://www.gnu.org/",
+      "reason": "HTTP403 Forbidden; excluded from coverage and replaced with Debian."
+    },
+    {
+      "url": "https://www.rfc-editor.org/info/rfc9110/",
+      "reason": "Real search link followed and huge full text page loaded. Instrumented comparison exceeded 15s browser tool timeout; no performance result counted. Replaced with RFC explanatory article route."
+    }
+  ],
+  "limitations": [
+    "Not an installed extension; no genuine document_start, isolated-world bridge, browser chrome or Firefox behavior validated here.",
+    "Only sampled representative routes and controls; cannot inspect every page of these websites.",
+    "Sites change; URLs/titles and raw comparisons reflect this run. DOM sizes can change between visits.",
+    "Multiple T3 clients intermittently targeted stale same-tab documents, even after exclusive browser ownership. Wrong-URL attempts were discarded. All retained comparisons have expected URLs and three loaded font buffers. Successful snapshots saved for all7sites.",
+    "Measured scrolling samples are short and low-resolution CPU results near0 are noisy. Do not translate discovery savings into page-load speedup or user-visible latency gains.",
+    "The initial probe captures protected nodes at injection; on RFC SPA navigations detached initial nodes limit changedProtected coverage, so interior screenshot inspection supplemented it.",
+    "No page in this ordinary-site batch used an open shadow root; shadow mode covered separately by another agent."
+  ],
+  "pages": [
+    {
+      "site": "Wikipedia",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 2423,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Wikipedia, the free encyclopedia",
+          "url": "https://en.wikipedia.org/wiki/Main_Page"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled during alternating measurements.",
+        "Opened Main menu and followed featured-article link."
+      ],
+      "findings": "No protected font changes or overflow; no measurable steady-state scanning gain.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Wikipedia",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 1654,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "White-headed fruit dove - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/White-headed_fruit_dove"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.4,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 808.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Opened featured bird article by main-page link.",
+        "Scrolled and checked article TOC, image infobox and scientific-name formatting."
+      ],
+      "findings": "No protected font changes or overflow.",
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-en-wikipedia-org-muuzj1e3-503e1ca8.png",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected"
+    },
+    {
+      "site": "Wikipedia",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 2194,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "John Gould - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/John_Gould"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 812.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed John Gould link from featured article after checking Description TOC jump.",
+        "Scrolled and inspected biography, sidebar TOC and links."
+      ],
+      "findings": "No protected font changes or overflow. Article heading retains serif font, body uses Lexend.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Hacker News",
+      "comparison": {
+        "page": {
+          "bodySamples": 96,
+          "bodyStyled": 96,
+          "changedProtected": [],
+          "elements": 818,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Hacker News",
+          "url": "https://news.ycombinator.com/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.3,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.3,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled front-page table then followed article comments."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected",
+      "fontMeasurementLimitation": "Original measurements count computed CSS font assignment. Representative interior page was subsequently rechecked with actual loaded Lexend after suppressing CSP-blocked mocked data: font-face declarations."
+    },
+    {
+      "site": "Hacker News",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 11611,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Run Qwen 3.8 Flash Next (125B) on consumer hardware (RTX 4090) at 100T/s | Hacker News",
+          "url": "https://news.ycombinator.com/item?id=49953495"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 833.9,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.2,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed comments link from front page.",
+        "Scrolled long discussion.",
+        "Collapsed and expanded first thread; observed .coll class and [38 more] label.",
+        "Repeated comment collapse/expand after successful actual Lexend font loading; no horizontal overflow."
+      ],
+      "findings": "Collapse/expand comment thread works; preformatted code remains monospace. No overflow or protected-font changes. Screenshot inspected.",
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-news-ycombinator-com-muv00lbu-e483e6cc.png",
+      "limitations": [
+        "Data URL @font-face blocked by site CSP in mocked extension; six failed CSS FontFace rules suppressed for this visual check so loaded buffer faces provide actual Lexend. Original performance comparisons measured CSS font family assignment, not successful glyph loading."
+      ],
+      "fontVerification": {
+        "before": false,
+        "after": true,
+        "removedFailedCssFontFaces": 6,
+        "font": "Lexend for the Web"
+      },
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected",
+      "fontMeasurementLimitation": "Original measurements count computed CSS font assignment. Representative interior page was subsequently rechecked with actual loaded Lexend after suppressing CSP-blocked mocked data: font-face declarations."
+    },
+    {
+      "site": "Hacker News",
+      "comparison": {
+        "page": {
+          "bodySamples": 59,
+          "bodyStyled": 59,
+          "changedProtected": [],
+          "elements": 444,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Ask | Hacker News",
+          "url": "https://news.ycombinator.com/ask"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 803.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.1,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed Ask navigation from comments page.",
+        "Scrolled Ask list and checked links."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected",
+      "fontMeasurementLimitation": "Original measurements count computed CSS font assignment. Representative interior page was subsequently rechecked with actual loaded Lexend after suppressing CSP-blocked mocked data: font-face declarations."
+    },
+    {
+      "site": "Python documentation",
+      "comparison": {
+        "page": {
+          "bodySamples": 75,
+          "bodyStyled": 75,
+          "changedProtected": [],
+          "elements": 497,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "3.14.8 Documentation",
+          "url": "https://docs.python.org/3/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.4,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.4,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled documentation index.",
+        "Followed Tutorial navigation link."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Python documentation",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 666,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "The Python Tutorial — Python 3.14.8 documentation",
+          "url": "https://docs.python.org/3/tutorial/index.html"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 803.3,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed Tutorial index.",
+        "Scrolled table of contents; clicked Using the Python Interpreter."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Python documentation",
+      "comparison": {
+        "page": {
+          "bodySamples": 56,
+          "bodyStyled": 56,
+          "changedProtected": [],
+          "elements": 582,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "2. Using the Python Interpreter — Python 3.14.8 documentation",
+          "url": "https://docs.python.org/3/tutorial/interpreter.html"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed Using the Python Interpreter chapter.",
+        "Scrolled chapter; inspected code and navigation.",
+        "Clicked sidebar Interactive Mode TOC link; anchor navigation scrolled correctly."
+      ],
+      "findings": "No overflow or protected font changes; code remains monospace.",
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-docs-python-org-muuzpw0n-eb28ff2a.png",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected"
+    },
+    {
+      "site": "Debian",
+      "comparison": {
+        "page": {
+          "bodySamples": 14,
+          "bodyStyled": 14,
+          "changedProtected": [],
+          "elements": 267,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Debian -- The Universal Operating System",
+          "url": "https://www.debian.org/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled homepage and inspected navigation links."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Debian",
+      "comparison": {
+        "page": {
+          "bodySamples": 44,
+          "bodyStyled": 44,
+          "changedProtected": [],
+          "elements": 194,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Debian -- User Support",
+          "url": "https://www.debian.org/support"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed homepage User Support link.",
+        "Scrolled support directory and inspected section anchors.",
+        "Clicked Known Problems table-of-contents anchor; scroll worked."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-debian-org-muuzr4ne-c3958ed1.png",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected"
+    },
+    {
+      "site": "Debian",
+      "comparison": {
+        "page": {
+          "bodySamples": 52,
+          "bodyStyled": 52,
+          "changedProtected": [],
+          "elements": 227,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Debian -- Documentation",
+          "url": "https://www.debian.org/doc/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed documentation link from User Support page.",
+        "Scrolled documentation directory and inspected user/admin manual links."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "RFC Editor",
+      "comparison": {
+        "page": {
+          "bodySamples": 80,
+          "bodyStyled": 80,
+          "changedProtected": [],
+          "elements": 546,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "RFC Editor",
+          "url": "https://www.rfc-editor.org/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.7,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled RFC Editor homepage.",
+        "Opened/closed RFC Series dropdown; submitted read-only RFC 9110 search successfully."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "RFC Editor",
+      "comparison": {
+        "page": {
+          "bodySamples": 85,
+          "bodyStyled": 85,
+          "changedProtected": [],
+          "elements": 915,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Search | RFC Editor",
+          "url": "https://www.rfc-editor.org/search/?q=9110"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.4,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Submitted RFC 9110 search from homepage; results rendered via SPA.",
+        "Scrolled result filters and links.",
+        "Expanded, collapsed and expanded author filter in observer and auto modes; new labels inherit Lexend."
+      ],
+      "findings": "No overflow or protected font changes; SPA retains CSS coverage.",
+      "interactionComparison": {
+        "action": "Expand author filter using Show more authors",
+        "observer": {
+          "callbacks": 1,
+          "discoveryMs": 0.2000000011175871,
+          "maxTaskMs": 0.10000000055879354,
+          "page": {
+            "bodySamples": 87,
+            "bodyStyled": 87,
+            "changedProtected": [],
+            "elements": 921,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "observer-baseline",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Search | RFC Editor",
+            "url": "https://www.rfc-editor.org/search/?q=9110"
+          },
+          "records": 1,
+          "tasks": 1,
+          "version": "observer",
+          "visits": 4
+        },
+        "auto": {
+          "callbacks": 0,
+          "discoveryMs": 0,
+          "maxTaskMs": 0,
+          "page": {
+            "bodySamples": 87,
+            "bodyStyled": 87,
+            "changedProtected": [],
+            "elements": 920,
+            "horizontalOverflow": 0,
+            "loadedFontBuffers": 3,
+            "mode": "css",
+            "openShadowRoots": 0,
+            "shadowStyled": 0,
+            "shadowText": 0,
+            "title": "Search | RFC Editor",
+            "url": "https://www.rfc-editor.org/search/?q=9110"
+          },
+          "records": 0,
+          "tasks": 0,
+          "version": "auto",
+          "visits": 0
+        }
+      },
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "RFC Editor",
+      "comparison": {
+        "page": {
+          "bodySamples": 86,
+          "bodyStyled": 86,
+          "changedProtected": [],
+          "elements": 437,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "What Is an RFC? | RFC Editor",
+          "url": "https://www.rfc-editor.org/series/rfc/"
+        },
+        "runs": [
+          {
+            "callbacks": 1,
+            "discoveryMs": 1.2,
+            "elapsedMs": 803.7,
+            "maxTaskMs": 1.1,
+            "mode": "observer-baseline",
+            "records": 2,
+            "sample": 0,
+            "tasks": 1,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.8,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 803.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Opened RFC Series menu from search and followed What is an RFC.",
+        "Scrolled explanatory article."
+      ],
+      "findings": "No overflow or protected font changes; menus and SPA navigation work.",
+      "limitations": [
+        "An additional RFC9110 full-text route loaded, but instrumentation timed out; excluded from measured coverage."
+      ],
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-rfc-editor-org-muuzvksp-8b6c128c.png",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected"
+    },
+    {
+      "site": "Project Gutenberg",
+      "comparison": {
+        "page": {
+          "bodySamples": 41,
+          "bodyStyled": 41,
+          "changedProtected": [],
+          "elements": 376,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Free eBooks | Project Gutenberg",
+          "url": "https://www.gutenberg.org/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.7,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.4,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 802.9,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.1,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled homepage; checked book cards and categories.",
+        "Searched Pride and Prejudice using site search."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Project Gutenberg",
+      "comparison": {
+        "page": {
+          "bodySamples": 25,
+          "bodyStyled": 25,
+          "changedProtected": [],
+          "elements": 218,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Books: Pride and Prejudice - Project Gutenberg",
+          "url": "https://www.gutenberg.org/ebooks/search/?query=Pride+and+Prejudice"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.2,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Read search results for Pride and Prejudice.",
+        "Scrolled search results."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected"
+    },
+    {
+      "site": "Project Gutenberg",
+      "comparison": {
+        "page": {
+          "bodySamples": 38,
+          "bodyStyled": 38,
+          "changedProtected": [],
+          "elements": 353,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "Pride and Prejudice by Jane Austen | Project Gutenberg",
+          "url": "https://www.gutenberg.org/ebooks/1342"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.3,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.1,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Opened Pride and Prejudice book detail from search results.",
+        "Scrolled book metadata and reading options.",
+        "Expanded Other formats & older devices disclosure; plain text, HTML, EPUB and Kindle links shown."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-gutenberg-org-muuzwr8q-2dafa9c9.png",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected"
+    },
+    {
+      "site": "Kernel.org",
+      "comparison": {
+        "page": {
+          "bodySamples": 100,
+          "bodyStyled": 100,
+          "changedProtected": [],
+          "elements": 308,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "The Linux Kernel Archives",
+          "url": "https://www.kernel.org/"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.1,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.1,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.2,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.2,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Scrolled Linux Kernel Archives homepage; inspected release table and navigation."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected",
+      "fontMeasurementLimitation": "Original measurements count computed CSS font assignment. Representative interior page was subsequently rechecked with actual loaded Lexend after suppressing CSP-blocked mocked data: font-face declarations."
+    },
+    {
+      "site": "Kernel.org",
+      "comparison": {
+        "page": {
+          "bodySamples": 55,
+          "bodyStyled": 55,
+          "changedProtected": [],
+          "elements": 205,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "The Linux Kernel Archives - FAQ",
+          "url": "https://www.kernel.org/category/faq.html"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.5,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 800.9,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.3,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.3,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed FAQ navigation from homepage.",
+        "Scrolled FAQ and inspected question/answer formatting."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "screenshot": "/home/costeer/.t3/userdata/browser-artifacts/browser-screenshot-www-kernel-org-muv01hdd-dcc5df25.png",
+      "fontVerification": {
+        "after": true,
+        "before": false,
+        "page": {
+          "bodySamples": 55,
+          "bodyStyled": 55,
+          "changedProtected": [],
+          "elements": 205,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "The Linux Kernel Archives - FAQ",
+          "url": "https://www.kernel.org/category/faq.html"
+        },
+        "removed": 6
+      },
+      "limitations": [
+        "Data URL @font-face font checks failed before visual correction; suppressed CSS FontFace declarations so loaded buffer faces supply Lexend. Original discovery measurement uses fallback glyphs."
+      ],
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "Interior screenshot inspected",
+      "fontMeasurementLimitation": "Original measurements count computed CSS font assignment. Representative interior page was subsequently rechecked with actual loaded Lexend after suppressing CSP-blocked mocked data: font-face declarations."
+    },
+    {
+      "site": "Kernel.org",
+      "comparison": {
+        "page": {
+          "bodySamples": 60,
+          "bodyStyled": 60,
+          "changedProtected": [],
+          "elements": 210,
+          "horizontalOverflow": 0,
+          "loadedFontBuffers": 3,
+          "mode": "css",
+          "openShadowRoots": 0,
+          "shadowStyled": 0,
+          "shadowText": 0,
+          "title": "The Linux Kernel Archives - Releases",
+          "url": "https://www.kernel.org/category/releases.html"
+        },
+        "runs": [
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.3,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.6,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 0,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 801.2,
+            "maxTaskMs": 0,
+            "mode": "css",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "auto",
+            "visits": 0
+          },
+          {
+            "callbacks": 0,
+            "discoveryMs": 0,
+            "elapsedMs": 806.9,
+            "maxTaskMs": 0,
+            "mode": "observer-baseline",
+            "records": 0,
+            "sample": 1,
+            "tasks": 0,
+            "version": "observer",
+            "visits": 0
+          }
+        ]
+      },
+      "interactions": [
+        "Followed Releases navigation from FAQ.",
+        "Scrolled release lifecycle and version tables."
+      ],
+      "findings": "No overflow or protected font changes.",
+      "mode": "css",
+      "openShadowRoots": 0,
+      "visualInspection": "DOM, typography metrics and safe controls inspected",
+      "fontMeasurementLimitation": "Original measurements count computed CSS font assignment. Representative interior page was subsequently rechecked with actual loaded Lexend after suppressing CSP-blocked mocked data: font-face declarations."
+    }
+  ]
+}

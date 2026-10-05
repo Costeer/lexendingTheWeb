@@ -9,6 +9,7 @@
     "check": "node scripts/check.mjs",
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
     "test": "node --test",
+    "benchmark": "node scripts/benchmark.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "verify:chrome": "npm test && npm run check && npm run package",
     "verify:firefox": "npm test && npm run check && npm run package && npm run lint:firefox",

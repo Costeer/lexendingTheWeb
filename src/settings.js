@@ -105,10 +105,12 @@
     }
 
     const siteRules = [];
+    let ruleBytes = 2; // The surrounding JSON array brackets.
     rules.forEach((rule) => {
-      const candidate = [...siteRules, rule];
-      if (JSON.stringify(candidate).length <= MAX_SITE_RULE_BYTES) {
+      const addedBytes = JSON.stringify(rule).length + (siteRules.length ? 1 : 0);
+      if (ruleBytes + addedBytes <= MAX_SITE_RULE_BYTES) {
         siteRules.push(rule);
+        ruleBytes += addedBytes;
       }
     });
 
@@ -130,21 +132,28 @@
     || (rule.includeSubdomains && hostname.endsWith(`.${rule.hostname}`))
   );
 
-  const matchingRules = (settings, hostname) => settings.siteRules
-    .filter((rule) => ruleMatches(rule, hostname))
-    .sort((a, b) => {
-      const aExact = a.hostname === hostname && !a.includeSubdomains;
-      const bExact = b.hostname === hostname && !b.includeSubdomains;
-      return Number(bExact) - Number(aExact)
-        || b.hostname.length - a.hostname.length
-        || Number(a.includeSubdomains) - Number(b.includeSubdomains);
-    });
+  const compareRules = (a, b, hostname) => {
+    const aExact = a.hostname === hostname && !a.includeSubdomains;
+    const bExact = b.hostname === hostname && !b.includeSubdomains;
+    return Number(bExact) - Number(aExact)
+      || b.hostname.length - a.hostname.length
+      || Number(a.includeSubdomains) - Number(b.includeSubdomains);
+  };
 
   const resolveSite = (value, hostname) => {
     const settings = normalizeSettings(value);
-    const matches = matchingRules(settings, normalizeHostname(hostname));
-    const enabledRule = matches.find((rule) => rule.enabled !== null);
-    const scopeRule = matches.find((rule) => rule.scope !== null);
+    const normalizedHostname = normalizeHostname(hostname);
+    let enabledRule = null;
+    let scopeRule = null;
+    for (const rule of settings.siteRules) {
+      if (!ruleMatches(rule, normalizedHostname)) continue;
+      if (rule.enabled !== null && (!enabledRule || compareRules(rule, enabledRule, normalizedHostname) < 0)) {
+        enabledRule = rule;
+      }
+      if (rule.scope !== null && (!scopeRule || compareRules(rule, scopeRule, normalizedHostname) < 0)) {
+        scopeRule = rule;
+      }
+    }
     const siteEnabled = enabledRule?.enabled ?? true;
 
     return {
