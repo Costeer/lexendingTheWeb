@@ -27,7 +27,8 @@ function createBackground({ stored = {}, supported = true } = {}) {
         if (!supported) throw new Error("No content script");
         return { ready: true, active: true, hostname: "example.com" };
       },
-      onUpdated: event()
+      onUpdated: event(),
+      onRemoved: event()
     },
     storage: {
       sync: {
@@ -87,4 +88,34 @@ test("toolbar refresh requests the main frame's state", async () => {
   assert.equal(messages.length, 1);
   assert.equal(messages[0].options.frameId, 0);
   assert.equal(icons.at(-1).tabId, 42);
+});
+
+test("repeated toolbar states avoid duplicate browser API calls and closed tabs release their state", async () => {
+  const { browser, icons } = createBackground();
+  const sender = { tab: { id: 42 }, frameId: 0 };
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  assert.equal(icons.length, 1);
+  browser.tabs.onUpdated.listener(42, { status: "loading" });
+  browser.tabs.onUpdated.listener(42, { url: "https://example.com/next" });
+  assert.equal(icons.length, 2);
+  assert.equal(icons.at(-1).path["16"], "assets/icons/icon-off-16.png");
+  browser.tabs.onRemoved.listener(42);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: false }, sender);
+  assert.equal(icons.length, 3);
+});
+
+test("a failed toolbar update can retry the same state", async () => {
+  const { browser, icons } = createBackground();
+  let attempts = 0;
+  const setIcon = browser.action.setIcon;
+  browser.action.setIcon = async (value) => {
+    if (++attempts === 1) throw new Error("Tab temporarily unavailable");
+    return setIcon(value);
+  };
+  const sender = { tab: { id: 42 }, frameId: 0 };
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  await new Promise((resolve) => setImmediate(resolve));
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  assert.equal(icons.length, 1);
 });

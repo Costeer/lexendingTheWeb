@@ -248,3 +248,18 @@ test("deleting a previewed rule reveals the next rule and removes an unnecessary
   assert.equal(page.get("#toggle-rule-list").hidden, true);
   assert.equal(page.writes.at(-1).siteRules.length, 2);
 });
+
+test("readability and appearance changes preserve the existing site-rule rows", async () => {
+  const page = await openSettings({ desktop: true, count: 60 });
+  const rows = [...page.rows()];
+  page.get("#text-scale").value = "110";
+  page.get("#text-scale").emit("change");
+  await tick();
+  page.get("#dark-theme").checked = true;
+  page.get("#dark-theme").emit("change");
+  await tick();
+  assert.equal(page.rows().length, rows.length);
+  page.rows().forEach((row, index) => assert.equal(row, rows[index]));
+  assert.equal(page.writes.at(-1).theme, "dark");
+  assert.equal(page.writes.at(-1).textScale, 110);
+});

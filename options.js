@@ -99,6 +99,7 @@
   let saveRevision = 0;
   let toastTimer;
   let readabilityAnimationToken = 0;
+  let renderedRulesKey;
   const quote = quotesApi.random();
 
   const setSaveState = (state, message) => {
@@ -260,6 +261,11 @@
 
   const renderRules = () => {
     const query = searchInput.value.trim().toLowerCase();
+    const key = JSON.stringify([
+      settings.siteRules, query, desktopSettingsLayout.matches, rulesExpanded
+    ]);
+    if (key === renderedRulesKey) return;
+    renderedRulesKey = key;
     const rules = settings.siteRules
       .filter((rule) => rule.hostname.includes(query))
       .sort((a, b) => (
