@@ -239,6 +239,60 @@ input[type="radio"] {
   display: none !important;
 }
 
+/* One desktop switch component, shared by settings and the popup. */
+@media (hover: hover) and (pointer: fine) {
+  :root body .ui-switch > input + .ui-switch-track {
+    position: relative;
+    display: block;
+    flex: 0 0 54px;
+    width: 54px;
+    height: 28px;
+    border: 1px solid var(--ui-border);
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: none;
+    transform: none;
+    transition:
+      background-color var(--motion-fast) ease,
+      border-color var(--motion-fast) ease,
+      box-shadow var(--motion-base) var(--motion-ease);
+  }
+
+  :root body .ui-switch > input + .ui-switch-track .ui-switch-thumb {
+    position: absolute;
+    display: block;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    transform: translateX(0);
+    transition:
+      background-color var(--motion-fast) ease,
+      transform var(--motion-base) var(--motion-ease);
+  }
+
+  :root body .ui-switch > input:checked + .ui-switch-track {
+    background: var(--accent);
+  }
+
+  :root body .ui-switch > input:checked + .ui-switch-track .ui-switch-thumb {
+    background: var(--on-accent);
+    transform: translateX(26px);
+  }
+
+  :root body .ui-switch:hover > input + .ui-switch-track {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
+  }
+
+  :root body .ui-switch > input:focus-visible + .ui-switch-track {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
