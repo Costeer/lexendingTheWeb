@@ -1,64 +1,56 @@
 # Privacy Policy for Lexend for the Web
 
-Last updated: September 22, 2026
+Last updated: October 5, 2026
 
-The developer of Lexend for the Web does not collect, receive, sell, or share
-personal data. The extension processes visible website text locally and stores
-the preferences and hostname rules described below so it can provide its
-user-facing typography features.
+Lexend for the Web doesn't track you. It doesn't collect your personal data or
+record what you read. The developer doesn't receive, sell, or share your data.
 
-## Data stored by the extension
+## Page text stays on your device
 
-The extension stores only the settings needed to provide its functionality:
+The extension needs access to HTTP and HTTPS pages to change their fonts and
+spacing. It processes text in your browser without saving it or sending it
+anywhere. Browser-protected pages, such as settings, can't be accessed or
+changed.
 
-- Whether the extension is enabled
-- Whether Lexend applies to body text only or body text and headings
-- Optional text-size, line-height, and letter-spacing preferences
-- User-created hostname rules, including enabled state, subdomain coverage, and
-  per-site text scope
+## Only your settings are saved
 
-These settings are saved with the browser's synchronized extension storage.
-Depending on the user's browser configuration, the browser vendor may sync the
-settings between signed-in browser profiles. Lexend for the Web does not operate a
-server and cannot access the user's browser-sync account.
+Your browser remembers:
 
-Users can change or delete individual hostname rules from the extension's
-settings page. They can also clear all saved rules, reset the remaining
-preferences, or remove all extension data by uninstalling the extension.
+- Whether Lexend is on or off
+- Whether it applies to body text only or headings too
+- Your text size, line height, and letter spacing
+- The site rules you create, including hostnames, on/off choices, text scope,
+  and whether to include subdomains
 
-## Website access
+These use your browser's synchronized extension storage. If browser sync is on,
+your browser provider may sync them between signed-in profiles. The developer
+has no server and no access to your sync account.
 
-Lexend for the Web runs on HTTP and HTTPS pages to replace visible typography with
-the locally bundled Lexend font. Page contents are processed only inside the
-browser and are never recorded or transmitted. Browser-protected pages cannot
-be accessed or modified by the extension.
+## You control your settings
 
-## Settings files
+In Settings, you can edit or delete site rules, clear all rules, and reset your
+reading preferences. Uninstalling the extension removes its saved data.
 
-Users may export their settings to a JSON file or import a previously exported
-file. Importing and exporting happen locally on the user's device. The files
-are never uploaded by the extension.
+You can also export a JSON backup or import one you've saved. These files stay
+on your device; the extension never uploads them.
 
-## Third parties
+## There are no trackers or remote downloads
 
-The extension contains no analytics, advertising, remote code, trackers, or
-third-party network services. The Lexend font is packaged with the extension,
-so websites are not contacted to download it.
+The extension has no analytics, advertising, trackers, remote code, or
+third-party network services. The fonts come with the extension and don't need
+to be downloaded from a website.
+
+If you follow an external link, that site's own privacy policy applies.
 
 ## Limited Use
 
-The use of information received from browser APIs adheres to the Chrome Web
-Store User Data Policy, including the Limited Use requirements. Information is
-used only to provide the extension's disclosed typography features. It is not
-transferred to third parties, used for advertising or credit decisions, or read
-by humans.
+Lexend for the Web follows the Chrome Web Store User Data Policy, including the
+Limited Use requirements. Information from browser APIs is used only for the
+extension's font, spacing, and site settings. It is not transferred to third
+parties, used for advertising or credit decisions, or read by humans.
 
-## Changes
+## Changes and questions
 
-Material changes to this policy will be documented in the project's release
-notes and reflected in the date above.
-
-## Contact
-
-Questions and privacy requests may be filed through the project's
-[GitHub issue tracker](https://github.com/Costeer/lexendingTheWeb/issues).
+Material changes to this policy will be explained in the release notes and
+reflected in the date above. For questions or privacy requests, open an issue
+in the [GitHub issue tracker](https://github.com/Costeer/lexendingTheWeb/issues).

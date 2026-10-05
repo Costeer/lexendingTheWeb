@@ -1,59 +1,19 @@
-# Store listing copy
-
-## Category
-
-Accessibility
+# Store description
 
 ## Summary
 
-Make websites easier to read with Lexend. Choose body text only or body text
-plus headings, with per-site controls and no tracking.
+Change website text to Lexend, adjust the size and spacing, and pause it wherever you prefer the original fonts.
 
 ## Detailed description
 
-Lexend for the Web replaces website typography with Lexend. Page text is
-processed locally and is never recorded or sent to the developer.
+Lexend for the Web changes website text to Lexend. You can adjust the text size,
+line height, and letter spacing, and choose whether to change headings too. If
+you prefer a site's own fonts, pause the extension there. It remembers your
+choice for the next visit.
 
-Key features:
+Code, math, and common icon fonts are left alone. The fonts come with the
+extension, and page text stays in your browser. There are no trackers or
+analytics.
 
-- Apply Lexend to body text or to body text and headings
-- Pause the extension globally or on individual websites
-- Apply a rule to one hostname or include its subdomains
-- Adjust text size, line height, and letter spacing
-- Search, edit, and clear rules from the settings page
-- Toggle Lexend on the current website with a keyboard shortcut
-- Import and export settings as JSON
-- Leave code, mathematical notation, SVG graphics, and common icon fonts alone
-- Handle dynamic content, open shadow roots, and related frames
-- Sync preferences with the browser's extension storage
-
-Browsers do not allow extensions to change protected pages such as settings and
-extension stores. The popup identifies those pages.
-
-Lexend for the Web contains no analytics, advertising, remote code, or trackers.
-User-created hostname rules may be synchronized by the browser when browser
-sync is enabled; the developer cannot access that sync account or its data.
-
-## Permission justifications
-
-### Read and change data on websites
-
-Required to apply the Lexend font to visible text on HTTP and HTTPS pages. Page
-contents remain in the browser and are not stored or transmitted.
-
-### Storage
-
-Stores the enabled state, typography preferences, and user-created site rules
-using the browser's synchronized extension storage.
-
-## Support URL
-
-https://github.com/Costeer/lexendingTheWeb/issues
-
-## Homepage URL
-
-https://github.com/Costeer/lexendingTheWeb
-
-## Privacy policy URL
-
-https://github.com/Costeer/lexendingTheWeb/blob/main/PRIVACY.md
+This is an unofficial project, unaffiliated with and not endorsed by the
+creators of Lexend.
