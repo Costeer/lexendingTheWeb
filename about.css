@@ -69,6 +69,15 @@
   font-weight: 500;
 }
 
+.about-lexend-word {
+  letter-spacing: 0;
+  transition: letter-spacing 320ms var(--motion-ease);
+}
+
+.about-lexend-link:is(:hover, :focus-visible) .about-lexend-word {
+  letter-spacing: .14em;
+}
+
 .support-card {
   --support-mx: 70%;
   --support-my: 30%;
