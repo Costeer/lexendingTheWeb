@@ -293,18 +293,20 @@ input[type="radio"] {
   }
 }
 
-/* Move two matching gradient edges together: one paints the letters, the other
-   paints their square highlight. Text inverts only where the swipe has reached. */
+/* Matching angled edges invert the letters exactly where the highlight reaches.
+   Overscan keeps the diagonal completely outside the link at either endpoint. */
 :root body :is(.about-lexend-link, .about-back-link, .about-links a,
   .mobile-about-link, .preview-attribution a, .quote-footer a,
   .inline-link, .text-link, .page-attribution a) {
   --link-ink: var(--ink);
   --link-paper: var(--surface);
+  padding-inline: 4px;
+  margin-inline: -4px;
   border-radius: 0;
   background-image:
-    linear-gradient(to right, var(--link-paper) 50%, var(--link-ink) 50%),
-    linear-gradient(to right, var(--link-ink) 50%, transparent 50%);
-  background-size: 200% 100%;
+    linear-gradient(110deg, var(--link-paper) 50%, var(--link-ink) 50%),
+    linear-gradient(110deg, var(--link-ink) 50%, transparent 50%);
+  background-size: calc(200% + 32px) 100%;
   background-position: 100% 0;
   background-repeat: no-repeat;
   background-origin: border-box;
@@ -315,12 +317,12 @@ input[type="radio"] {
   transform: none;
   transition:
     background-position 180ms ease-out,
-    text-decoration-color 180ms ease-out,
     transform 100ms ease-out;
 }
 
 :root body .site-strip .text-link {
   --link-paper: var(--site-strip-background);
+  margin-inline: -4px;
 }
 
 :root body .page-attribution a {
@@ -335,7 +337,9 @@ input[type="radio"] {
   .mobile-about-link, .preview-attribution a, .quote-footer a,
   .inline-link, .text-link, .page-attribution a):is(:hover, :focus-visible) {
   background-position: 0 0;
-  text-decoration-color: var(--link-paper);
+  /* The underline blends into the highlight as it passes, then reappears
+     behind the retreating edge without a separate fade. */
+  text-decoration-color: var(--link-ink);
   text-underline-offset: 3px;
 }
 
