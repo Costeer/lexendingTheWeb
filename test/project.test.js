@@ -223,7 +223,7 @@ test("mobile About is in the header and the desktop tab remains Appearance", asy
 });
 
 test("Appearance contains theme settings while About owns the project introduction", async () => {
-  const [options, about, aboutCss] = await Promise.all([read("options.html"), read("about.html"), read("about.css")]);
+  const [options, about] = await Promise.all([read("options.html"), read("about.html")]);
   const appearance = options.match(/<section id="appearance-panel"[\s\S]*?<\/section>/)?.[0];
   assert.ok(appearance);
   assert.match(appearance, /id="dark-theme"/);
@@ -232,7 +232,6 @@ test("Appearance contains theme settings while About owns the project introducti
   assert.match(about, /<h2 id="about-title">Lexend for the Web<\/h2>/);
   assert.match(about, /The extension uses Lexend for a clearer, more readable interface\./);
   assert.match(about, /class="about-lexend-link" href="https:\/\/www\.lexend\.com\/"/);
-  assert.match(aboutCss, /\.about-lexend-link:is\(:hover, :focus-visible\) \.about-lexend-word\s*\{\s*letter-spacing: \.14em;/);
 });
 
 test("settings navigation keeps scrollbar space and selected label metrics stable", async () => {

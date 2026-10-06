@@ -293,6 +293,69 @@ input[type="radio"] {
   }
 }
 
+/* Move two matching gradient edges together: one paints the letters, the other
+   paints their square highlight. Text inverts only where the swipe has reached. */
+:root body :is(.about-lexend-link, .about-back-link, .about-links a,
+  .mobile-about-link, .preview-attribution a, .quote-footer a,
+  .inline-link, .text-link, .page-attribution a) {
+  --link-ink: var(--ink);
+  --link-paper: var(--surface);
+  border-radius: 0;
+  background-image:
+    linear-gradient(to right, var(--link-paper) 50%, var(--link-ink) 50%),
+    linear-gradient(to right, var(--link-ink) 50%, transparent 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-clip: text, border-box;
+  -webkit-text-fill-color: transparent;
+  text-decoration-color: var(--link-ink);
+  text-underline-offset: 3px;
+  transform: none;
+  transition:
+    background-position 180ms ease-out,
+    text-decoration-color 180ms ease-out,
+    transform 100ms ease-out;
+}
+
+:root body .site-strip .text-link {
+  --link-paper: var(--site-strip-background);
+}
+
+:root body .page-attribution a {
+  --link-paper: var(--settings-muted);
+}
+
+:root body .quote-footer a {
+  display: inline-block;
+}
+
+:root body :is(.about-lexend-link, .about-back-link, .about-links a,
+  .mobile-about-link, .preview-attribution a, .quote-footer a,
+  .inline-link, .text-link, .page-attribution a):is(:hover, :focus-visible) {
+  background-position: 0 0;
+  text-decoration-color: var(--link-paper);
+  text-underline-offset: 3px;
+}
+
+:root body :is(.about-lexend-link, .about-back-link, .about-links a,
+  .mobile-about-link, .preview-attribution a, .quote-footer a,
+  .inline-link, .text-link, .page-attribution a):active {
+  transform: translateY(2px) scale(.98);
+}
+
+/* Keep native high-contrast text when the OS suppresses background images. */
+@media (forced-colors: active) {
+  :root body :is(.about-lexend-link, .about-back-link, .about-links a,
+    .mobile-about-link, .preview-attribution a, .quote-footer a,
+    .inline-link, .text-link, .page-attribution a) {
+    background-image: none;
+    -webkit-text-fill-color: LinkText;
+    text-decoration-color: LinkText;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -58,10 +58,8 @@
   text-underline-offset: 3px;
 }
 
-.about-links a:hover,
-.about-lexend-link:hover,
-.about-back-link:hover {
-  text-underline-offset: 5px;
+.about-links a {
+  display: inline-block;
 }
 
 .about-lexend-link {
@@ -69,16 +67,6 @@
   margin-top: 16px;
   font-size: 16px;
   font-weight: 500;
-}
-
-.about-lexend-word {
-  display: inline-block;
-  letter-spacing: 0;
-  transition: letter-spacing 320ms var(--motion-ease);
-}
-
-.about-lexend-link:is(:hover, :focus-visible) .about-lexend-word {
-  letter-spacing: .14em;
 }
 
 .support-card {

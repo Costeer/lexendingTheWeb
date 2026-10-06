@@ -74,12 +74,6 @@ main {
   text-decoration: none;
 }
 
-.page-attribution a:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transform: translateY(-1px);
-}
-
 .page-attribution svg {
   width: 15px;
   height: 15px;
@@ -575,14 +569,10 @@ section + section {
 }
 
 .preview-attribution a {
+  display: inline-block;
   color: inherit;
   font-weight: 600;
   text-underline-offset: 2px;
-}
-
-.preview-attribution a:hover {
-  color: var(--ink);
-  text-underline-offset: 4px;
 }
 
 .inline-link {
@@ -594,11 +584,6 @@ section + section {
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.inline-link:hover {
-  color: var(--ink);
-  text-underline-offset: 4px;
 }
 
 .add-rule {

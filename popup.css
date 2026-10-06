@@ -212,11 +212,6 @@ button:not(:disabled):active,
   text-underline-offset: 2px;
 }
 
-.text-link:hover {
-  color: var(--ink);
-  text-underline-offset: 4px;
-}
-
 .popup-section {
   margin: 0;
   padding: 11px 13px 13px;
@@ -389,11 +384,6 @@ fieldset:disabled {
   color: inherit;
   font-weight: 600;
   text-underline-offset: 2px;
-}
-
-.quote-footer a:hover {
-  color: var(--ink);
-  text-underline-offset: 4px;
 }
 
 .restricted-note {
