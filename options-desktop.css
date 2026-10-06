@@ -35,6 +35,12 @@
 
 /* Use the same mobile layout as the panels, including wide touch screens. */
 @media not all and (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  :root .mobile-intro {
+    display: block;
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+  }
+
   :root body.settings-page {
     display: flex;
     flex-direction: column;
