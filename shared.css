@@ -191,22 +191,67 @@ input[type="radio"] {
   border: 0;
 }
 
-/* Preset slots stay equal; only their visual selection grows, not the hit area. */
+/* One selection layer slides beneath equal, stationary radio hit areas. */
 :root :is(.segment-group, .segments) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  --segment-index: 0;
+  isolation: isolate;
+}
+
+:root .segments {
+  position: relative;
+}
+
+:root :is(.segment-group, .segments)::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% / 3);
+  border-radius: calc(var(--ui-radius) - 1px);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(var(--segment-index) * 100%));
+  transition: transform 220ms var(--motion-ease), opacity 120ms ease;
+  z-index: 0;
+}
+
+:root :is(.segment-group, .segments):has(input:checked)::before {
+  opacity: 1;
+}
+
+:root :is(.segment-group, .segments):has(label:nth-child(2) input:checked) {
+  --segment-index: 1;
+}
+
+:root :is(.segment-group, .segments):has(label:nth-child(3) input:checked) {
+  --segment-index: 2;
 }
 
 :root :is(.segment-group, .segments) label {
   position: relative;
-}
-
-:root :is(.segment-group, .segments) label:has(input:checked) {
   z-index: 1;
 }
 
-:root :is(.segment-group, .segments) span {
+:root body :is(.segment-group, .segments) label span {
   pointer-events: none;
+  background: transparent;
   transform: scale(1);
+  transition: background-color 120ms ease, color 120ms ease, transform 80ms ease;
+}
+
+@media (hover: hover) {
+  :root body :is(.segment-group, .segments) label:hover span {
+    background: rgba(217, 0, 0, .12);
+  }
+}
+
+:root body :is(.segment-group, .segments) input:checked + span {
+  color: var(--on-accent);
+}
+
+:root body :is(.segment-group, .segments) label:active span {
+  transform: scale(.97);
 }
 
 :root :is(.segment-group, .segments) label:first-child span {
@@ -217,13 +262,6 @@ input[type="radio"] {
 :root :is(.segment-group, .segments) label:last-child span {
   border-top-right-radius: calc(var(--ui-radius) - 1px);
   border-bottom-right-radius: calc(var(--ui-radius) - 1px);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  :root :is(.segment-group, .segments) input:checked + span {
-    border-radius: var(--ui-radius);
-    transform: scale(1.04);
-  }
 }
 
 /* Keep the longest label readable in equal slots on small phone screens. */

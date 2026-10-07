@@ -404,23 +404,6 @@ section + section {
   text-align: center;
 }
 
-.segment-group label:hover span {
-  color: var(--ink);
-  background: var(--accent-tint);
-}
-
-.segment-group input:checked + span {
-  position: relative;
-  z-index: 1;
-  color: var(--on-accent);
-  background: var(--ink);
-}
-
-.segment-group label:has(input:checked):hover span {
-  color: var(--on-accent);
-  background: var(--accent);
-}
-
 .segment-group input:focus-visible + span {
   position: relative;
   z-index: 2;
@@ -1360,11 +1343,6 @@ input::placeholder {
 
 :root .segment-group label:first-child span {
   border-left: 0;
-}
-
-:root .segment-group input:checked + span {
-  color: var(--on-accent);
-  background: var(--accent);
 }
 
 :root .slider-heading strong {

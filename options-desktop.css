@@ -341,11 +341,6 @@
     border-left: 0;
   }
 
-  :root .settings-layout .segment-group input:checked + span {
-    color: var(--on-accent);
-    background: var(--accent);
-  }
-
   :root .settings-layout .slider-control {
     display: grid;
     grid-template-columns: 32% minmax(0, 1fr);

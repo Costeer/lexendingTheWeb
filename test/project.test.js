@@ -271,13 +271,14 @@ test("sidebar press feedback animates only contents and keeps its hit area stabl
   }
 });
 
-test("preset controls use equal fixed slots and motion-aware selection growth", async () => {
+test("preset controls use equal fixed slots with one sliding selection layer", async () => {
   const [sharedCss, optionsCss, desktopCss, popupCss, popupJs] = await Promise.all([
     read("shared.css"), read("options.css"), read("options-desktop.css"), read("popup.css"), read("popup.js")
   ]);
   assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\)\s*\{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
-  assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\) span\s*\{[^}]*pointer-events: none;[^}]*transform: scale\(1\);/);
-  assert.match(sharedCss, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*:root :is\(\.segment-group, \.segments\) input:checked \+ span\s*\{[^}]*transform: scale\(1\.04\);/);
+  assert.match(sharedCss, /:root body :is\(\.segment-group, \.segments\) label span\s*\{[^}]*pointer-events: none;[^}]*background: transparent;[^}]*transform: scale\(1\);/);
+  assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\)::before\s*\{[^}]*opacity: 0;[^}]*transition: transform 220ms/);
+  assert.match(sharedCss, /:has\(input:checked\)::before\s*\{\s*opacity: 1;/);
   for (const css of [optionsCss, desktopCss, popupCss]) {
     assert.doesNotMatch(css, /grid-template-columns: \.9fr 1\.2fr \.9fr;/);
     assert.match(css, /:root [^{]*\.(?:segment-group|segments)\s*\{[^}]*overflow: visible;/);

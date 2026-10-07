@@ -340,21 +340,6 @@ fieldset:disabled {
   font-weight: 500;
 }
 
-.segments label:hover span {
-  color: var(--ink);
-  background: var(--accent-tint);
-}
-
-.segments input:checked + span {
-  color: var(--surface);
-  background: var(--ink);
-}
-
-.segments label:has(input:checked):hover span {
-  color: var(--surface);
-  background: var(--accent);
-}
-
 .spacing-preview {
   margin: 10px 0 0;
   padding: 9px;
@@ -648,11 +633,6 @@ fieldset:disabled {
   color: var(--text-muted);
   font-weight: 400;
   letter-spacing: .02em;
-}
-
-:root .segments input:checked + span {
-  color: var(--on-accent);
-  background: var(--accent);
 }
 
 :root .spacing-preview {
