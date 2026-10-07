@@ -129,7 +129,7 @@ try {
     await driver.sendDevToolsCommand("ServiceWorker.enable", {});
     for (const value of [120, 110]) {
       await driver.sendDevToolsCommand("ServiceWorker.stopAllWorkers", {});
-      await driver.findElement(By.css(`input[name="basicTextScale"][value="${value}"] + span`)).click();
+      await driver.findElement(By.css(`label:has(input[name="basicTextScale"][value="${value}"])`)).click();
       await wait("document.querySelector('#save-status').classList.contains('is-saved')", "The restarted worker confirms the save");
       assert.equal((await saved()).textScale, value);
     }
