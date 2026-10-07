@@ -1576,6 +1576,19 @@ input::placeholder {
   color: var(--ink);
 }
 
+.rule-delete-prompt {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+:root .delete-rule[data-action="confirm"] {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 :root .field-error,
 :root .check-label:hover strong {
   color: var(--ink);

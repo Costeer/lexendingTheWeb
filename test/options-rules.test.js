@@ -25,6 +25,14 @@ class Element {
     this.children.push(...children);
   }
   replaceChildren(...children) { this.children = []; this.append(...children); }
+  insertBefore(child, reference) {
+    child.parent = this;
+    this.children.splice(this.children.indexOf(reference), 0, child);
+  }
+  remove() {
+    this.parent.children.splice(this.parent.children.indexOf(this), 1);
+    this.parent = null;
+  }
   setAttribute(name, value) { this.attributes.set(name, value); }
   getAttribute(name) { return this.attributes.get(name); }
   removeAttribute(name) { this.attributes.delete(name); }
@@ -34,7 +42,7 @@ class Element {
     if (this.className.split(" ").includes(selector.slice(1))) return this;
     return this.parent?.closest(selector);
   }
-  focus() {}
+  focus() { this.focused = true; }
 }
 
 async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings } = {}) {
@@ -243,10 +251,107 @@ test("deleting a previewed rule reveals the next rule and removes an unnecessary
   const page = await openSettings({ count: 3 });
   const deleteButton = page.rows()[0].children.at(-1);
   page.get("#rule-list").emit("click", { target: deleteButton });
+  assert.equal(page.rows().length, 2);
+  assert.equal(page.writes.length, 0);
+  assert.equal(deleteButton.dataset.action, "cancel");
+  const confirmButton = page.rows()[0].children.find((child) => child.dataset.action === "confirm");
+  page.get("#rule-list").emit("click", { target: confirmButton });
   await tick();
   assert.deepEqual(page.rows().map((row) => row.dataset.hostname), ["site2.example.com", "site3.example.com"]);
   assert.equal(page.get("#toggle-rule-list").hidden, true);
   assert.equal(page.writes.at(-1).siteRules.length, 2);
+  assert.equal(page.rows()[0].children.at(-1).focused, true);
+});
+
+test("cancel and Escape restore the original rule without persisting changes", async () => {
+  const page = await openSettings({ count: 2 });
+  const list = page.get("#rule-list");
+  const row = page.rows()[0];
+  const originalDomain = row.children[0].children[0];
+  const status = row.children[1];
+  const button = row.children.at(-1);
+  for (const cancelWithEscape of [false, true]) {
+    list.emit("click", { target: button });
+    assert.equal(button.dataset.action, "cancel");
+    assert.equal(status.hidden, true);
+    assert.equal(row.children[0].children[0].className, "rule-delete-prompt");
+    assert.match(button.getAttribute("aria-label"), /Cancel deleting rule for site1.example.com/);
+    if (cancelWithEscape) {
+      let prevented = false;
+      list.emit("keydown", { key: "Escape", target: button, preventDefault() { prevented = true; } });
+      assert.equal(prevented, true);
+    } else {
+      list.emit("click", { target: button });
+    }
+    assert.equal(row.children[0].children[0], originalDomain);
+    assert.equal(status.hidden, false);
+    assert.equal(button.dataset.action, "delete");
+    assert.equal(button.focused, true);
+    assert.equal(row.children.length, 3);
+    assert.equal(page.rows()[0], row);
+  }
+  await tick();
+  assert.equal(page.writes.length, 0);
+});
+
+test("confirmation messages use five stable domain-hashed variants across reloads", async () => {
+  const collect = async () => {
+    const page = await openSettings({ count: 60, desktop: true });
+    const prompts = new Map();
+    let previousButton;
+    for (const row of page.rows()) {
+      const button = row.children.at(-1);
+      page.get("#rule-list").emit("click", { target: button });
+      if (previousButton) assert.equal(previousButton.dataset.action, "delete");
+      prompts.set(row.dataset.hostname, row.children[0].children[0].textContent);
+      previousButton = button;
+    }
+    assert.equal(page.writes.length, 0);
+    return prompts;
+  };
+  const first = await collect();
+  assert.equal(new Set(first.values()).size, 5);
+  assert.deepEqual(await collect(), first);
+  const filtered = await openSettings({ count: 60 });
+  filtered.get("#rule-search").value = "site42.example.com";
+  filtered.get("#rule-search").emit("input");
+  const row = filtered.rows()[0];
+  filtered.get("#rule-list").emit("click", { target: row.children.at(-1) });
+  assert.equal(row.children[0].children[0].textContent, first.get("site42.example.com"));
+});
+
+test("confirmation distinguishes exact-host and subdomain rules and deletes only the confirmed variant", async () => {
+  const page = await openSettings({ getSettings: async () => ({ siteRules: [
+    { hostname: "example.com", includeSubdomains: true, enabled: false },
+    { hostname: "example.com", includeSubdomains: false, enabled: false }
+  ] }) });
+  const list = page.get("#rule-list");
+  const [exact, subdomains] = page.rows();
+  list.emit("click", { target: exact.children.at(-1) });
+  const prompt = exact.children[0].children[0].textContent;
+  list.emit("click", { target: subdomains.children.at(-1) });
+  assert.equal(subdomains.children[0].children[0].textContent, prompt);
+  const confirm = subdomains.children.find((child) => child.dataset.action === "confirm");
+  assert.match(confirm.getAttribute("aria-label"), /example.com and its subdomains/);
+  list.emit("click", { target: confirm });
+  await tick();
+  assert.equal(page.writes.length, 1);
+  assert.equal(page.writes[0].siteRules.length, 1);
+  assert.equal(page.writes[0].siteRules[0].includeSubdomains, false);
+});
+
+test("filtering or leaving Site rules dismisses a pending confirmation", async () => {
+  const page = await openSettings({ desktop: true });
+  const list = page.get("#rule-list");
+  list.emit("click", { target: page.rows()[0].children.at(-1) });
+  page.get("#rule-search").value = "site2";
+  page.get("#rule-search").emit("input");
+  const row = page.rows()[0];
+  assert.equal(row.children.at(-1).dataset.action, "delete");
+  list.emit("click", { target: row.children.at(-1) });
+  page.navigation.find((button) => button.dataset.settingsPanel === "appearance-panel").emit("click");
+  assert.equal(row.children.at(-1).dataset.action, "delete");
+  assert.equal(page.writes.length, 0);
 });
 
 test("readability and appearance changes preserve the existing site-rule rows", async () => {

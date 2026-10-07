@@ -78,6 +78,7 @@
 
   settingsNavigation.forEach((button) => {
     button.addEventListener("click", () => {
+      cancelRuleDeletion();
       selectedSettingsPanel = button.dataset.settingsPanel;
       renderSettingsNavigation();
       const heading = document.querySelector(`#${selectedSettingsPanel} h2`);
@@ -100,6 +101,8 @@
   let toastTimer;
   let readabilityAnimationToken = 0;
   let renderedRulesKey;
+  let pendingRuleDeletion = null;
+  const ruleRowData = new WeakMap();
   const quote = quotesApi.random();
 
   const setSaveState = (state, message) => {
@@ -249,14 +252,81 @@
     appearanceState.textContent = darkThemeInput.checked ? "On" : "Off";
   };
 
-  const makeDeleteButton = (rule) => {
+  const deletionPrompts = [
+    "Delete this site rule?",
+    "Remove this site rule?",
+    "Really delete this rule?",
+    "Ready to remove this rule?",
+    "Confirm deleting this rule?"
+  ];
+
+  const deletionPrompt = (hostname) => {
+    // FNV-1a: stable across reloads, ordering, and exact/subdomain variants.
+    let hash = 2166136261;
+    for (let index = 0; index < hostname.length; index += 1) {
+      hash = Math.imul(hash ^ hostname.charCodeAt(index), 16777619) >>> 0;
+    }
+    return deletionPrompts[hash % deletionPrompts.length];
+  };
+
+  const setRuleButtonAction = (button, rule, action) => {
+    const target = `${rule.hostname}${rule.includeSubdomains ? " and its subdomains" : ""}`;
+    const labels = {
+      delete: `Delete rule for ${target}`,
+      cancel: `Cancel deleting rule for ${target}`,
+      confirm: `Confirm deleting rule for ${target}`
+    };
+    button.dataset.action = action;
+    button.setAttribute("aria-label", labels[action]);
+    button.title = labels[action];
+    if (action === "delete") {
+      button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3h8l1 2h4v2H3V5h4l1-2Zm-2 6h12l-1 12H7L6 9Zm3 2v8h2v-8H9Zm4 0v8h2v-8h-2Z" /></svg>';
+    } else if (action === "cancel") {
+      button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>';
+    } else {
+      button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    }
+  };
+
+  const makeDeleteButton = (rule, action = "delete") => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "delete-rule";
-    button.setAttribute("aria-label", `Delete rule for ${rule.hostname}`);
-    button.title = `Delete rule for ${rule.hostname}`;
-    button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3h8l1 2h4v2H3V5h4l1-2Zm-2 6h12l-1 12H7L6 9Zm3 2v8h2v-8H9Zm4 0v8h2v-8h-2Z" /></svg>';
+    setRuleButtonAction(button, rule, action);
     return button;
+  };
+
+  const cancelRuleDeletion = (restoreFocus = false) => {
+    if (!pendingRuleDeletion) return;
+    const { row, domain, status, button, rule, originalContent, confirmButton } = pendingRuleDeletion;
+    pendingRuleDeletion = null;
+    domain.replaceChildren(...originalContent);
+    status.hidden = false;
+    confirmButton.remove();
+    row.classList.remove("is-confirming-delete");
+    setRuleButtonAction(button, rule, "delete");
+    if (restoreFocus) button.focus();
+  };
+
+  const requestRuleDeletion = (row) => {
+    cancelRuleDeletion();
+    const { domain, status, button, rule } = ruleRowData.get(row);
+    const originalContent = [...domain.children];
+    const prompt = document.createElement("span");
+    prompt.className = "rule-delete-prompt";
+    prompt.setAttribute("role", "status");
+    prompt.textContent = deletionPrompt(rule.hostname);
+    const context = document.createElement("span");
+    context.className = "visually-hidden";
+    context.textContent = ` Rule for ${rule.hostname}${rule.includeSubdomains ? " and its subdomains" : ""}.`;
+    prompt.append(context);
+    domain.replaceChildren(prompt);
+    status.hidden = true;
+    row.classList.add("is-confirming-delete");
+    setRuleButtonAction(button, rule, "cancel");
+    const confirmButton = makeDeleteButton(rule, "confirm");
+    row.insertBefore(confirmButton, button);
+    pendingRuleDeletion = { row, domain, status, button, rule, originalContent, confirmButton };
   };
 
   const renderRules = () => {
@@ -265,6 +335,7 @@
       settings.siteRules, query, desktopSettingsLayout.matches, rulesExpanded
     ]);
     if (key === renderedRulesKey) return;
+    cancelRuleDeletion();
     renderedRulesKey = key;
     const rules = settings.siteRules
       .filter((rule) => rule.hostname.includes(query))
@@ -303,7 +374,9 @@
       status.className = "rule-status";
       status.textContent = rule.enabled === null ? "Inherit" : (rule.enabled ? "Active" : "Paused");
 
-      row.append(domain, status, makeDeleteButton(rule));
+      const button = makeDeleteButton(rule);
+      ruleRowData.set(row, { domain, status, button, rule });
+      row.append(domain, status, button);
       ruleList.append(row);
     });
 
@@ -516,12 +589,33 @@
   ruleList.addEventListener("click", (event) => {
     const button = event.target.closest(".delete-rule");
     const row = button?.closest(".rule-row");
-    if (!row) return;
+    if (!row || !ruleRowData.has(row)) return;
+    if (button.dataset.action === "delete") {
+      requestRuleDeletion(row);
+      return;
+    }
+    if (pendingRuleDeletion?.row !== row) return;
+    if (button.dataset.action === "cancel") {
+      cancelRuleDeletion(true);
+      return;
+    }
+    if (button.dataset.action !== "confirm") return;
+    const index = [...ruleList.children].indexOf(row);
+    pendingRuleDeletion = null;
     save(settingsApi.removeSiteRule(
       settings,
       row.dataset.hostname,
       row.dataset.subdomains === "true"
     ));
+    const nextRow = ruleList.children[Math.min(index, ruleList.children.length - 1)];
+    (ruleRowData.get(nextRow)?.button ?? hostnameInput).focus();
+  });
+
+  ruleList.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && pendingRuleDeletion?.row === event.target.closest(".rule-row")) {
+      event.preventDefault();
+      cancelRuleDeletion(true);
+    }
   });
 
   exportButton.addEventListener("click", () => {
