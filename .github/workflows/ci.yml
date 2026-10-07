@@ -49,7 +49,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run package
-      - run: npm run test:browser -- ${{ matrix.browser }}
+      - run: xvfb-run -a npm run test:browser -- ${{ matrix.browser }}
       - uses: actions/upload-artifact@v6
         if: always()
         with:

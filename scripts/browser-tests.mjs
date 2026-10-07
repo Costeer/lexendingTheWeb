@@ -26,6 +26,23 @@ const checks = [];
 const check = async (name, run) => { await run(); checks.push(name); console.log(`PASS ${browserName}: ${name}`); };
 const wait = (expression, description) => driver.wait(() => driver.executeScript(`return (${expression});`), 15000, description, 100);
 const script = (fn, ...args) => driver.executeScript(typeof fn === "string" ? `return (${fn});` : fn, ...args);
+const navigateExtension = async (url) => {
+  if (browserName === "firefox") {
+    // WebDriver intentionally disallows privileged URL navigation from content
+    // context. Open our page through browser chrome in this isolated profile.
+    await driver.setContext(firefox.Context.CHROME);
+    try {
+      await driver.executeScript(function (url) {
+        window.gBrowser.selectedBrowser.loadURI(Services.io.newURI(url), {
+          triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+        });
+      }, url);
+    } finally {
+      await driver.setContext(firefox.Context.CONTENT);
+    }
+    await wait(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete'`, "Extension page opens");
+  } else await driver.get(url);
+};
 const extensionCall = async (fn, ...args) => {
   const result = await driver.executeAsyncScript(`
     const done = arguments[arguments.length - 1];
@@ -57,12 +74,12 @@ try {
   if (browserName === "chrome") {
     const extensionDirectory = join(root, "dist/chrome");
     const options = new chrome.Options().setBrowserVersion("stable").addArguments(
-      "--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,900",
+      "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,900",
       `--user-data-dir=${profile}`, `--disable-extensions-except=${extensionDirectory}`, `--load-extension=${extensionDirectory}`
     );
     builder.setChromeOptions(options);
   } else {
-    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion("stable").addArguments("-headless"));
+    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion("stable").addArguments("--remote-allow-system-access"));
   }
   driver = await builder.build();
   await driver.manage().setTimeouts({ script: 20000 });
@@ -84,7 +101,7 @@ try {
   assert(origin, "Installed font URLs identify the extension's real origin");
   await driver.switchTo().newWindow("tab");
   const optionsTab = await driver.getWindowHandle();
-  await driver.get(`${origin}options.html`);
+  await navigateExtension(`${origin}options.html`);
   await wait("!document.querySelector('#dark-theme').disabled", "Settings must initialize");
 
   await check("real background serializes concurrent preferences and rule changes", async () => {
@@ -186,9 +203,9 @@ try {
       await driver.findElement(By.css(`[data-settings-panel="${id}"]`)).click();
       assert.deepEqual(await script("[...document.querySelectorAll('.settings-panel')].filter(p=>!p.hidden).map(p=>p.id)"), [id]);
     }
-    await driver.get(`${origin}about.html`);
+    await navigateExtension(`${origin}about.html`);
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
-    await driver.get(`${origin}options.html`);
+    await navigateExtension(`${origin}options.html`);
     await wait("!document.querySelector('#dark-theme').disabled", "Settings reload");
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
     await driver.manage().window().setRect({ width: 390, height: 844 });
@@ -212,7 +229,7 @@ try {
   });
 
   await check("popup uses the real stored preferences and fits a narrow viewport", async () => {
-    await driver.get(`${origin}popup.html`);
+    await navigateExtension(`${origin}popup.html`);
     await wait("!document.querySelector('#enabled').disabled", "Popup initializes");
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
     await driver.manage().window().setRect({ width: 390, height: 844 });

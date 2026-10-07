@@ -62,8 +62,30 @@ npm run check
 npm run build
 ```
 
-The build writes extensions you can load locally to `dist/chrome` and
-`dist/firefox`.
+Browser-ready files are written to `dist/chrome` and `dist/firefox`.
+
+### Installed-browser regression tests
+
+```sh
+npm run package
+npm run test:browser -- chrome
+npm run test:browser -- firefox
+```
+
+These tests install the built extension into an isolated browser profile and
+exercise real synchronized storage, the background worker, document-start
+content scripts, typography, exclusions, shadow-root recovery, related frames,
+keyboard deletion, imports, and responsive settings and popup layouts. Chrome
+also checks forced colors and reduced motion. Selenium Manager downloads matching
+browser/driver binaries as needed; its usage statistics are disabled by the test
+runner. Results and screenshots are written to `dist/browser-tests/`.
+The tests open desktop browser windows. On a Linux server without a desktop,
+prefix each browser command with `xvfb-run -a`; CI does this automatically so
+pointer/hover media queries match the desktop interface.
+
+CI runs both browsers on pull requests and checks dependency advisories. The
+narrow-window tests cover responsive layout, not Firefox Android's browser chrome;
+the Android add-on still needs device testing before release.
 
 ### Load in Chrome
 
