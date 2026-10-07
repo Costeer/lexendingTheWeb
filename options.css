@@ -87,6 +87,9 @@ main {
   align-items: center;
   justify-content: center;
   color: var(--accent);
+  /* This nested formatting context cannot use the link's text-clipped
+     background. Override its inherited transparent WebKit text fill. */
+  -webkit-text-fill-color: currentColor;
   font-size: 18px;
   font-weight: 700;
   line-height: 1;

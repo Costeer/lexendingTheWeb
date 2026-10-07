@@ -125,6 +125,16 @@ try {
     assert.deepEqual(result.siteRules.map((rule) => rule.hostname), ["keep.example"]);
   });
 
+  if (browserName === "chrome") await check("rendered settings save after the background worker restarts", async () => {
+    await driver.sendDevToolsCommand("ServiceWorker.enable", {});
+    for (const value of [120, 110]) {
+      await driver.sendDevToolsCommand("ServiceWorker.stopAllWorkers", {});
+      await driver.findElement(By.css(`input[name="basicTextScale"][value="${value}"] + span`)).click();
+      await wait("document.querySelector('#save-status').classList.contains('is-saved')", "The restarted worker confirms the save");
+      assert.equal((await saved()).textScale, value);
+    }
+  });
+
   await check("px/rem/em typography scales once while opt-outs and layout keep their original metrics", async () => {
     await driver.switchTo().window(websiteTab);
     await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 22", "110% text scaling");
@@ -207,6 +217,7 @@ try {
     }
     await navigateExtension(`${origin}about.html`);
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
+    assert.notEqual(await script("getComputedStyle(document.querySelector('.attribution-heart')).webkitTextFillColor"), "rgba(0, 0, 0, 0)", "Footer heart must not inherit transparent link text");
     await navigateExtension(`${origin}options.html`);
     await wait("!document.querySelector('#dark-theme').disabled", "Settings reload");
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
@@ -241,13 +252,49 @@ try {
     // Desktop windows have a minimum width. CDP supplies a real 320px viewport
     // so intrinsic popup sizing cannot hide overflow on narrow mobile surfaces.
     if (browserName === "chrome") {
-      await driver.sendDevToolsCommand("Emulation.setDeviceMetricsOverride", { width: 320, height: 844, deviceScaleFactor: 1, mobile: false });
+      await driver.sendDevToolsCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+      await driver.sendDevToolsCommand("Emulation.setDeviceMetricsOverride", { width: 320, height: 844, deviceScaleFactor: 1, mobile: true });
       await wait("innerWidth === 320", "Narrow popup viewport applies");
+      await wait("matchMedia('(hover: none) and (pointer: coarse)').matches", "Touch popup layout applies");
       assert.equal(await script("document.documentElement.scrollWidth <= innerWidth + 1"), true, "320px popup must fit");
       await wait("[...document.querySelectorAll('.segments span')].every(el=>{const range=document.createRange();range.selectNodeContents(el);const text=range.getBoundingClientRect(),box=el.getBoundingClientRect();return text.left>=box.left-.5 && text.right<=box.right+.5;})", "All popup option labels fit their segments");
       await driver.sendDevToolsCommand("Emulation.clearDeviceMetricsOverride", {});
+      await driver.sendDevToolsCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
     }
     await writeFile(join(artifactDirectory, "popup-mobile.png"), await driver.takeScreenshot(), "base64");
+  });
+
+  if (browserName === "chrome") await check("actual toolbar popup has a stable width and saves changes", async () => {
+    await driver.manage().window().setRect({ width: 1280, height: 900 });
+    const result = await extensionCall(async () => {
+      const api = globalThis.chrome;
+      await api.action.openPopup();
+      let view;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        view = api.extension.getViews({ type: "popup" })[0];
+        if (view?.document.querySelector("#enabled")?.disabled === false) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      if (!view) throw new Error("The actual toolbar popup did not open");
+      await view.document.fonts.ready;
+      const bodyWidth = view.document.body.getBoundingClientRect().width;
+      const viewportWidth = view.innerWidth;
+      const input = view.document.querySelector('input[name="spacing"][value="0.08"]');
+      input.click();
+      let settings;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        settings = await api.storage.sync.get(null);
+        if (settings.letterSpacing === .08) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const feedback = view.document.querySelector("#popup-feedback").textContent;
+      view.close();
+      return { bodyWidth, viewportWidth, spacing: settings.letterSpacing, feedback };
+    });
+    assert.equal(result.bodyWidth, 360);
+    assert(result.viewportWidth >= 360 && result.viewportWidth < 380, "Toolbar width stays intrinsic, not collapsed or full-page");
+    assert.equal(result.spacing, .08);
+    assert.equal(result.feedback, "");
   });
   await writeFile(join(artifactDirectory, "results.json"), JSON.stringify({ browserName, checks, installedExtension: true }, null, 2));
 } catch (error) {

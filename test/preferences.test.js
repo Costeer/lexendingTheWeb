@@ -112,3 +112,72 @@ test("preference edits migrate legacy keys without losing their rules", async ()
   assert.equal(f.saved().letterSpacing, 0.04);
   assert.equal(f.saved().disabledSites, undefined);
 });
+
+const connectFixture = (f, { missingWriter = false } = {}) => {
+  const ports = [];
+  const event = () => ({ listeners: [], addListener(listener) { this.listeners.push(listener); },
+    emit(value) { this.listeners.forEach((listener) => listener(value)); } });
+  f.extension.runtime.connect = ({ name }) => {
+    assert.equal(name, preferences.connectionName);
+    let disconnected = false;
+    const port = { onMessage: event(), onDisconnect: event(),
+      disconnect() { disconnected = true; this.onDisconnect.emit(); },
+      postMessage({ id, operation }) {
+        if (disconnected) throw new Error("Disconnected port");
+        if (missingWriter) return;
+        f.store.mutate(operation).then(
+          (settings) => { if (!disconnected) this.onMessage.emit({ id, ok: true, settings }); },
+          (error) => { if (!disconnected) this.onMessage.emit({ id, ok: false, message: error.message }); }
+        );
+      }
+    };
+    ports.push(port);
+    if (missingWriter) queueMicrotask(() => port.disconnect());
+    return port;
+  };
+  return ports;
+};
+
+test("dedicated save connections correlate concurrent responses and preserve unrelated settings", async () => {
+  const f = fixture({ theme: "dark" });
+  const ports = connectFixture(f);
+  const first = preferences.createClient(f.extension), second = preferences.createClient(f.extension);
+  await Promise.all([first.load(), second.load()]);
+  await Promise.all([
+    first.mutate({ type: "patch", changes: { textScale: 110 } }),
+    first.mutate({ type: "patch", changes: { letterSpacing: .08 } }),
+    second.mutate({ type: "addRule", rule: { hostname: "saved.example", enabled: false } })
+  ]);
+  assert.equal(ports.length, 2, "each page reuses one connection for its writes");
+  assert.equal(f.saved().textScale, 110);
+  assert.equal(f.saved().letterSpacing, .08);
+  assert.equal(f.saved().theme, "dark");
+  assert.equal(f.saved().siteRules[0].hostname, "saved.example");
+});
+
+test("an idle connection disconnect reconnects on the next save", async () => {
+  const f = fixture();
+  const ports = connectFixture(f);
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  await client.mutate({ type: "patch", changes: { textScale: 110 } });
+  ports[0].disconnect();
+  await client.mutate({ type: "patch", changes: { letterSpacing: .08 } });
+  assert.equal(ports.length, 2);
+  assert.equal(f.saved().textScale, 110);
+  assert.equal(f.saved().letterSpacing, .08);
+});
+
+test("missing writer responses expose a reload instruction and roll back the optimistic edit", async () => {
+  const f = fixture({ theme: "dark" });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  f.extension.runtime.sendMessage = async () => undefined;
+  await assert.rejects(client.mutate({ type: "patch", changes: { theme: "light" } }),
+    (error) => error.code === "BACKGROUND_UNAVAILABLE" && /Reload the extension/.test(error.message));
+  assert.equal(client.settings.theme, "dark");
+  assert.equal(f.writes.length, 0);
+  connectFixture(f, { missingWriter: true });
+  await assert.rejects(client.mutate({ type: "patch", changes: { theme: "light" } }), { code: "BACKGROUND_UNAVAILABLE" });
+  assert.equal(client.settings.theme, "dark");
+});

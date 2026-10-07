@@ -113,6 +113,30 @@
     }
   };
 
+  const canMutate = (sender) => sender?.id === extension.runtime.id
+    && sender.url?.startsWith(extension.runtime.getURL(""));
+  const mutationResponse = (operation) => store.mutate(operation).then(
+    (settings) => ({ ok: true, settings }),
+    (error) => ({ ok: false, code: error.code ?? "SAVE_FAILED", message: error.message ?? "Changes could not be saved." })
+  );
+  const forbiddenResponse = { ok: false, code: "FORBIDDEN", message: "Settings changes must come from an extension page." };
+
+  extension.runtime.onConnect?.addListener((port) => {
+    if (port.name !== globalThis.LexendPreferences.connectionName) return;
+    const allowed = canMutate(port.sender);
+    let disconnected = false;
+    port.onDisconnect.addListener(() => { disconnected = true; });
+    port.onMessage.addListener((request) => {
+      if (!Number.isSafeInteger(request?.id)) return;
+      const response = allowed ? mutationResponse(request.operation) : Promise.resolve(forbiddenResponse);
+      response.then((value) => {
+        if (!disconnected) {
+          try { port.postMessage({ id: request.id, ...value }); } catch {}
+        }
+      });
+    });
+  });
+
   extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === "LEXEND_FRAME_REQUIREMENT") {
       // Runtime sender metadata identifies the actual extension/frame. Page
@@ -142,15 +166,11 @@
     if (message?.type === globalThis.LexendPreferences.messageType) {
       // Only our extension pages can mutate settings. Content scripts, which
       // run in third-party tabs, may report state but cannot submit writes.
-      if (sender.id !== extension.runtime.id
-          || !sender.url?.startsWith(extension.runtime.getURL(""))) {
-        sendResponse({ ok: false, code: "FORBIDDEN", message: "Settings changes must come from an extension page." });
+      if (!canMutate(sender)) {
+        sendResponse(forbiddenResponse);
         return undefined;
       }
-      store.mutate(message.operation).then(
-        (settings) => sendResponse({ ok: true, settings }),
-        (error) => sendResponse({ ok: false, code: error.code ?? "SAVE_FAILED", message: error.message ?? "Changes could not be saved." })
-      );
+      mutationResponse(message.operation).then(sendResponse);
       return true;
     }
     if (message?.type === "LEXEND_STATE" && sender.frameId === 0) {

@@ -3,6 +3,7 @@
 
   const api = globalThis.LexendSettings;
   const messageType = "LEXEND_SETTINGS_MUTATE";
+  const connectionName = "lexend-settings";
   const preferenceKeys = new Set(["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
   const legacyKeys = ["disabledSites", "spacing", "uiStyle"];
   const applyOperation = (settings, operation) => {
@@ -66,6 +67,57 @@
     let eventRevision = 0;
     let startupChanges = {};
     const pending = [];
+    let connection;
+    let requestId = 0;
+    const unavailable = () => api.settingsError("BACKGROUND_UNAVAILABLE",
+      "The extension background isn't responding. Reload the extension, then reopen settings.");
+    const sendOperation = (operation) => {
+      const runtime = extension?.runtime;
+      if (!runtime?.connect) return runtime.sendMessage({ type: messageType, operation });
+      // A dedicated connection targets the writer and does not rely on the
+      // first response from every runtime.onMessage listener in the extension.
+      if (!connection) {
+        const port = runtime.connect({ name: connectionName });
+        const state = { port, requests: new Map() };
+        connection = state;
+        port.onMessage.addListener((response) => {
+          const request = state.requests.get(response?.id);
+          if (!request) return;
+          state.requests.delete(response.id);
+          clearTimeout(request.timeout);
+          request.resolve(response);
+        });
+        port.onDisconnect.addListener(() => {
+          // Read lastError even when idle so Chrome does not report an unchecked
+          // disconnect. The next save opens a new port and wakes the worker.
+          void runtime.lastError;
+          if (connection === state) connection = null;
+          state.requests.forEach((request) => {
+            clearTimeout(request.timeout);
+            request.reject(unavailable());
+          });
+          state.requests.clear();
+        });
+      }
+      const state = connection;
+      return new Promise((resolve, reject) => {
+        const id = ++requestId;
+        const timeout = setTimeout(() => {
+          state.requests.delete(id);
+          if (connection === state) connection = null;
+          try { state.port.disconnect(); } catch {}
+          reject(unavailable());
+        }, 15000);
+        state.requests.set(id, { resolve, reject, timeout });
+        try { state.port.postMessage({ id, operation }); }
+        catch {
+          state.requests.delete(id);
+          clearTimeout(timeout);
+          if (connection === state) connection = null;
+          reject(unavailable());
+        }
+      });
+    };
     const current = () => pending.reduce((value, entry) => (
       entry.operation.type === "patch" ? applyOperation(value, entry.operation) : value
     ), confirmed);
@@ -114,13 +166,14 @@
       },
       async mutate(operation) {
         if (!loaded) throw api.settingsError("NOT_LOADED", "Wait until your settings have loaded.");
-        if (!extension?.runtime?.sendMessage) throw api.settingsError("PREVIEW_ONLY", "Changes are preview-only here.");
+        if (!extension?.runtime?.connect && !extension?.runtime?.sendMessage) throw api.settingsError("PREVIEW_ONLY", "Changes are preview-only here.");
         const entry = { operation };
         pending.push(entry);
         emit();
         const revision = eventRevision;
         try {
-          const response = await extension.runtime.sendMessage({ type: messageType, operation });
+          const response = await sendOperation(operation);
+          if (!response) throw unavailable();
           if (!response?.ok) throw api.settingsError(response?.code ?? "SAVE_FAILED", response?.message ?? "Changes could not be saved.");
           // Do not overwrite a newer storage event with an older response.
           if (revision === eventRevision) confirmed = api.normalizeSettings(response.settings);
@@ -133,5 +186,5 @@
     };
   };
 
-  globalThis.LexendPreferences = Object.freeze({ createStore, createClient, messageType });
+  globalThis.LexendPreferences = Object.freeze({ createStore, createClient, messageType, connectionName });
 })();

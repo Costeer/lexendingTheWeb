@@ -42,6 +42,7 @@ function createBackground({ stored = {}, supported = true } = {}) {
     commands: { onCommand: event() },
     runtime: {
       onMessage: event(),
+      onConnect: event(),
       id: "test-extension",
       getURL: (path) => `extension://test/${path}`,
       onInstalled: event(),
@@ -161,6 +162,26 @@ test("only extension pages can use the settings mutation channel", async () => {
   });
   assert.equal(response.ok, true);
   assert.equal(writes[0].theme, "dark");
+});
+
+test("dedicated settings connections authorize the sender and reply only after saving", async () => {
+  const { browser, writes } = createBackground();
+  const responses = [];
+  const port = { name: globalThis.LexendPreferences.connectionName,
+    sender: { id: "test-extension", url: "extension://test/options.html" },
+    onMessage: event(), onDisconnect: event(), postMessage(value) { responses.push(value); } };
+  browser.runtime.onConnect.listener(port);
+  port.onMessage.listener({ id: 1, operation: { type: "patch", changes: { textScale: 120 } } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(responses[0].id, 1);
+  assert.equal(responses[0].ok, true);
+  assert.equal(writes[0].textScale, 120);
+  const denied = { ...port, sender: { id: "test-extension", url: "https://example.com" }, onMessage: event(), onDisconnect: event() };
+  browser.runtime.onConnect.listener(denied);
+  denied.onMessage.listener({ id: 2, operation: { type: "patch", changes: { theme: "dark" } } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(responses[1].code, "FORBIDDEN");
+  assert.equal(writes.length, 1);
 });
 
 test("shortcut capacity failures show a toolbar error without dropping any rules", async () => {
