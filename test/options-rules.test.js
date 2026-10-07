@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import "../src/settings.js";
+import "../src/preferences.js";
 
 const source = await readFile(new URL("../options.js", import.meta.url), "utf8");
 const themeSource = await readFile(new URL("../src/ui-theme.js", import.meta.url), "utf8");
@@ -45,7 +46,7 @@ class Element {
   focus() { this.focused = true; }
 }
 
-async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings } = {}) {
+async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings, allowErrors = false } = {}) {
   const elements = new Map();
   const get = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new Element());
@@ -71,6 +72,20 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   const errors = [];
   const root = { dataset: {} };
   const cache = new Map([["lexend-ui-theme", cachedTheme]]);
+  let stored = { siteRules: Array.from({ length: count }, (_, index) => ({
+    hostname: `site${index + 1}.example.com`, includeSubdomains: false, enabled: false
+  })) };
+  let changeListener;
+  const storage = {
+    async get() { return getSettings ? getSettings() : stored; },
+    async set(patch) {
+      stored = { ...stored, ...patch };
+      writes.push(structuredClone(stored));
+      changeListener?.(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
+    },
+    async remove() {}
+  };
+  const store = globalThis.LexendPreferences.createStore(storage);
   const context = {
     document: {
       documentElement: root,
@@ -87,20 +102,15 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
       setItem: (key, value) => cache.set(key, value)
     },
     LexendSettings: globalThis.LexendSettings,
+    LexendPreferences: globalThis.LexendPreferences,
     LexendQuotes: { random: () => ({ text: "Preview", author: "Author", lang: "en", url: "https://example.com" }) },
-    browser: { storage: {
-      sync: {
-        async get() {
-          if (getSettings) return getSettings();
-          return { siteRules: Array.from({ length: count }, (_, index) => ({
-            hostname: `site${index + 1}.example.com`, includeSubdomains: false, enabled: false
-          })) };
-        },
-        async set(settings) { writes.push(settings); },
-        async remove() {}
-      },
-      onChanged: { addListener() {} }
-    } },
+    browser: {
+      runtime: { async sendMessage({ operation }) {
+        try { return { ok: true, settings: await store.mutate(operation) }; }
+        catch (error) { return { ok: false, code: error.code, message: error.message }; }
+      } },
+      storage: { sync: storage, onChanged: { addListener(listener) { changeListener = listener; } } }
+    },
     matchMedia: (query) => query.includes("min-width") ? media : { matches: false },
     location: { search: "" },
     URLSearchParams,
@@ -110,9 +120,10 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   runInNewContext(themeSource, context);
   runInNewContext(source, context);
   await tick();
-  assert.deepEqual(errors, []);
+  if (!allowErrors) assert.deepEqual(errors, []);
   return {
     get, writes, panels, navigation, root, cache, inputs,
+    change(changes) { changeListener(changes, "sync"); },
     rows: () => get("#rule-list").children,
     resize(desktopMode) { media.matches = desktopMode; media.listener(); }
   };
@@ -137,6 +148,38 @@ test("settings retain the dark navigation cache while loading, then honor synced
   const stale = await openSettings({ cachedTheme: "dark", getSettings: async () => ({ theme: "light" }) });
   assert.equal(stale.root.dataset.theme, "light", "the cache does not override synced settings");
   assert.equal(stale.cache.get("lexend-ui-theme"), "light");
+});
+
+test("failed settings reads keep controls disabled and Retry reads without writing defaults", async () => {
+  let attempts = 0;
+  const page = await openSettings({ allowErrors: true, getSettings: async () => {
+    if (++attempts === 1) throw new Error("Read temporarily failed");
+    return { theme: "dark", enabled: false, siteRules: [{ hostname: "saved.example", enabled: false }] };
+  } });
+  assert.equal(page.get("#dark-theme").disabled, true);
+  page.get("#dark-theme").emit("change");
+  assert.equal(page.writes.length, 0);
+  await page.get("#retry-save").emit("click");
+  await tick();
+  assert.equal(attempts, 2);
+  assert.equal(page.writes.length, 0);
+  assert.equal(page.get("#dark-theme").disabled, false);
+  assert.equal(page.get("#dark-theme").checked, true);
+  assert.equal(page.rows()[0].dataset.hostname, "saved.example");
+});
+
+test("controls cannot save before initialization and newer storage events win over the read", async () => {
+  let resolve;
+  const page = await openSettings({ getSettings: () => new Promise((done) => { resolve = done; }) });
+  assert.equal(page.get("#text-scale").disabled, true);
+  page.get("#text-scale").value = "110";
+  page.get("#text-scale").emit("change");
+  assert.equal(page.writes.length, 0);
+  page.change({ theme: { newValue: "dark" } });
+  resolve({ theme: "light", textScale: 120 });
+  await tick();
+  assert.equal(page.get("#dark-theme").checked, true);
+  assert.equal(page.get("#text-scale").value, "120");
 });
 
 test("readability presets select only exact saved values, never the nearest choice", async () => {

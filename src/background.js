@@ -3,9 +3,10 @@
 
   const extension = globalThis.browser ?? globalThis.chrome;
   if (!globalThis.LexendSettings && typeof importScripts === "function") {
-    importScripts("settings.js");
+    importScripts("settings.js", "preferences.js");
   }
   const settingsApi = globalThis.LexendSettings;
+  const store = globalThis.LexendPreferences.createStore(extension.storage.sync);
   const iconSizes = [16, 32, 48, 128];
 
   const iconPaths = (active) => Object.fromEntries(
@@ -16,6 +17,21 @@
   );
   const icons = { active: iconPaths(true), paused: iconPaths(false) };
   const tabStates = new Map();
+  const tabRevisions = new Map();
+  const advanceTab = (tabId) => {
+    const revision = (tabRevisions.get(tabId) ?? 0) + 1;
+    tabRevisions.set(tabId, revision);
+    return revision;
+  };
+  const refreshTab = async (tabId) => {
+    const revision = advanceTab(tabId);
+    try {
+      const state = await extension.tabs.sendMessage(tabId, { type: "LEXEND_GET_STATE" }, { frameId: 0 });
+      if (tabRevisions.get(tabId) === revision) await setTabState(tabId, Boolean(state?.ready && state.active));
+    } catch {
+      if (tabRevisions.get(tabId) === revision) await setTabState(tabId, false);
+    }
+  };
 
   const setTabState = async (tabId, active) => {
     if (tabId === undefined) return;
@@ -49,18 +65,12 @@
     await Promise.all(tabs.map(async (tab) => {
       if (tab.id === undefined) return;
       if (!settings.enabled) {
+        advanceTab(tab.id);
         await setTabState(tab.id, false);
         return;
       }
 
-      try {
-        const state = await extension.tabs.sendMessage(tab.id, {
-          type: "LEXEND_GET_STATE"
-        }, { frameId: 0 });
-        await setTabState(tab.id, Boolean(state?.active));
-      } catch {
-        await setTabState(tab.id, false);
-      }
+      await refreshTab(tab.id);
     }));
   };
 
@@ -78,11 +88,7 @@
     }
     if (!state?.ready || !settingsApi.validHostname(state.hostname)) return;
 
-    const settings = settingsApi.normalizeSettings(
-      await extension.storage.sync.get(null)
-    );
-    await extension.storage.sync.set(settingsApi.toggleSite(settings, state.hostname));
-    await extension.storage.sync.remove?.(["disabledSites", "spacing"]);
+    await store.mutate({ type: "toggleSite", hostname: state.hostname });
   };
 
   extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -111,19 +117,38 @@
       }).then(() => sendResponse({ relayed: true }), () => sendResponse({ relayed: false }));
       return true;
     }
+    if (message?.type === globalThis.LexendPreferences.messageType) {
+      // Only our extension pages can mutate settings. Content scripts, which
+      // run in third-party tabs, may report state but cannot submit writes.
+      if (sender.id !== extension.runtime.id
+          || !sender.url?.startsWith(extension.runtime.getURL(""))) {
+        sendResponse({ ok: false, code: "FORBIDDEN", message: "Settings changes must come from an extension page." });
+        return undefined;
+      }
+      store.mutate(message.operation).then(
+        (settings) => sendResponse({ ok: true, settings }),
+        (error) => sendResponse({ ok: false, code: error.code ?? "SAVE_FAILED", message: error.message ?? "Changes could not be saved." })
+      );
+      return true;
+    }
     if (message?.type === "LEXEND_STATE" && sender.frameId === 0) {
+      advanceTab(sender.tab?.id);
       setTabState(sender.tab?.id, Boolean(message.active));
     }
   });
 
   extension.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (changeInfo.status === "loading" || changeInfo.url) {
+    if (changeInfo.status === "loading") {
+      advanceTab(tabId);
       setTabState(tabId, false);
+    } else if (changeInfo.url || changeInfo.status === "complete") {
+      refreshTab(tabId).catch(() => {});
     }
   });
 
   extension.tabs.onRemoved?.addListener((tabId) => {
     tabStates.delete(tabId);
+    tabRevisions.delete(tabId);
   });
 
   extension.storage.onChanged.addListener((changes, areaName) => {

@@ -4,18 +4,15 @@ import "../src/settings.js";
 
 const api = globalThis.LexendSettings;
 
-test("rule byte accounting preserves insertion order and fits smaller rules after oversized candidates", () => {
+test("oversized rule collections remain intact on read and fail explicitly before writing", () => {
   const candidates = Array.from({ length: 250 }, (_, i) => ({
     hostname: `site${i}.${"a".repeat(i % 3 === 0 ? 63 : 1)}.example.com`,
     includeSubdomains: i % 2 === 0,
     enabled: false,
     scope: null
   }));
-  const expected = [];
-  for (const rule of candidates) {
-    if (JSON.stringify([...expected, rule]).length <= 7000) expected.push(rule);
-  }
-  assert.deepEqual(api.normalizeSettings({ siteRules: candidates }).siteRules, expected);
+  assert.deepEqual(api.normalizeSettings({ siteRules: candidates }).siteRules, candidates);
+  assert.throws(() => api.validateCapacity({ siteRules: candidates }), { code: "RULE_CAPACITY" });
 });
 
 test("enabled and scope precedence are independent of rule insertion order", () => {

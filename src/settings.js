@@ -97,22 +97,16 @@
     const rules = new Map();
 
     if (Array.isArray(sourceRules)) {
-      sourceRules.slice(0, 250).forEach((candidate) => {
+      sourceRules.forEach((candidate) => {
         const rule = normalizeRule(candidate);
         if (!rule) return;
         rules.set(`${rule.hostname}\n${rule.includeSubdomains}`, rule);
       });
     }
 
-    const siteRules = [];
-    let ruleBytes = 2; // The surrounding JSON array brackets.
-    rules.forEach((rule) => {
-      const addedBytes = JSON.stringify(rule).length + (siteRules.length ? 1 : 0);
-      if (ruleBytes + addedBytes <= MAX_SITE_RULE_BYTES) {
-        siteRules.push(rule);
-        ruleBytes += addedBytes;
-      }
-    });
+    // Reading and resolving settings must never silently discard saved rules.
+    // Enforce write limits separately, before making a storage mutation.
+    const siteRules = [...rules.values()];
 
     return {
       enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
@@ -125,6 +119,52 @@
         : clampNumber(value.lineHeight, defaults.lineHeight, 1, 2.4, 2),
       letterSpacing: normalizeLetterSpacing(value)
     };
+  };
+
+  const settingsError = (code, message) => Object.assign(new Error(message), { code });
+  const validateCapacity = (value) => {
+    const settings = normalizeSettings(value);
+    if (settings.siteRules.length > 250
+        || new TextEncoder().encode(JSON.stringify(settings.siteRules)).length > MAX_SITE_RULE_BYTES) {
+      throw settingsError("RULE_CAPACITY", "There isn't room for these site rules. Remove some rules before adding or importing more.");
+    }
+    return settings;
+  };
+
+  const validateImport = (payload) => {
+    const value = payload?.settings;
+    if (![1, 2].includes(payload?.schemaVersion) || !value || typeof value !== "object" || Array.isArray(value)) {
+      throw settingsError("INVALID_IMPORT", "Choose a valid Lexend settings file.");
+    }
+    if (value.siteRules !== undefined && (!Array.isArray(value.siteRules)
+        || value.siteRules.some((rule) => !normalizeRule(rule)
+          || (rule.enabled !== undefined && rule.enabled !== null && typeof rule.enabled !== "boolean")
+          || (rule.scope !== undefined && rule.scope !== null && !["body", "all"].includes(rule.scope))
+          || (rule.includeSubdomains !== undefined && typeof rule.includeSubdomains !== "boolean")))) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains an invalid site rule. Nothing was imported.");
+    }
+    if (value.disabledSites !== undefined && (!Array.isArray(value.disabledSites)
+        || value.disabledSites.some((hostname) => !validHostname(normalizeHostname(hostname))))) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains an invalid site rule. Nothing was imported.");
+    }
+    for (const [key, valid] of [
+      ["enabled", (v) => typeof v === "boolean"],
+      ["scope", (v) => ["body", "all"].includes(v)],
+      ["theme", (v) => ["light", "dark"].includes(v)],
+      ["textScale", (v) => typeof v === "number" && v >= 80 && v <= 140],
+      ["lineHeight", (v) => typeof v === "number" && (v === 0 || (v >= 1 && v <= 2.4))],
+      ["letterSpacing", (v) => typeof v === "number" && v >= 0 && v <= 0.2]
+    ]) {
+      if (value[key] !== undefined && !valid(value[key])) {
+        throw settingsError("INVALID_IMPORT", `The settings file contains an invalid ${key} value. Nothing was imported.`);
+      }
+    }
+    const settings = validateCapacity(value);
+    const source = value.siteRules ?? value.disabledSites;
+    if (source && settings.siteRules.length !== source.length) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains duplicate site rules. Nothing was imported.");
+    }
+    return settings;
   };
 
   const ruleMatches = (rule, hostname) => (
@@ -191,7 +231,7 @@
       .map((rule) => keyMatches(rule) ? updated : rule)
       .filter(Boolean);
     if (updated && !settings.siteRules.some(keyMatches)) siteRules.push(updated);
-    return normalizeSettings({ ...settings, siteRules });
+    return validateCapacity({ ...settings, siteRules });
   };
 
   const removeSiteRule = (value, hostname, includeSubdomains = false) => {
@@ -225,6 +265,9 @@
     resolveSite,
     setSiteRule,
     toggleSite,
+    settingsError,
+    validateCapacity,
+    validateImport,
     validHostname
   });
 })();

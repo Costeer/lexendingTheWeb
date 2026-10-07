@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
-    "lint:firefox": "web-ext lint --source-dir dist/firefox",
+    "lint:firefox": "addons-linter dist/firefox --warnings-as-errors",
     "test": "node scripts/test.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "verify:chrome": "npm test && npm run check && npm run package",
@@ -21,6 +21,9 @@
   "devDependencies": {
     "fflate": "^0.8.3",
     "playwright": "^1.63.0",
-    "web-ext": "^10.7.0"
+    "addons-linter": "^10.13.0"
+  },
+  "overrides": {
+    "source-map-js": "^1.2.2"
   }
 }

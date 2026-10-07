@@ -342,7 +342,7 @@ test("site rules migrate and resolve by specificity", () => {
   assert.equal(settingsApi.resolveSite(settings, "docs.example.com").siteEnabled, false);
 });
 
-test("normalization rejects invalid values and respects the sync storage limit", () => {
+test("normalization rejects invalid preferences without silently truncating existing rules", () => {
   assert.equal(settingsApi.validHostname("valid-subdomain.example.com"), true);
   assert.equal(settingsApi.validHostname("-invalid.example.com"), false);
 
@@ -364,8 +364,8 @@ test("normalization rejects invalid values and respects the sync storage limit",
   assert.equal(settings.lineHeight, 1);
   assert.equal(settings.letterSpacing, 0.2);
   assert.equal(settings.theme, "light");
-  assert.ok(JSON.stringify(settings.siteRules).length <= 7000);
-  assert.ok(settings.siteRules.length < siteRules.length);
+  assert.equal(settings.siteRules.length, siteRules.length);
+  assert.throws(() => settingsApi.validateCapacity(settings), { code: "RULE_CAPACITY" });
 });
 
 test("interface themes normalize and replace legacy styles without changing readability", () => {

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import "../src/settings.js";
+import "../src/preferences.js";
 
 const source = await readFile(new URL("../src/background.js", import.meta.url), "utf8");
 
@@ -33,7 +34,7 @@ function createBackground({ stored = {}, supported = true } = {}) {
     storage: {
       sync: {
         async get() { return stored; },
-        async set(value) { stored = value; writes.push(value); },
+        async set(value) { stored = { ...stored, ...value }; writes.push(value); },
         async remove() {}
       },
       onChanged: event()
@@ -41,11 +42,13 @@ function createBackground({ stored = {}, supported = true } = {}) {
     commands: { onCommand: event() },
     runtime: {
       onMessage: event(),
+      id: "test-extension",
+      getURL: (path) => `extension://test/${path}`,
       onInstalled: event(),
       onStartup: event()
     }
   };
-  runInNewContext(source, { browser, LexendSettings: globalThis.LexendSettings, console });
+  runInNewContext(source, { browser, LexendSettings: globalThis.LexendSettings, LexendPreferences: globalThis.LexendPreferences, console });
   return { browser, messages, writes, icons };
 }
 
@@ -118,4 +121,44 @@ test("a failed toolbar update can retry the same state", async () => {
   await new Promise((resolve) => setImmediate(resolve));
   browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
   assert.equal(icons.length, 1);
+});
+
+test("single-page URL updates reconcile the toolbar with the main frame", async () => {
+  const { browser, icons, messages } = createBackground();
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 });
+  browser.tabs.onUpdated.listener(42, { url: "https://example.com/route" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(messages.at(-1).options.frameId, 0);
+  assert.equal(icons.at(-1).path[16], "assets/icons/icon-16.png");
+});
+
+test("stale toolbar queries cannot override a newer document state or a closed tab", async () => {
+  const { browser, icons } = createBackground();
+  let respond;
+  browser.tabs.sendMessage = () => new Promise((resolve) => { respond = resolve; });
+  browser.tabs.onUpdated.listener(42, { url: "https://example.com/first" });
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 });
+  respond({ ready: true, active: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(icons.at(-1).path[16], "assets/icons/icon-16.png");
+  const count = icons.length;
+  browser.tabs.onUpdated.listener(42, { status: "complete" });
+  browser.tabs.onRemoved.listener(42);
+  respond({ ready: true, active: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(icons.length, count);
+});
+
+test("only extension pages can use the settings mutation channel", async () => {
+  const { browser, writes } = createBackground();
+  const request = { type: "LEXEND_SETTINGS_MUTATE", operation: { type: "patch", changes: { theme: "dark" } } };
+  let denied;
+  browser.runtime.onMessage.listener(request, { id: "test-extension", url: "https://example.com", tab: { id: 42 } }, (value) => { denied = value; });
+  assert.equal(denied.code, "FORBIDDEN");
+  assert.equal(writes.length, 0);
+  const response = await new Promise((resolve) => {
+    assert.equal(browser.runtime.onMessage.listener(request, { id: "test-extension", url: "extension://test/options.html" }, resolve), true);
+  });
+  assert.equal(response.ok, true);
+  assert.equal(writes[0].theme, "dark");
 });

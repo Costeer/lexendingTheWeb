@@ -4,7 +4,6 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const quotesApi = globalThis.LexendQuotes;
-  const storage = extension?.storage?.sync;
   const tabs = extension?.tabs;
   const protectedHosts = new Set([
     "chrome.google.com",
@@ -36,11 +35,16 @@
   const toggleSiteButton = document.querySelector("#toggle-site");
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
+  const retryLoad = document.querySelector("#retry-load");
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
   let feedbackTimer;
   const quote = quotesApi.random();
+  const preferences = globalThis.LexendPreferences.createClient(extension, {
+    theme: settings.theme,
+    onChange(value) { settings = value; render(); }
+  });
 
   const renderQuote = () => {
     spacingPreviewText.textContent = `“${quote.text}”`;
@@ -69,8 +73,10 @@
       settings.enabled ? "Turn Lexend off" : "Turn Lexend on"
     );
     masterState.textContent = settings.enabled ? "On" : "Off";
-    scopeFieldset.disabled = !settings.enabled;
-    spacingFieldset.disabled = !settings.enabled;
+    enabledInput.disabled = !preferences.loaded;
+    toggleSiteButton.disabled = !preferences.loaded;
+    scopeFieldset.disabled = !preferences.loaded || !settings.enabled;
+    spacingFieldset.disabled = !preferences.loaded || !settings.enabled;
     scopeInputs.forEach((input) => {
       input.checked = input.value === settings.scope;
     });
@@ -111,24 +117,22 @@
     renderSite();
   };
 
-  const save = async (nextSettings) => {
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
-    if (!storage) {
-      showFeedback("Changes are preview-only here.");
+  const mutate = async (operation) => {
+    if (!preferences.loaded) {
+      render();
       return false;
     }
 
     try {
-      await storage.set(settings);
-      await storage.remove?.(["disabledSites", "spacing"]);
+      await preferences.mutate(operation);
       return true;
     } catch (error) {
       console.error("Lexend for the Web could not save settings.", error);
-      showFeedback("Changes could not be saved.", true, 0);
+      showFeedback(error.message || "Changes could not be saved.", true, 0);
       return false;
     }
   };
+  const save = (changes) => mutate({ type: "patch", changes });
 
   const getSiteContext = async () => {
     if (!tabs?.query) {
@@ -180,12 +184,12 @@
   });
 
   enabledInput.addEventListener("change", () => {
-    save({ ...settings, enabled: enabledInput.checked });
+    save({ enabled: enabledInput.checked });
   });
 
   scopeInputs.forEach((input) => {
     input.addEventListener("change", () => {
-      if (input.checked) save({ ...settings, scope: input.value });
+      if (input.checked) save({ scope: input.value });
     });
   });
 
@@ -193,44 +197,34 @@
     input.addEventListener("click", () => {
       const letterSpacing = Number(input.value);
       if (settings.letterSpacing !== letterSpacing) {
-        save({ ...settings, letterSpacing });
+        save({ letterSpacing });
       }
     });
   });
 
   toggleSiteButton.addEventListener("click", () => {
     if (!site?.supported) return;
-    save(settingsApi.toggleSite(settings, site.hostname));
-  });
-
-  extension?.storage?.onChanged?.addListener((changes, areaName) => {
-    if (areaName !== "sync") return;
-    const nextSettings = { ...settings };
-    Object.entries(changes).forEach(([key, change]) => {
-      if (change.newValue === undefined) delete nextSettings[key];
-      else nextSettings[key] = change.newValue;
-    });
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
+    mutate({ type: "toggleSite", hostname: site.hostname });
   });
 
   const start = async () => {
+    retryLoad.hidden = true;
     try {
-      const [storedSettings, siteContext] = await Promise.all([
-        storage ? storage.get(null) : settings,
-        getSiteContext()
-      ]);
-      settings = settingsApi.normalizeSettings(storedSettings);
-      site = siteContext;
+      await preferences.load();
+      try { site = await getSiteContext(); }
+      catch { site = { hostname: "", supported: false, restricted: true }; }
+      feedback.textContent = "";
       render();
     } catch (error) {
       console.error("Lexend for the Web could not load settings.", error);
       site = { hostname: "", supported: false, restricted: true };
+      retryLoad.hidden = false;
       render();
       showFeedback("Settings could not be loaded.", true, 0);
     }
   };
 
+  retryLoad.addEventListener("click", start);
   renderQuote();
   start();
 })();

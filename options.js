@@ -4,7 +4,6 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const quotesApi = globalThis.LexendQuotes;
-  const storage = extension?.storage?.sync;
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
   const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
@@ -95,8 +94,8 @@
   renderSettingsNavigation();
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
-  let failedSettings = null;
-  let writeQueue = Promise.resolve();
+  let failedOperation = null;
+  let loadFailed = false;
   let saveRevision = 0;
   let toastTimer;
   let readabilityAnimationToken = 0;
@@ -104,6 +103,17 @@
   let pendingRuleDeletion = null;
   const ruleRowData = new WeakMap();
   const quote = quotesApi.random();
+  const mutationControls = [darkThemeInput, advancedModeInput, textScaleSlider,
+    lineHeightSlider, letterSpacingSlider, resetReadabilityButton, hostnameInput,
+    subdomainsInput, exportButton, importButton, importFile,
+    ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
+  const preferences = globalThis.LexendPreferences.createClient(extension, {
+    theme: settings.theme,
+    onChange(value) {
+      settings = value;
+      render();
+    }
+  });
 
   const setSaveState = (state, message) => {
     saveStatus.className = `save-status is-${state}`;
@@ -298,6 +308,7 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "delete-rule";
+    button.disabled = !preferences.loaded;
     setRuleButtonAction(button, rule, action);
     return button;
   };
@@ -401,48 +412,37 @@
     renderInterfaceStyle();
     renderReadability();
     renderRules();
+    mutationControls.forEach((control) => { control.disabled = !preferences.loaded; });
+    updateAddRuleState();
   };
 
-  const persist = (snapshot) => {
+  const persist = async (operation) => {
+    if (!preferences.loaded) {
+      render();
+      return false;
+    }
     const revision = ++saveRevision;
-    failedSettings = null;
+    failedOperation = null;
     setSaveState("saving", "Saving…");
 
-    const write = async () => {
-      if (!storage) {
-        if (revision === saveRevision) {
-          setSaveState("error", "Changes are preview-only");
-          failedSettings = snapshot;
-        }
-        return false;
-      }
       try {
-        await storage.set(snapshot);
-        await storage.remove?.(["disabledSites", "spacing", "uiStyle"]);
+        await preferences.mutate(operation);
         if (revision === saveRevision) {
-          failedSettings = null;
+          failedOperation = null;
           setSaveState("saved", "All changes saved");
         }
         return true;
       } catch (error) {
         console.error("Lexend for the Web could not save settings.", error);
         if (revision === saveRevision) {
-          failedSettings = snapshot;
-          setSaveState("error", "Changes could not be saved");
+          failedOperation = operation;
+          setSaveState("error", error.message || "Changes could not be saved");
         }
         return false;
       }
-    };
-
-    writeQueue = writeQueue.then(write, write);
-    return writeQueue;
   };
 
-  const save = (nextSettings) => {
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
-    return persist(settings);
-  };
+  const save = (changes) => persist({ type: "patch", changes });
 
   const clearHostnameError = () => {
     hostnameError.textContent = "";
@@ -462,10 +462,11 @@
 
   const updateAddRuleState = () => {
     const hostname = normalizeHostnameInput(hostnameInput.value);
-    addRuleButton.disabled = !settingsApi.validHostname(hostname);
+    addRuleButton.disabled = !preferences.loaded || !settingsApi.validHostname(hostname);
   };
 
   advancedModeInput.addEventListener("change", async () => {
+    if (!preferences.loaded) return;
     renderReadabilityMode(true);
     if (!preferenceStorage) return;
     try {
@@ -479,7 +480,6 @@
 
   darkThemeInput.addEventListener("change", () => {
     save({
-      ...settings,
       theme: darkThemeInput.checked ? "dark" : "light"
     });
   });
@@ -494,7 +494,7 @@
     inputs.forEach((input) => {
       input.addEventListener("click", () => {
         const value = Number(input.value);
-        if (settings[key] !== value) save({ ...settings, [key]: value });
+        if (settings[key] !== value) save({ [key]: value });
       });
     });
   });
@@ -530,13 +530,12 @@
       renderPreview(draft);
     });
     input.addEventListener("change", () => {
-      save({ ...settings, [key]: getValue(input.value) });
+      save({ [key]: getValue(input.value) });
     });
   });
 
   resetReadabilityButton.addEventListener("click", () => {
     save({
-      ...settings,
       textScale: settingsApi.defaults.textScale,
       lineHeight: settingsApi.defaults.lineHeight,
       letterSpacing: settingsApi.defaults.letterSpacing
@@ -544,7 +543,8 @@
   });
 
   retrySaveButton.addEventListener("click", () => {
-    persist(failedSettings ?? settings);
+    if (loadFailed) loadSettings();
+    else if (failedOperation) persist(failedOperation);
   });
 
   hostnameInput.addEventListener("input", () => {
@@ -553,8 +553,9 @@
     updateAddRuleState();
   });
 
-  addRuleForm.addEventListener("submit", (event) => {
+  addRuleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!preferences.loaded) return;
     clearHostnameError();
     const hostname = normalizeHostnameInput(hostnameInput.value);
     if (!settingsApi.validHostname(hostname)) {
@@ -568,13 +569,13 @@
       return;
     }
 
-    const nextSettings = settingsApi.setSiteRule(settings, {
+    const rule = {
       hostname,
       includeSubdomains,
       enabled: false
-    });
-    if (!settingsApi.getDirectRule(nextSettings, hostname, includeSubdomains)) {
-      showHostnameError("There isn't room for another site rule");
+    };
+    if (!await persist({ type: "addRule", rule })) {
+      showHostnameError(saveStatusText.textContent);
       return;
     }
 
@@ -582,7 +583,6 @@
     subdomainsInput.checked = false;
     updateSubdomainPreview();
     updateAddRuleState();
-    save(nextSettings);
   });
 
   searchInput.addEventListener("input", renderRules);
@@ -592,7 +592,8 @@
     renderRules();
   });
 
-  ruleList.addEventListener("click", (event) => {
+  ruleList.addEventListener("click", async (event) => {
+    if (!preferences.loaded) return;
     const button = event.target.closest(".delete-rule");
     const row = button?.closest(".rule-row");
     if (!row || !ruleRowData.has(row)) return;
@@ -607,12 +608,13 @@
     }
     if (button.dataset.action !== "confirm") return;
     const index = [...ruleList.children].indexOf(row);
-    pendingRuleDeletion = null;
-    save(settingsApi.removeSiteRule(
-      settings,
-      row.dataset.hostname,
-      row.dataset.subdomains === "true"
-    ));
+    cancelRuleDeletion();
+    if (!await persist({ type: "removeRule", hostname: row.dataset.hostname,
+      includeSubdomains: row.dataset.subdomains === "true" })) {
+      renderRules();
+      ruleRowData.get(row)?.button.focus();
+      return;
+    }
     const nextRow = ruleList.children[Math.min(index, ruleList.children.length - 1)];
     (ruleRowData.get(nextRow)?.button ?? hostnameInput).focus();
   });
@@ -625,6 +627,7 @@
   });
 
   exportButton.addEventListener("click", () => {
+    if (!preferences.loaded) return;
     const payload = {
       schemaVersion: 2,
       exportedAt: new Date().toISOString(),
@@ -644,21 +647,18 @@
 
   importButton.addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", async () => {
+    if (!preferences.loaded) return;
     const file = importFile.files?.[0];
     if (!file) return;
     importError.textContent = "";
     try {
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
       const payload = JSON.parse(await file.text());
-      if (![1, 2].includes(payload?.schemaVersion)
-          || !payload.settings
-          || typeof payload.settings !== "object"
-          || Array.isArray(payload.settings)) {
-        throw new Error("Unsupported settings file");
-      }
-      if (await save(payload.settings)) showToast("Settings imported");
-    } catch {
-      importError.textContent = "Choose a valid Lexend settings file.";
+      const imported = settingsApi.validateImport(payload);
+      if (await persist({ type: "replace", settings: imported })) showToast("Settings imported");
+      else importError.textContent = saveStatusText.textContent;
+    } catch (error) {
+      importError.textContent = error.code ? error.message : "Choose a valid Lexend settings file.";
     } finally {
       importFile.value = "";
     }
@@ -702,22 +702,12 @@
     }
   });
 
-  extension?.storage?.onChanged?.addListener((changes, areaName) => {
-    if (areaName !== "sync") return;
-    const nextSettings = { ...settings };
-    Object.entries(changes).forEach(([key, change]) => {
-      if (change.newValue === undefined) delete nextSettings[key];
-      else nextSettings[key] = change.newValue;
-    });
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
-  });
-
-  const start = async () => {
+  const loadSettings = async () => {
+    loadFailed = false;
+    failedOperation = null;
+    setSaveState("loading", "Loading settings…");
     try {
-      settings = settingsApi.normalizeSettings(
-        storage ? await storage.get(null) : settings
-      );
+      await preferences.load();
       if (preferenceStorage) {
         try {
           const preferences = await preferenceStorage.get(ADVANCED_PREFERENCE_KEY);
@@ -730,12 +720,16 @@
       render();
       setSaveState("saved", "All changes saved");
     } catch (error) {
+      loadFailed = true;
       console.error("Lexend for the Web could not load settings.", error);
       renderReadabilityMode();
       render();
       setSaveState("error", "Settings could not be loaded");
     }
+  };
 
+  const start = async () => {
+    await loadSettings();
     try {
       const commands = await extension?.commands?.getAll?.();
       const command = commands?.find((item) => item.name === "toggle-current-site");
