@@ -94,12 +94,19 @@ the Android add-on still needs device testing before release.
 3. Turn on **Developer mode**.
 4. Choose **Load unpacked** and select `dist/chrome`.
 
+After rebuilding, click **Reload** on this extension in `chrome://extensions`,
+then close and reopen its settings and popup. Refreshing just the settings tab
+does not reload the background worker or apply manifest changes.
+
 ### Load in Firefox
 
 1. Run `npm run build`.
 2. Open `about:debugging#/runtime/this-firefox`.
 3. Choose **Load Temporary Add-on**.
 4. Select `dist/firefox/manifest.json`.
+
+After rebuilding, use the add-on's **Reload** button in `about:debugging` and
+reopen settings so the interface and background scripts come from the same build.
 
 ## Package
 
