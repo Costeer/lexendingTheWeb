@@ -109,6 +109,13 @@ npm run package
 
 This builds both extensions and creates their ZIP files in `dist/releases`.
 
+Before submitting a release, run `npm run verify:chrome`,
+`npm run verify:firefox` (including Mozilla's `addons-linter`), and both
+installed-browser regression suites from the exact commit being submitted.
+Check navigation and rule deletion with a keyboard and screen reader. Also
+smoke-test the popup and settings on a real Firefox Android device; desktop
+narrow-window tests do not cover Android's extension surface.
+
 ## For website authors
 
 Add `data-lexend-ignore` to an element to keep its original typography,
