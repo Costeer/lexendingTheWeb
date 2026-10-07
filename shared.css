@@ -241,8 +241,8 @@ input[type="radio"] {
     background-color 120ms ease,
     color 120ms ease,
     transform 80ms ease,
-    letter-spacing 220ms var(--motion-ease),
-    font-weight 220ms var(--motion-ease);
+    letter-spacing 320ms var(--motion-ease),
+    font-weight 320ms var(--motion-ease);
 }
 
 @media (hover: hover) {
@@ -253,8 +253,8 @@ input[type="radio"] {
 
 :root body :is(.segment-group, .segments) input:checked + span {
   color: var(--on-accent);
-  font-weight: 550;
-  letter-spacing: .04em;
+  font-weight: 600;
+  letter-spacing: .1em;
 }
 
 :root body :is(.segment-group, .segments) label:active span {
@@ -280,7 +280,7 @@ input[type="radio"] {
   }
 
   :root body :is(.segment-group, .segments) input:checked + span {
-    letter-spacing: .015em;
+    letter-spacing: .03em;
   }
 }
 
