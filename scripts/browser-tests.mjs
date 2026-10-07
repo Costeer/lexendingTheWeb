@@ -79,7 +79,8 @@ try {
     );
     builder.setChromeOptions(options);
   } else {
-    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion("stable").addArguments("--remote-allow-system-access"));
+    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion("stable"));
+    builder.setFirefoxService(new firefox.ServiceBuilder().addArguments("--allow-system-access"));
   }
   driver = await builder.build();
   await driver.manage().setTimeouts({ script: 20000 });
@@ -209,10 +210,11 @@ try {
     await wait("!document.querySelector('#dark-theme').disabled", "Settings reload");
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
     await driver.manage().window().setRect({ width: 390, height: 844 });
+    await wait("[...document.querySelectorAll('.settings-panel')].every(p=>!p.hidden)", "Narrow layout reveals all sections");
     assert.equal(await script("document.documentElement.scrollWidth <= innerWidth + 1"), true, "Narrow settings must not overflow horizontally");
-    assert.equal(await script("[...document.querySelectorAll('.settings-panel')].every(p=>!p.hidden)"), true);
     await writeFile(join(artifactDirectory, "settings-mobile.png"), await driver.takeScreenshot(), "base64");
     await driver.manage().window().setRect({ width: 1280, height: 900 });
+    await wait("[...document.querySelectorAll('.settings-panel')].filter(p=>!p.hidden).length === 1", "Desktop layout restores one section");
   });
 
   if (browserName === "chrome") await check("forced colors retain a visible selected option and reduced motion disables transitions", async () => {
