@@ -63,6 +63,9 @@ npm run build
 ```
 
 Browser-ready files are written to `dist/chrome` and `dist/firefox`.
+The build prints their absolute paths. If you are working in a separate Git
+worktree, use the folders printed by that worktree's build. Another checkout's
+`dist` folder can contain an older extension even when both have the same version.
 
 ### Installed-browser regression tests
 
