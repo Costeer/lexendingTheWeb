@@ -181,3 +181,52 @@ test("missing writer responses expose a reload instruction and roll back the opt
   await assert.rejects(client.mutate({ type: "patch", changes: { theme: "light" } }), { code: "BACKGROUND_UNAVAILABLE" });
   assert.equal(client.settings.theme, "dark");
 });
+
+test("Chrome disconnect errors preserve the browser's actual failure reason", async () => {
+  const f = fixture({ theme: "dark" });
+  const ports = connectFixture(f, { missingWriter: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  const cause = { message: "Could not establish connection. Receiving end does not exist." };
+  let lastErrorReads = 0;
+  Object.defineProperty(f.extension.runtime, "lastError", { get() { lastErrorReads++; return cause; } });
+  await assert.rejects(client.mutate({ type: "patch", changes: { theme: "light" } }),
+    (error) => error.code === "BACKGROUND_UNAVAILABLE"
+      && error.message.includes(cause.message) && error.cause === cause);
+  assert.equal(client.settings.theme, "dark");
+  assert.equal(f.writes.length, 0);
+  assert.equal(ports.length, 1);
+  assert.equal(lastErrorReads, 1, "the error is captured in the disconnect callback");
+});
+
+test("Firefox disconnect errors preserve the port's failure reason", async () => {
+  const f = fixture({ theme: "dark" });
+  const ports = connectFixture(f, { missingWriter: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  const cause = new Error("Could not establish connection. Receiving end does not exist.");
+  const mutation = client.mutate({ type: "patch", changes: { theme: "light" } });
+  ports[0].error = cause;
+  await assert.rejects(mutation,
+    (error) => error.code === "BACKGROUND_UNAVAILABLE"
+      && error.message.includes(cause.message) && error.cause === cause);
+  assert.equal(client.settings.theme, "dark");
+  assert.equal(f.writes.length, 0);
+});
+
+test("posting to a disconnected port preserves the synchronous connection error", async () => {
+  const f = fixture({ theme: "dark" });
+  const ports = connectFixture(f);
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  await client.mutate({ type: "patch", changes: { textScale: 110 } });
+  const cause = new Error("Attempting to use a disconnected port object");
+  ports[0].postMessage = () => { throw cause; };
+  await assert.rejects(client.mutate({ type: "patch", changes: { theme: "light" } }),
+    (error) => error.code === "BACKGROUND_UNAVAILABLE"
+      && error.message.includes(cause.message) && error.cause === cause);
+  assert.equal(client.settings.theme, "dark");
+  await client.mutate({ type: "patch", changes: { theme: "light" } });
+  assert.equal(client.settings.theme, "light");
+  assert.equal(ports.length, 2, "the next save opens a fresh connection");
+});

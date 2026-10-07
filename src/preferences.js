@@ -69,8 +69,14 @@
     const pending = [];
     let connection;
     let requestId = 0;
-    const unavailable = () => api.settingsError("BACKGROUND_UNAVAILABLE",
-      "The extension background isn't responding. Reload the extension, then reopen settings.");
+    const unavailable = (cause) => {
+      const detail = typeof cause?.message === "string" ? cause.message : "";
+      const error = api.settingsError("BACKGROUND_UNAVAILABLE",
+        "The extension background isn't responding. Reload the extension, then reopen settings."
+        + (detail ? ` Background error: ${detail}` : ""));
+      if (cause) error.cause = cause;
+      return error;
+    };
     const sendOperation = (operation) => {
       const runtime = extension?.runtime;
       if (!runtime?.connect) return runtime.sendMessage({ type: messageType, operation });
@@ -89,12 +95,14 @@
         });
         port.onDisconnect.addListener(() => {
           // Read lastError even when idle so Chrome does not report an unchecked
-          // disconnect. The next save opens a new port and wakes the worker.
-          void runtime.lastError;
+          // disconnect. It exists only during this callback, so preserve its
+          // message instead of hiding the reason the background is unavailable.
+          // Firefox reports connection errors on the port instead.
+          const cause = runtime.lastError ?? port.error;
           if (connection === state) connection = null;
           state.requests.forEach((request) => {
             clearTimeout(request.timeout);
-            request.reject(unavailable());
+            request.reject(unavailable(cause));
           });
           state.requests.clear();
         });
@@ -110,11 +118,11 @@
         }, 15000);
         state.requests.set(id, { resolve, reject, timeout });
         try { state.port.postMessage({ id, operation }); }
-        catch {
+        catch (error) {
           state.requests.delete(id);
           clearTimeout(timeout);
           if (connection === state) connection = null;
-          reject(unavailable());
+          reject(unavailable(error));
         }
       });
     };
