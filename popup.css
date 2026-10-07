@@ -421,12 +421,23 @@ fieldset:disabled {
 
 :root .panel {
   position: relative;
-  width: 360px;
+  width: min(360px, 100vw);
   overflow: hidden;
   border: var(--frame-border);
   border-radius: 0;
   background: var(--surface);
   box-shadow: var(--frame-shadow);
+}
+
+@media (max-width: 360px) {
+  :root .site-strip-copy {
+    min-width: 0;
+  }
+
+  :root #site-status-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 :root .masthead {

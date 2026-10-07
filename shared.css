@@ -274,7 +274,7 @@ input[type="radio"] {
 /* Keep the longest label readable in equal slots on small phone screens. */
 @media (max-width: 360px) {
   :root :is(.segment-group, .segments) label span {
-    padding-inline: 3px;
+    padding-inline: 1px;
     font-size: 13px;
     letter-spacing: 0;
   }

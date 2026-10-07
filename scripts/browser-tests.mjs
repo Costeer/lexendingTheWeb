@@ -130,13 +130,14 @@ try {
     await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 22", "110% text scaling");
     const result = await measurements();
     assert.equal(result.rem.size, 22);
-    assert.equal(result.fixed.size, 18.7);
+    // Engines quantize fractional CSS pixels differently (Firefox uses 1/64px).
+    assert(Math.abs(result.fixed.size - 18.7) < .03);
     assert.equal(result.nested.size, 16.5);
     assert.equal(result.layout.padding, 20);
     for (const id of ["ignored-text", "code", "svg-text"]) assert(!result[id].family.includes("Lexend"), `${id} keeps its original font`);
     assert.equal(await script("getComputedStyle(document.documentElement).fontSize"), "20px");
     await script("document.body.classList.add('font-big')");
-    await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 26.4", "Changed website styles must be remeasured");
+    await wait("Math.abs(parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) - 26.4) < .03", "Changed website styles must be remeasured");
     await script("document.body.classList.remove('font-big')");
     await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 22", "Restored website styles must be remeasured");
   });
@@ -219,6 +220,7 @@ try {
 
   if (browserName === "chrome") await check("forced colors retain a visible selected option and reduced motion disables transitions", async () => {
     await driver.sendDevToolsCommand("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-reduced-motion", value: "reduce" }] });
+    await wait("matchMedia('(forced-colors: active)').matches && getComputedStyle(document.querySelector('.segment-group input:checked + span')).backgroundColor !== 'rgba(0, 0, 0, 0)'", "Forced colors selection styles apply");
     const result = await script(() => {
       const selected = document.querySelector('.segment-group input:checked + span');
       return { background: getComputedStyle(selected).backgroundColor, outline: getComputedStyle(selected).outlineWidth,
@@ -236,6 +238,15 @@ try {
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
     await driver.manage().window().setRect({ width: 390, height: 844 });
     assert.equal(await script("document.documentElement.scrollWidth <= innerWidth + 1"), true);
+    // Desktop windows have a minimum width. CDP supplies a real 320px viewport
+    // so intrinsic popup sizing cannot hide overflow on narrow mobile surfaces.
+    if (browserName === "chrome") {
+      await driver.sendDevToolsCommand("Emulation.setDeviceMetricsOverride", { width: 320, height: 844, deviceScaleFactor: 1, mobile: false });
+      await wait("innerWidth === 320", "Narrow popup viewport applies");
+      assert.equal(await script("document.documentElement.scrollWidth <= innerWidth + 1"), true, "320px popup must fit");
+      await wait("[...document.querySelectorAll('.segments span')].every(el=>{const range=document.createRange();range.selectNodeContents(el);const text=range.getBoundingClientRect(),box=el.getBoundingClientRect();return text.left>=box.left-.5 && text.right<=box.right+.5;})", "All popup option labels fit their segments");
+      await driver.sendDevToolsCommand("Emulation.clearDeviceMetricsOverride", {});
+    }
     await writeFile(join(artifactDirectory, "popup-mobile.png"), await driver.takeScreenshot(), "base64");
   });
   await writeFile(join(artifactDirectory, "results.json"), JSON.stringify({ browserName, checks, installedExtension: true }, null, 2));
