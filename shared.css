@@ -237,7 +237,12 @@ input[type="radio"] {
   pointer-events: none;
   background: transparent;
   transform: scale(1);
-  transition: background-color 120ms ease, color 120ms ease, transform 80ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    transform 80ms ease,
+    letter-spacing 220ms var(--motion-ease),
+    font-weight 220ms var(--motion-ease);
 }
 
 @media (hover: hover) {
@@ -248,6 +253,8 @@ input[type="radio"] {
 
 :root body :is(.segment-group, .segments) input:checked + span {
   color: var(--on-accent);
+  font-weight: 550;
+  letter-spacing: .04em;
 }
 
 :root body :is(.segment-group, .segments) label:active span {
@@ -270,6 +277,10 @@ input[type="radio"] {
     padding-inline: 3px;
     font-size: 13px;
     letter-spacing: 0;
+  }
+
+  :root body :is(.segment-group, .segments) input:checked + span {
+    letter-spacing: .015em;
   }
 }
 
