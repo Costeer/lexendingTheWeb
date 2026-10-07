@@ -150,6 +150,34 @@ try {
     await wait("Math.abs(parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) - 26.4) < .03", "Changed website styles must be remeasured");
     await script("document.body.classList.remove('font-big')");
     await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 22", "Restored website styles must be remeasured");
+    await script(() => {
+      const paragraph = document.createElement("p");
+      paragraph.id = "changing-text"; paragraph.textContent = "Dynamic text";
+      document.body.append(paragraph);
+    });
+    await wait("parseFloat(getComputedStyle(document.querySelector('#changing-text')).fontSize) === 22", "Inserted text is scaled");
+    await script(() => {
+      const span = document.createElement("span"); span.textContent = "Child text";
+      document.querySelector("#changing-text").replaceChildren(span);
+    });
+    await wait("parseFloat(getComputedStyle(document.querySelector('#changing-text')).fontSize) === 20 && parseFloat(getComputedStyle(document.querySelector('#changing-text span')).fontSize) === 22", "Text becoming a wrapper must not compound child sizing");
+    await script("document.querySelector('#changing-text span').firstChild.data = ' '");
+    await wait("!getComputedStyle(document.querySelector('#changing-text span')).fontFamily.includes('Lexend')", "Whitespace no longer needs a text override");
+    await script("document.querySelector('#changing-text span').firstChild.data = 'Restored text'");
+    await wait("parseFloat(getComputedStyle(document.querySelector('#changing-text span')).fontSize) === 22", "Character data edits restore text scaling");
+  });
+
+  await check("main's engine styles mixed prose while preserving editors and nested icon fonts", async () => {
+    const result = await script(() => Object.fromEntries(["mixed-prose", "mixed-code", "editor-token", "nested-glyph"].map((id) => {
+      const style = getComputedStyle(document.getElementById(id));
+      return [id, { family: style.fontFamily, size: parseFloat(style.fontSize) }];
+    })));
+    assert(result["mixed-prose"].family.includes("Lexend for the Web"));
+    assert.equal(result["mixed-prose"].size, 22);
+    for (const id of ["mixed-code", "editor-token", "nested-glyph"]) {
+      assert(!result[id].family.includes("Lexend for the Web"), `${id} keeps its original font`);
+      assert.equal(result[id].size, 20);
+    }
   });
 
   await check("removed stylesheets and later shadow roots recover without changing active settings", async () => {
@@ -165,7 +193,11 @@ try {
     await driver.switchTo().window(optionsTab);
     await patch({ textScale: 100 });
     await driver.switchTo().window(websiteTab);
-    await wait("!document.querySelector('#rem').hasAttribute('data-lexend-scaled')", "Default sizing removes extension properties");
+    await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 20", "Default sizing restores the site's text size");
+    await script("document.querySelector('#host').setAttribute('data-lexend-ignore', '')");
+    await wait("!getComputedStyle(document.querySelector('#host').shadowRoot.querySelector('p')).fontFamily.includes('Lexend')", "Dynamic opt-outs remove shadow styling");
+    await script("document.querySelector('#host').removeAttribute('data-lexend-ignore')");
+    await wait("getComputedStyle(document.querySelector('#host').shadowRoot.querySelector('p')).fontFamily.includes('Lexend')", "Removing opt-outs restyles existing shadows");
     await script("history.pushState({}, '', '/new-route')");
     assert((await measurements()).rem.family.includes("Lexend"));
   });

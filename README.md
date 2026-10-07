@@ -51,7 +51,7 @@ available in [HTML](docs/privacy.html) for hosting as a standalone page.
 
 ## Build and test
 
-You'll need Node.js 20 or newer. Install the dependencies and Chromium for the
+You'll need Node.js 22 or newer. Install the dependencies and Chromium for the
 browser tests, then run the tests and repository checks:
 
 ```sh

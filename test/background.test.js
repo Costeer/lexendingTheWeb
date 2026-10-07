@@ -49,7 +49,7 @@ function createBackground({ stored = {}, supported = true } = {}) {
       onStartup: event()
     }
   };
-  runInNewContext(source, { browser, LexendSettings: globalThis.LexendSettings, LexendPreferences: globalThis.LexendPreferences, console });
+  runInNewContext(source, { browser, LexendSettings: globalThis.LexendSettings, LexendPreferences: globalThis.LexendPreferences, console, URL });
   return { browser, messages, writes, icons };
 }
 
@@ -83,6 +83,22 @@ test("toolbar state ignores messages from subframes", () => {
   assert.equal(icons.length, 1);
   assert.equal(icons[0].tabId, 42);
   assert.equal(icons[0].path["16"], "assets/icons/icon-16.png");
+});
+
+test("frame sizing messages still relay alongside the settings save handler", async () => {
+  const { browser, messages, writes } = createBackground();
+  const requirement = { viewportHeight: 48, requiredHeight: 80, baselineHeight: 48 };
+  const sender = { id: browser.runtime.id, tab: { id: 42 }, frameId: 7, url: "https://embedded.example/frame" };
+  const reply = await new Promise((resolve) => {
+    assert.equal(browser.runtime.onMessage.listener({ type: "LEXEND_FRAME_REQUIREMENT", requirement }, sender, resolve), true);
+  });
+  assert.equal(reply.relayed, true);
+  assert.equal(messages[0].message.type, "LEXEND_APPLY_FRAME_REQUIREMENT");
+  assert.equal(messages[0].message.frameUrl, sender.url);
+  assert.equal(messages[0].message.sourceFrameId, 7);
+  assert.equal(writes.length, 0);
+  browser.runtime.onMessage.listener({ type: "LEXEND_FRAME_REQUIREMENT", requirement }, { ...sender, id: "other-extension" }, () => assert.fail("Untrusted frames cannot relay"));
+  assert.equal(messages.length, 1);
 });
 
 test("toolbar refresh requests the main frame's state", async () => {
