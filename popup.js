@@ -4,7 +4,6 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const quotesApi = globalThis.LexendQuotes;
-  const storage = extension?.storage?.sync;
   const tabs = extension?.tabs;
   const protectedHosts = new Set([
     "chrome.google.com",
@@ -20,7 +19,6 @@
     "support.mozilla.org",
     "sync.services.mozilla.com"
   ]);
-  const spacingValues = [0, 0.04, 0.08];
 
   const enabledInput = document.querySelector("#enabled");
   const settingsButton = document.querySelector("#settings-button");
@@ -33,14 +31,20 @@
   const quoteAuthor = document.querySelector("#quote-author");
   const siteStrip = document.querySelector("#site-strip");
   const siteStatusText = document.querySelector("#site-status-text");
+  const siteMessage = document.querySelector("#site-message");
   const toggleSiteButton = document.querySelector("#toggle-site");
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
+  const retryLoad = document.querySelector("#retry-load");
 
-  let settings = settingsApi.normalizeSettings();
+  let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
   let feedbackTimer;
   const quote = quotesApi.random();
+  const preferences = globalThis.LexendPreferences.createClient(extension, {
+    theme: settings.theme,
+    onChange(value) { settings = value; render(); }
+  });
 
   const renderQuote = () => {
     spacingPreviewText.textContent = `“${quote.text}”`;
@@ -61,25 +65,23 @@
     }
   };
 
-  const nearestSpacing = (value) => spacingValues.reduce((nearest, candidate) => (
-    Math.abs(candidate - value) < Math.abs(nearest - value) ? candidate : nearest
-  ));
-
   const renderSettings = () => {
+    globalThis.LexendTheme.apply(settings.theme);
     enabledInput.checked = settings.enabled;
     enabledInput.setAttribute(
       "aria-label",
       settings.enabled ? "Turn Lexend off" : "Turn Lexend on"
     );
     masterState.textContent = settings.enabled ? "On" : "Off";
-    scopeFieldset.disabled = !settings.enabled;
-    spacingFieldset.disabled = !settings.enabled;
+    enabledInput.disabled = !preferences.loaded;
+    toggleSiteButton.disabled = !preferences.loaded;
+    scopeFieldset.disabled = !preferences.loaded || !settings.enabled;
+    spacingFieldset.disabled = !preferences.loaded || !settings.enabled;
     scopeInputs.forEach((input) => {
       input.checked = input.value === settings.scope;
     });
-    const selectedSpacing = nearestSpacing(settings.letterSpacing);
     spacingInputs.forEach((input) => {
-      input.checked = Number(input.value) === selectedSpacing;
+      input.checked = Number(input.value) === settings.letterSpacing;
     });
     spacingPreviewText.style.letterSpacing = `${settings.letterSpacing}em`;
   };
@@ -93,16 +95,20 @@
     const effective = settingsApi.resolveSite(settings, site.hostname);
     if (!settings.enabled) {
       siteStatusText.textContent = "Off";
+      siteMessage.textContent = "Lexend is paused everywhere.";
     } else {
       const status = effective.active ? "Active on " : "Paused on ";
       const hostname = document.createElement("strong");
       hostname.textContent = site.hostname;
       siteStatusText.replaceChildren(document.createTextNode(status), hostname);
+      siteMessage.textContent = effective.active
+        ? (effective.scope === "all" ? "Body text and headings use Lexend." : "Body text uses Lexend.")
+        : "This site uses its original fonts.";
     }
-    toggleSiteButton.textContent = effective.siteEnabled ? "Pause here" : "Resume here";
+    toggleSiteButton.textContent = effective.active ? "Pause here" : "Resume here";
     toggleSiteButton.setAttribute(
       "aria-label",
-      `${effective.siteEnabled ? "Pause" : "Resume"} Lexend on ${site.hostname}`
+      `${effective.active ? "Pause" : "Resume"} Lexend on ${site.hostname}`
     );
   };
 
@@ -111,24 +117,22 @@
     renderSite();
   };
 
-  const save = async (nextSettings) => {
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
-    if (!storage) {
-      showFeedback("Changes are preview-only here.");
+  const mutate = async (operation) => {
+    if (!preferences.loaded) {
+      render();
       return false;
     }
 
     try {
-      await storage.set(settings);
-      await storage.remove?.(["disabledSites", "spacing"]);
+      await preferences.mutate(operation);
       return true;
     } catch (error) {
       console.error("Lexend for the Web could not save settings.", error);
-      showFeedback("Changes could not be saved.", true, 0);
+      showFeedback(error.message || "Changes could not be saved.", true, 0);
       return false;
     }
   };
+  const save = (changes) => mutate({ type: "patch", changes });
 
   const getSiteContext = async () => {
     if (!tabs?.query) {
@@ -140,6 +144,9 @@
       try {
         const state = await tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 });
         const hostname = state?.hostname?.trim().toLowerCase();
+        if (state?.error === "SETTINGS_LOAD_FAILED") {
+          return { hostname, supported: false, restricted: false, error: "This page couldn't load your settings. Reload the page to try again." };
+        }
         if (state?.ready && hostname) {
           return { hostname, supported: true, restricted: false };
         }
@@ -180,12 +187,12 @@
   });
 
   enabledInput.addEventListener("change", () => {
-    save({ ...settings, enabled: enabledInput.checked });
+    save({ enabled: enabledInput.checked });
   });
 
   scopeInputs.forEach((input) => {
     input.addEventListener("change", () => {
-      if (input.checked) save({ ...settings, scope: input.value });
+      if (input.checked) save({ scope: input.value });
     });
   });
 
@@ -193,53 +200,35 @@
     input.addEventListener("click", () => {
       const letterSpacing = Number(input.value);
       if (settings.letterSpacing !== letterSpacing) {
-        save({ ...settings, letterSpacing });
+        save({ letterSpacing });
       }
     });
   });
 
   toggleSiteButton.addEventListener("click", () => {
     if (!site?.supported) return;
-    const effective = settingsApi.resolveSite(settings, site.hostname);
-    const withoutExactRule = settingsApi.removeSiteRule(settings, site.hostname, false);
-    const inherited = settingsApi.resolveSite(withoutExactRule, site.hostname);
-    const desiredEnabled = !effective.siteEnabled;
-    save(settingsApi.setSiteRule(settings, {
-      hostname: site.hostname,
-      includeSubdomains: false,
-      enabled: desiredEnabled === inherited.siteEnabled ? null : desiredEnabled
-    }));
-  });
-
-  extension?.storage?.onChanged?.addListener((changes, areaName) => {
-    if (areaName !== "sync") return;
-    const nextSettings = { ...settings };
-    Object.entries(changes).forEach(([key, change]) => {
-      if (change.newValue === undefined) delete nextSettings[key];
-      else nextSettings[key] = change.newValue;
-    });
-    settings = settingsApi.normalizeSettings(nextSettings);
-    render();
+    mutate({ type: "toggleSite", hostname: site.hostname });
   });
 
   const start = async () => {
+    retryLoad.hidden = true;
     try {
-      const [storedSettings, siteContext] = await Promise.all([
-        storage ? storage.get(null) : settingsApi.defaults,
-        getSiteContext()
-      ]);
-      settings = settingsApi.normalizeSettings(storedSettings);
-      site = siteContext;
+      await preferences.load();
+      try { site = await getSiteContext(); }
+      catch { site = { hostname: "", supported: false, restricted: true }; }
+      if (site.error) showFeedback(site.error, true, 0);
+      else feedback.textContent = "";
       render();
     } catch (error) {
       console.error("Lexend for the Web could not load settings.", error);
-      settings = settingsApi.normalizeSettings();
       site = { hostname: "", supported: false, restricted: true };
+      retryLoad.hidden = false;
       render();
       showFeedback("Settings could not be loaded.", true, 0);
     }
   };
 
+  retryLoad.addEventListener("click", start);
   renderQuote();
   start();
 })();

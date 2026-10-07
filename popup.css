@@ -1,5 +1,4 @@
 :root {
-  width: max-content;
   background: transparent;
   scrollbar-width: none;
 }
@@ -10,20 +9,49 @@ body::-webkit-scrollbar {
 }
 
 body {
-  width: max-content;
+  /* The toolbar measures body to choose its initial viewport. Using vw here
+     (or on a child) feeds that temporary viewport back into its preferred size. */
+  width: 360px;
   min-width: 0;
   margin: 0;
   overflow-x: hidden;
   background: transparent;
-  font-size: 14px;
+  font-size: 15px;
+}
+
+.site-message {
+  display: none;
 }
 
 button {
   background: transparent;
 }
 
+button,
+a,
+.master-control,
+.choice-card,
+.segments span,
+.switch-track,
+.switch-thumb {
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) ease,
+    transform var(--motion-base) var(--motion-ease);
+}
+
+button:not(:disabled):active,
+.choice-card:active,
+.segments label:active span,
+.master-control:active .switch-track {
+  transform: translateY(1px) scale(.98);
+}
+
 .panel {
-  width: 340px;
+  width: 100%;
   border: var(--frame-border);
   background: var(--surface);
 }
@@ -43,30 +71,24 @@ button {
   align-items: center;
   min-width: 0;
   gap: 12px;
-  font-size: 14px;
+  color: inherit;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: .06em;
+  text-decoration: none;
   white-space: nowrap;
 }
 
-.wordmark-mark {
-  display: grid;
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: var(--frame-border);
-  box-shadow: var(--active-shadow);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
+.wordmark:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
 }
 
-.masthead-actions {
+.masthead-leading {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
 }
 
 .settings-button {
@@ -78,11 +100,16 @@ button {
   border: var(--control-border);
   background: var(--surface);
   cursor: pointer;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
 }
 
 .settings-button:hover {
   color: var(--surface);
   background: var(--ink);
+}
+
+.settings-button:not(:disabled):active {
+  transform: none;
 }
 
 .settings-button svg {
@@ -96,7 +123,7 @@ button {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -127,7 +154,10 @@ button {
   width: 14px;
   height: 14px;
   background: var(--surface);
-  transition: transform 120ms ease;
+}
+
+.master-control:hover .switch-track {
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .master-control input:checked + .switch-track {
@@ -139,7 +169,7 @@ button {
 }
 
 .master-control input:focus-visible + .switch-track,
-.choice-card input:focus-visible + .radio-mark,
+.choice-card:has(input:focus-visible),
 .segments input:focus-visible + span {
   outline: 3px dashed var(--ink);
   outline-offset: 3px;
@@ -154,7 +184,7 @@ button {
   padding: 8px 13px;
   border-bottom: var(--section-divider);
   background: var(--popup-muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .site-strip p {
@@ -175,14 +205,10 @@ button {
   padding: 0;
   border: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.text-link:hover {
-  color: var(--accent);
 }
 
 .popup-section {
@@ -197,7 +223,7 @@ button {
   width: 100%;
   margin: 0 0 10px;
   padding: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -207,8 +233,7 @@ button {
 
 .choice-card {
   display: grid;
-  grid-template-columns: 17px 1fr;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   margin-right: 4px;
   padding: 9px;
@@ -221,34 +246,22 @@ button {
   margin-top: 9px;
 }
 
+.choice-card:hover {
+  background: var(--accent-tint);
+  box-shadow: 0 4px 10px rgb(0 0 0 / 10%);
+  transform: translateY(-1px);
+}
+
 .choice-card:has(input:checked) {
   background: var(--accent-tint);
   box-shadow: var(--active-shadow);
-}
-
-.radio-mark {
-  display: grid;
-  width: 15px;
-  height: 15px;
-  margin-top: 1px;
-  place-items: center;
-  border: var(--control-border);
-  border-radius: 50%;
-}
-
-.choice-card input:checked + .radio-mark::after {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  content: "";
 }
 
 .choice-copy {
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 4px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
 }
 
@@ -263,6 +276,16 @@ button {
 
 fieldset:disabled {
   opacity: .55;
+}
+
+fieldset {
+  transition:
+    opacity var(--motion-base) var(--motion-ease),
+    filter var(--motion-base) var(--motion-ease);
+}
+
+fieldset:disabled {
+  filter: grayscale(.35);
 }
 
 .segments {
@@ -286,13 +309,8 @@ fieldset:disabled {
   padding: 5px 3px;
   place-items: center;
   background: var(--surface);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-}
-
-.segments input:checked + span {
-  color: var(--surface);
-  background: var(--ink);
 }
 
 .spacing-preview {
@@ -309,14 +327,14 @@ fieldset:disabled {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
 }
 
 .quote-footer {
   margin-top: 7px;
   color: var(--secondary-text);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
 }
 
@@ -324,10 +342,6 @@ fieldset:disabled {
   color: inherit;
   font-weight: 600;
   text-underline-offset: 2px;
-}
-
-.quote-footer a:hover {
-  color: var(--accent);
 }
 
 .restricted-note {
@@ -347,84 +361,393 @@ fieldset:disabled {
 
 .restricted-note p {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.4;
-}
-
-.attribution {
-  padding: 9px 13px 8px;
-}
-
-.attribution > a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 28px;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.attribution > a:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.attribution svg {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
-}
-
-.attribution-mark {
-  position: relative;
-  display: inline-flex;
-  width: 18px;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  vertical-align: -1px;
-}
-
-.attribution-hover-mark {
-  position: absolute;
-  opacity: 0;
-}
-
-.attribution > a:hover .attribution-heart,
-.attribution > a:focus-visible .attribution-heart {
-  opacity: 0;
-}
-
-.attribution > a:hover .attribution-hover-mark,
-.attribution > a:focus-visible .attribution-hover-mark {
-  opacity: 1;
 }
 
 .popup-feedback {
   min-height: 0;
   margin: 0;
   color: var(--secondary-text);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
 }
 
 .popup-feedback:not(:empty) {
-  margin-top: 7px;
+  padding: 8px 13px;
+  border-bottom: var(--section-divider);
+  background: var(--popup-muted);
 }
 
 .popup-feedback.is-error {
-  color: var(--accent);
+  color: var(--ink);
   font-weight: 500;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .switch-thumb {
-    transition: none;
+:root body {
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+:root .panel {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: var(--frame-border);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: var(--frame-shadow);
+}
+
+@media (max-width: 360px) {
+  :root .site-strip-copy {
+    min-width: 0;
+  }
+
+  :root #site-status-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+:root .masthead {
+  min-height: 78px;
+  padding: 18px 24px;
+  border-bottom: 0;
+}
+
+:root .wordmark-lexend {
+  display: flex;
+}
+
+:root .wordmark {
+  display: grid;
+  width: 76px;
+  height: 34px;
+  padding: 0 12px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 0;
+  color: var(--on-accent);
+  background: var(--accent);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition: width 460ms var(--motion-ease);
+}
+
+:root .wordmark:is(:hover, :focus) {
+  width: 154px;
+  color: var(--on-accent);
+  transform: none;
+}
+
+:root .settings-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+:root .settings-button:hover {
+  color: var(--surface);
+  background: var(--ink);
+}
+
+:root .master-control {
+  gap: 10px;
+  color: var(--secondary-text);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  text-transform: none;
+}
+
+:root .switch-track {
+  width: 50px;
+  height: 26px;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--surface);
+}
+
+:root .switch-thumb {
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 0;
+}
+
+:root .master-control input:checked + .switch-track {
+  background: var(--accent);
+}
+
+:root .master-control input:checked + .switch-track .switch-thumb {
+  background: var(--on-accent);
+  transform: translateX(24px);
+}
+
+:root .site-strip {
+  display: flex;
+  min-height: 40px;
+  padding: 9px 26px 9px 22px;
+  border: 0;
+  border-top: 1px solid var(--site-strip-border);
+  border-bottom: 1px solid var(--site-strip-border);
+  border-left: 4px solid var(--accent);
+  color: var(--ink);
+  background: var(--site-strip-background);
+}
+
+:root #site-status-text {
+  color: inherit;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root #site-status-text strong {
+  font-weight: 500;
+}
+
+:root .site-message {
+  display: none;
+}
+
+:root .site-strip .text-link {
+  margin: 0;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+:root .popup-section {
+  padding: 22px 24px;
+  border-bottom: 0;
+}
+
+:root .scope-section {
+  padding-bottom: 6px;
+}
+
+:root .spacing-section {
+  padding-top: 12px;
+}
+
+:root .popup-section legend {
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: .14em;
+  text-transform: none;
+}
+
+:root .choice-card {
+  margin-right: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--text-body);
+  background: var(--surface);
+}
+
+:root .choice-card:has(input:checked) {
+  padding: 8px 9px;
+  border-width: 6px;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--active-shadow);
+}
+
+:root .choice-copy {
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+:root .choice-copy strong {
+  color: var(--text-title);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: .025em;
+}
+
+:root .segments {
+  overflow: visible;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+}
+
+:root .segments label + label {
+  border-left: 1px solid var(--ui-border);
+}
+
+:root .segments span {
+  min-height: 38px;
+  padding: 9px 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 400;
+  letter-spacing: .02em;
+}
+
+:root .spacing-preview {
+  position: relative;
+  margin: 30px 6px 34px;
+  padding: 20px 22px;
+  border: 7px solid var(--accent);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 14%);
+}
+
+:root .spacing-preview::before,
+:root .spacing-preview::after {
+  position: absolute;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 70px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:root .spacing-preview::before {
+  top: -24px;
+  left: 8px;
+  content: "“";
+}
+
+:root .spacing-preview::after {
+  right: 8px;
+  bottom: -58px;
+  content: "”";
+}
+
+:root .spacing-preview blockquote {
+  color: var(--text-body);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.75;
+}
+
+:root .quote-footer {
+  margin-top: 8px;
+  color: var(--secondary-text);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  text-transform: none;
+}
+
+:root .restricted-note {
+  border-bottom: 0;
+  background: var(--popup-muted);
+}
+
+:root .quote-footer a:hover,
+:root .popup-feedback.is-error {
+  color: var(--ink);
+}
+
+:root .master-control input:focus-visible + .switch-track,
+:root .choice-card:has(input:focus-visible),
+:root .segments input:focus-visible + span {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+:root .popup-feedback:not(:empty) {
+  padding: 10px 24px;
+  border-bottom: 0;
+  color: var(--surface);
+  background: var(--ink);
+}
+
+/* Mobile browsers present the popup in a full-page viewport. Keep desktop
+   popup sizing intrinsic, but let touch layouts fill their browser surface. */
+@media (hover: none) and (pointer: coarse) {
+  :root,
+  :root body {
+    width: 100%;
+    min-height: 100%;
+    background: var(--surface);
+  }
+
+  :root .panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+
+  :root .masthead,
+  :root .site-strip,
+  :root .popup-section {
+    padding-inline: clamp(16px, 5vw, 32px);
+  }
+
+  :root .masthead {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  :root .settings-button,
+  :root .master-control,
+  :root .site-strip .text-link,
+  :root .segments span {
+    min-height: 44px;
+  }
+
+  :root .settings-button {
+    width: 44px;
+  }
+
+  :root .site-strip-copy {
+    min-width: 0;
+  }
+
+  :root #site-status-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  :root .popup-section {
+    min-width: 0;
+  }
+
+  :root .spacing-section {
+    flex: 1;
+  }
+
+  :root .spacing-preview {
+    padding-inline: clamp(16px, 4vw, 28px);
+  }
+
+  :root .spacing-preview blockquote {
+    max-height: none;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    scrollbar-gutter: auto;
+  }
+
+  :root .quote-footer {
+    overflow-wrap: anywhere;
   }
 }

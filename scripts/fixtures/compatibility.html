@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lexend compatibility fixture</title>
+    <style>
+      html { font-size: 20px; }
+      body { font-family: Georgia, serif; }
+      p { font-size: 1rem; }
+      .fixed { font-size: 17px; }
+      .nested { font-size: .75em; }
+      .layout { padding: 1rem; }
+      .font-big p { font-size: 24px; }
+      code { font-family: inherit; }
+      nav { display: flex; gap: 1rem; }
+      nav a { font-size: 16px; }
+    </style>
+  </head>
+  <body>
+    <nav><a href="/one">First section</a><a href="/two">Second section</a></nav>
+    <h1 id="heading">A heading</h1>
+    <p id="rem">Rem text <span id="nested" class="nested">Nested text</span></p>
+    <p id="fixed" class="fixed">Fixed text</p>
+    <div id="ignored" data-lexend-ignore><p id="ignored-text">Original typography</p></div>
+    <p><code id="code">Inherited code typography</code></p>
+    <p id="mixed-prose">Ordinary text with <code id="mixed-code">inline code</code> stays readable.</p>
+    <div class="monaco-editor" style="font-family: monospace; font-size: 20px"><div class="view-line"><span id="editor-token">const value = 123;</span></div></div>
+    <span class="material-symbols-outlined" style="font-family: 'Material Symbols Outlined'; font-size: 20px"><span id="nested-glyph">home</span></span>
+    <svg width="80" height="25"><text id="svg-text" y="20">SVG text</text></svg>
+    <div class="layout" id="layout"><p>Content</p></div>
+    <div id="host"></div>
+    <iframe id="frame" src="/frame" title="Related frame"></iframe>
+    <script>
+      window.fixtureAttachShadow = Element.prototype.attachShadow;
+    </script>
+  </body>
+</html>

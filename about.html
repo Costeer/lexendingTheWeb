@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About Lexend for the Web</title>
+    <script src="src/ui-theme.js"></script>
+    <link rel="stylesheet" href="shared.css" />
+    <link rel="stylesheet" href="options.css" />
+    <link rel="stylesheet" href="options-desktop.css" />
+    <link rel="stylesheet" href="about.css" />
+  </head>
+  <body class="settings-page about-page">
+    <div class="settings-card">
+    <header class="desktop-settings-header about-page-header">
+      <a
+        class="settings-wordmark lexend-wordmark"
+        href="https://www.lexend.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Visit the Lexend website"
+      >
+        <span class="lxnd-word" aria-hidden="true">
+          <span class="lxnd-letter">L</span>
+          <span class="lxnd-letter lxnd-letter-insert">E</span>
+          <span class="lxnd-letter">X</span>
+          <span class="lxnd-letter lxnd-letter-insert">E</span>
+          <span class="lxnd-letter">N</span>
+          <span class="lxnd-letter">D</span>
+        </span>
+      </a>
+      <h1>Settings</h1>
+      <a class="mobile-about-link" href="about.html" aria-current="page">About</a>
+    </header>
+
+    <div class="settings-layout">
+      <nav class="desktop-settings-nav" aria-label="Settings categories">
+        <a href="options.html?section=readability-panel">
+          <span class="settings-nav-content">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16M12 5v14M8 19h8" /></svg>
+            Readability
+          </span>
+        </a>
+        <a href="options.html?section=rules-panel">
+          <span class="settings-nav-content">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z" /></svg>
+            Site rules
+          </span>
+        </a>
+        <a href="options.html?section=appearance-panel">
+          <span class="settings-nav-content">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z" /></svg>
+            Appearance
+          </span>
+        </a>
+        <a href="options.html?section=tools-panel">
+          <span class="settings-nav-content">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 4v6h8V4M8 20v-6h8v6" /></svg>
+            Backup and shortcut
+          </span>
+        </a>
+        <a href="about.html" aria-current="page">
+          <span class="settings-nav-content">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg>
+            About
+          </span>
+        </a>
+      </nav>
+
+      <main>
+        <section class="settings-panel" aria-labelledby="about-title">
+          <a class="about-back-link" href="options.html">← Back to settings</a>
+          <div class="section-heading">
+            <h2 id="about-title">Lexend for the Web</h2>
+            <p class="helper">
+              Lexend for the Web makes websites easier to read with Lexend,
+              adjustable text size, and more comfortable spacing.
+              The extension uses Lexend for a clearer, more readable interface.
+            </p>
+            <a class="about-lexend-link" href="https://www.lexend.com/" target="_blank" rel="noopener noreferrer">
+              About <span class="about-lexend-word">Lexend</span> ↗
+            </a>
+          </div>
+
+          <div class="about-block">
+            <h3>Independent project</h3>
+            <p id="project-disclaimer">
+              This is an independent, unofficial extension. It is not affiliated
+              with, endorsed by, or sponsored by Lexend, Google Fonts, or their
+              creators.
+            </p>
+            <div class="about-links">
+              <a href="https://github.com/Costeer/lexendingTheWeb" target="_blank" rel="noopener noreferrer">Source code ↗</a>
+            </div>
+          </div>
+
+          <a
+            id="donate-link"
+            class="support-card"
+            href="https://ko-fi.com/costeer"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Support Me :3 on Ko-fi (opens in a new tab)"
+          >
+            <span class="support-stars" aria-hidden="true">
+              <span class="support-constellation">
+                <span class="support-sparkle"></span>
+                <span class="support-sparkle"></span>
+                <span class="support-sparkle"></span>
+                <span class="support-sparkle"></span>
+                <span class="support-sparkle"></span>
+              </span>
+              <span class="support-shooting-star"></span>
+              <span class="support-shooting-star"></span>
+              <span class="support-shooting-star"></span>
+              <span class="support-shooting-star"></span>
+              <span class="support-shooting-star"></span>
+            </span>
+            <span class="support-copy">
+              <span class="support-card-title">Support<br />Me :3</span>
+              <span class="support-handle">
+                <span class="support-cup" aria-hidden="true">
+                  <svg class="support-steam" viewBox="0 0 30 30" focusable="false">
+                    <path d="M10 9c-1.5-1.5 1.5-2.5 0-4" />
+                    <path d="M15 9c-1.5-1.5 1.5-2.5 0-4" />
+                  </svg>
+                  <!-- Official logo from https://more.ko-fi.com/brand-assets; unmodified. -->
+                  <img class="support-kofi-logo" src="assets/kofi-logo.avif" width="1024" height="1024" alt="" />
+                </span>
+                <span>ko-fi.com/costeer</span>
+              </span>
+            </span>
+            <span class="support-orb" aria-hidden="true">
+              <!-- Profile image from https://github.com/Costeer, bundled locally. -->
+              <img class="support-avatar" src="assets/costeer-avatar.png" width="320" height="320" alt="" />
+              <span class="support-live"></span>
+              <span class="support-card-arrow">
+                <svg class="support-arrow-outbound" viewBox="0 0 24 24" focusable="false"><path d="M7 17 17 7M8 7h9v9" /></svg>
+                <span class="support-arrow-return">☭</span>
+              </span>
+            </span>
+          </a>
+        </section>
+      </main>
+    </div>
+    </div>
+
+    <footer class="page-attribution">
+      <a href="about.html" aria-label="About Lexend for the Web, made by costeer">
+        <span>made with
+          <span class="attribution-mark" aria-hidden="true">
+            <span class="attribution-heart">♥</span>
+            <span class="attribution-hover-mark">☭</span>
+          </span>
+          by costeer</span>
+      </a>
+    </footer>
+
+    <span id="support-confetti" class="support-confetti" aria-hidden="true"></span>
+
+    <script src="src/settings.js"></script>
+    <script src="about.js"></script>
+  </body>
+</html>

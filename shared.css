@@ -26,24 +26,55 @@
 }
 
 :root {
-  --accent: #C40000;
-  --accent-tint: #FDECEC;
-  --ink: #111111;
-  --surface: #FFFFFF;
-  --popup-muted: #F4F4F4;
-  --settings-muted: #FAF8F4;
-  --secondary-text: #444444;
-  --frame-border: 3px solid var(--ink);
-  --section-divider: 2px solid var(--ink);
-  --control-border: 2px solid var(--ink);
-  --active-shadow: 4px 4px 0 var(--accent);
-  --frame-shadow: 8px 8px 0 var(--accent);
   --font-ui: "Lexend UI", system-ui, sans-serif;
-  color-scheme: only light;
+  --motion-fast: 140ms;
+  --motion-base: 200ms;
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --accent: #D90000;
+  --accent-tint: #FFF2F2;
+  --on-accent: #FFFFFF;
+  --ink: #000000;
+  --surface: #FFFFFF;
+  --popup-muted: #EEEEEE;
+  --settings-muted: #EEEEEE;
+  --secondary-text: var(--ink);
+  --ui-border: #C2C2C2;
+  --ui-radius: 5px;
+  --frame-border: 1px solid var(--ui-border);
+  --divider: #DDDDDD;
+  --section-divider: 1px solid var(--divider);
+  --row-divider: #E5E5E5;
+  --site-strip-background: #FDEAEA;
+  --site-strip-border: #E8D4D4;
+  --control-border: 1px solid var(--ui-border);
+  --active-shadow: 0 6px 16px rgb(0 0 0 / 14%);
+  --frame-shadow: 0 12px 32px rgb(0 0 0 / 14%);
+  --text-title: var(--ink);
+  --text-body: var(--ink);
+  --text-muted: var(--ink);
+  --text-soft: var(--ink);
+  color-scheme: light;
   font-family: var(--font-ui);
   color: var(--ink);
   background: var(--surface);
   font-synthesis: none;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+:root[data-theme="dark"] {
+  --accent: #D90000;
+  --accent-tint: #351B1B;
+  --ink: #FFFFFF;
+  --surface: #151515;
+  --popup-muted: #242424;
+  --settings-muted: #242424;
+  --ui-border: #686868;
+  --divider: #424242;
+  --row-divider: #383838;
+  --site-strip-background: #351B1B;
+  --site-strip-border: #613333;
+  color-scheme: dark;
 }
 
 *,
@@ -70,12 +101,82 @@ input[type="radio"] {
   -webkit-tap-highlight-color: transparent;
 }
 
-button:focus-visible,
-input:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
-  outline: 3px dashed var(--ink);
-  outline-offset: 3px;
+:root button:focus-visible,
+:root input:focus-visible,
+:root a:focus-visible,
+:root [tabindex]:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.lxnd-badge {
+  display: none;
+  text-decoration: none;
+}
+
+.lxnd-word {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-wordmark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 34px;
+  padding: 0 12px;
+  overflow: hidden;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: none;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: width 460ms var(--motion-ease);
+}
+
+.settings-wordmark:is(:hover, :focus) {
+  width: 154px;
+}
+
+.lxnd-letter {
+  display: inline-grid;
+  width: .72em;
+  flex: 0 0 auto;
+  place-items: center;
+  transition:
+    width 420ms var(--motion-ease),
+    margin-right 420ms var(--motion-ease),
+    opacity 180ms ease,
+    transform 420ms var(--motion-ease);
+}
+
+.lxnd-letter-insert {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-.3em) scaleX(.25);
+}
+
+:root :is(.lxnd-badge, .lexend-wordmark):is(:hover, :focus) .lxnd-letter:not(:last-child) {
+  margin-right: .55em;
+}
+
+:root :is(.lxnd-badge, .lexend-wordmark):is(:hover, :focus) .lxnd-letter-insert {
+  width: .72em;
+  opacity: 1;
+  transform: translateX(0) scaleX(1);
+}
+
+:root :is(.lxnd-badge, .lexend-wordmark) .lxnd-letter:hover {
+  transform: translateY(-2px) scale(1.12);
 }
 
 .visually-hidden {
@@ -90,6 +191,246 @@ a:focus-visible,
   border: 0;
 }
 
+/* One selection layer slides beneath equal, stationary radio hit areas. */
+:root :is(.segment-group, .segments) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  --segment-index: 0;
+  isolation: isolate;
+}
+
+:root .segments {
+  position: relative;
+}
+
+:root :is(.segment-group, .segments)::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% / 3);
+  border-radius: calc(var(--ui-radius) - 1px);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(var(--segment-index) * 100%));
+  transition: transform 220ms var(--motion-ease), opacity 120ms ease;
+  z-index: 0;
+}
+
+:root :is(.segment-group, .segments):has(input:checked)::before {
+  opacity: 1;
+}
+
+:root :is(.segment-group, .segments):has(label:nth-child(2) input:checked) {
+  --segment-index: 1;
+}
+
+:root :is(.segment-group, .segments):has(label:nth-child(3) input:checked) {
+  --segment-index: 2;
+}
+
+:root :is(.segment-group, .segments) label {
+  position: relative;
+  z-index: 1;
+}
+
+:root body :is(.segment-group, .segments) label span {
+  pointer-events: none;
+  background: transparent;
+  transform: scale(1);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    transform 80ms ease,
+    letter-spacing 320ms var(--motion-ease),
+    font-weight 320ms var(--motion-ease);
+}
+
+@media (hover: hover) {
+  :root body :is(.segment-group, .segments) label:hover span {
+    background: rgba(217, 0, 0, .12);
+  }
+}
+
+:root body :is(.segment-group, .segments) input:checked + span {
+  color: var(--on-accent);
+  font-weight: 600;
+  letter-spacing: .1em;
+}
+
+:root body :is(.segment-group, .segments) label:active span {
+  transform: scale(.97);
+}
+
+:root :is(.segment-group, .segments) label:first-child span {
+  border-top-left-radius: calc(var(--ui-radius) - 1px);
+  border-bottom-left-radius: calc(var(--ui-radius) - 1px);
+}
+
+:root :is(.segment-group, .segments) label:last-child span {
+  border-top-right-radius: calc(var(--ui-radius) - 1px);
+  border-bottom-right-radius: calc(var(--ui-radius) - 1px);
+}
+
+/* Keep the longest label readable in equal slots on small phone screens. */
+@media (max-width: 360px) {
+  :root :is(.segment-group, .segments) label span {
+    padding-inline: 1px;
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  :root body :is(.segment-group, .segments) input:checked + span {
+    letter-spacing: .03em;
+  }
+}
+
 [hidden] {
   display: none !important;
+}
+
+/* One desktop switch component, shared by settings and the popup. */
+@media (hover: hover) and (pointer: fine) {
+  :root body .ui-switch > input + .ui-switch-track {
+    position: relative;
+    display: block;
+    flex: 0 0 54px;
+    width: 54px;
+    height: 28px;
+    border: 1px solid var(--ui-border);
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: none;
+    transform: none;
+    transition:
+      background-color var(--motion-fast) ease,
+      border-color var(--motion-fast) ease,
+      box-shadow var(--motion-base) var(--motion-ease);
+  }
+
+  :root body .ui-switch > input + .ui-switch-track .ui-switch-thumb {
+    position: absolute;
+    display: block;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    transform: translateX(0);
+    transition:
+      background-color var(--motion-fast) ease,
+      transform var(--motion-base) var(--motion-ease);
+  }
+
+  :root body .ui-switch > input:checked + .ui-switch-track {
+    background: var(--accent);
+  }
+
+  :root body .ui-switch > input:checked + .ui-switch-track .ui-switch-thumb {
+    background: var(--on-accent);
+    transform: translateX(26px);
+  }
+
+  :root body .ui-switch:hover > input + .ui-switch-track {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
+  }
+
+  :root body .ui-switch > input:focus-visible + .ui-switch-track {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+}
+
+/* Matching angled edges invert the letters exactly where the highlight reaches.
+   Overscan keeps the diagonal completely outside the link at either endpoint. */
+:root body :is(.about-lexend-link, .about-back-link, .about-links a,
+  .mobile-about-link, .preview-attribution a, .quote-footer a,
+  .inline-link, .text-link, .page-attribution a) {
+  --link-ink: var(--ink);
+  --link-paper: var(--surface);
+  padding-inline: 4px;
+  margin-inline: -4px;
+  border-radius: 0;
+  background-image:
+    linear-gradient(110deg, var(--link-paper) 50%, var(--link-ink) 50%),
+    linear-gradient(110deg, var(--link-ink) 50%, transparent 50%);
+  background-size: calc(200% + 32px) 100%;
+  background-position: 100% 0;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-clip: text, border-box;
+  -webkit-text-fill-color: transparent;
+  text-decoration-color: var(--link-ink);
+  text-underline-offset: 3px;
+  transform: none;
+  transition:
+    background-position 180ms ease-out,
+    transform 100ms ease-out;
+}
+
+:root body .site-strip .text-link {
+  --link-paper: var(--site-strip-background);
+  margin-inline: -4px;
+}
+
+:root body .page-attribution a {
+  --link-paper: var(--settings-muted);
+}
+
+:root body .quote-footer a {
+  display: inline-block;
+}
+
+:root body :is(.about-lexend-link, .about-back-link, .about-links a,
+  .mobile-about-link, .preview-attribution a, .quote-footer a,
+  .inline-link, .text-link, .page-attribution a):is(:hover, :focus-visible) {
+  background-position: 0 0;
+  /* The underline blends into the highlight as it passes, then reappears
+     behind the retreating edge without a separate fade. */
+  text-decoration-color: var(--link-ink);
+  text-underline-offset: 3px;
+}
+
+:root body :is(.about-lexend-link, .about-back-link, .about-links a,
+  .mobile-about-link, .preview-attribution a, .quote-footer a,
+  .inline-link, .text-link, .page-attribution a):active {
+  transform: translateY(2px) scale(.98);
+}
+
+/* Keep native high-contrast text when the OS suppresses background images. */
+@media (forced-colors: active) {
+  :root :is(.segment-group, .segments)::before {
+    display: none;
+  }
+  :root body :is(.segment-group, .segments) input:checked + span {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  :root body :is(.choice-card:has(input:checked), [aria-current="page"]) {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  :root body :is(.about-lexend-link, .about-back-link, .about-links a,
+    .mobile-about-link, .preview-attribution a, .quote-footer a,
+    .inline-link, .text-link, .page-attribution a) {
+    background-image: none;
+    -webkit-text-fill-color: LinkText;
+    text-decoration-color: LinkText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }

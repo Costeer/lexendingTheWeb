@@ -10,6 +10,7 @@
   "background": {
     "scripts": [
       "src/settings.js",
+      "src/preferences.js",
       "src/background.js"
     ]
   },

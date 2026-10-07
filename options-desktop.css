@@ -1,0 +1,536 @@
+.desktop-settings-header,
+.desktop-settings-nav,
+.mobile-about-link {
+  display: none;
+}
+
+.settings-layout {
+  display: contents;
+}
+
+:root body.settings-page {
+  background: var(--settings-muted);
+}
+
+.settings-card {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  background: var(--surface);
+}
+
+/* Extend the paper edge without clipping content, focus rings, or hover effects. */
+.settings-card::after {
+  position: absolute;
+  right: 0;
+  bottom: -12px;
+  left: 0;
+  height: 12px;
+  background:
+    linear-gradient(135deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x,
+    linear-gradient(225deg, var(--surface) 25%, transparent 25%) -12px 0 / 24px 24px repeat-x;
+  content: "";
+  pointer-events: none;
+}
+
+/* Use the same mobile layout as the panels, including wide touch screens. */
+@media not all and (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  :root .mobile-intro {
+    display: block;
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+  }
+
+  :root body.settings-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 0;
+    background: var(--settings-muted);
+  }
+
+  :root .settings-page .settings-card {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    margin: 0 0 12px;
+  }
+
+  :root .settings-page .settings-layout {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  :root .settings-page .settings-layout main {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+
+  :root .settings-page .settings-panel {
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+  }
+
+  :root .settings-page .readability-title-row {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+
+  :root .settings-page .desktop-settings-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+    padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px));
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--surface);
+  }
+
+  :root .settings-page .desktop-settings-header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: .015em;
+  }
+
+  :root .settings-page .mobile-about-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-left: auto;
+    padding: 0 4px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    text-underline-offset: 3px;
+  }
+
+  :root .settings-page .page-attribution {
+    width: 100%;
+    margin: 0;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Touch devices keep the stacked settings page, including in landscape. */
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  :root body.settings-page {
+    --ui-radius: 5px;
+    --control-border: 1px solid var(--ui-border);
+    --active-shadow: none;
+    padding: 0 0 32px;
+    color: var(--ink);
+    background: var(--settings-muted);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .settings-card {
+    padding: 28px 40px 32px;
+  }
+
+  .desktop-settings-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: min(1160px, 100%);
+    margin: 0 auto 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .desktop-settings-header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: .015em;
+  }
+
+  .settings-layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    align-items: start;
+    gap: 56px;
+    width: min(1160px, 100%);
+    min-height: 560px;
+    margin: 0 auto;
+  }
+
+  .desktop-settings-nav {
+    position: sticky;
+    top: 32px;
+    display: grid;
+    gap: 6px;
+  }
+
+  .desktop-settings-nav :is(button, a) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    padding: 6px 11px;
+    border: 6px solid transparent;
+    border-radius: 0;
+    color: var(--ink);
+    background: var(--surface);
+    font-size: 16px;
+    /* Selection changes the border, not the label's wrapping or row height. */
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: left;
+    text-decoration: none;
+  }
+
+  .desktop-settings-nav :is(button, a):hover {
+    border-color: var(--ui-border);
+  }
+
+  .desktop-settings-nav :is(button, a)[aria-current="page"] {
+    border-color: var(--accent);
+  }
+
+  /* Animate the contents, never the hit area or the selected border. */
+  .settings-nav-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    pointer-events: none;
+    transition: transform var(--motion-fast) var(--motion-ease);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .desktop-settings-nav :is(button, a):active .settings-nav-content {
+      transform: translateY(1px) scale(.98);
+    }
+  }
+
+  .desktop-settings-nav svg {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  :root .settings-layout main {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow: visible;
+    border: 0;
+    background: var(--surface);
+    box-shadow: none;
+  }
+
+  :root .settings-layout .settings-panel {
+    padding: 0;
+    border: 0;
+  }
+
+  :root .settings-layout .settings-panel[hidden] {
+    display: none;
+  }
+
+  :root .settings-layout h2 {
+    color: var(--ink);
+    font-size: 28px;
+    font-weight: 550;
+    line-height: 1.3;
+    letter-spacing: .015em;
+  }
+
+  :root .settings-layout h2:focus {
+    outline: none;
+  }
+
+  :root .settings-layout .section-heading {
+    margin-bottom: 30px;
+  }
+
+  :root .settings-layout .helper {
+    margin-top: 12px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.7;
+  }
+
+  :root .settings-layout .advanced-control {
+    align-self: center;
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .control-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 96px;
+    gap: 0;
+  }
+
+  :root .settings-layout .setting-control,
+  :root .settings-layout .slider-control {
+    position: relative;
+    height: 96px;
+    min-height: 96px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--row-divider);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  :root .settings-layout .setting-control legend {
+    position: absolute;
+    top: 35px;
+    left: 0;
+    width: 32%;
+    margin: 0;
+    padding: 0;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 26px;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .segment-group {
+    position: absolute;
+    inset: 26px 0 auto 34%;
+    height: 44px;
+    overflow: visible;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--surface);
+  }
+
+  :root .settings-layout .segment-group span {
+    height: 42px;
+    min-height: 42px;
+    padding: 8px 6px;
+    border: 0;
+    border-left: 1px solid var(--ui-border);
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .segment-group label:first-child span {
+    border-left: 0;
+  }
+
+  :root .settings-layout .slider-control {
+    display: grid;
+    grid-template-columns: 32% minmax(0, 1fr);
+    grid-template-rows: 28px 20px;
+    align-content: center;
+    column-gap: 2%;
+    row-gap: 8px;
+  }
+
+  :root .settings-layout .slider-heading {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1 / 3;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  :root .settings-layout .slider-heading strong {
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .slider-heading output {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: var(--ink);
+    background: transparent;
+    font-size: 15px;
+    text-align: left;
+  }
+
+  :root .settings-layout .slider-control input[type="range"],
+  :root .settings-layout .slider-limits {
+    grid-column: 2;
+    width: 100%;
+  }
+
+  :root .settings-layout .slider-limits {
+    font-size: 15px;
+    line-height: 20px;
+  }
+
+  :root .settings-layout .readability-preview {
+    margin-top: 30px;
+    padding: 0;
+    border: 0;
+    background: var(--surface);
+  }
+
+  :root .settings-layout .preview-heading {
+    margin-bottom: 26px;
+  }
+
+  :root .settings-layout .preview-heading > span {
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .preview-attribution {
+    font-size: 15px;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .appearance-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    color: var(--ink);
+    background: var(--surface);
+  }
+
+  :root .settings-layout .appearance-copy {
+    max-width: 64ch;
+  }
+
+  :root .settings-layout .appearance-control {
+    flex-direction: row;
+    gap: 16px;
+    width: 100%;
+    margin-top: 30px;
+    padding: 22px 0;
+    border-top: 1px solid var(--ui-border);
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  :root .settings-layout .appearance-label {
+    text-align: left;
+  }
+
+  :root .settings-layout .appearance-label strong {
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .appearance-label small {
+    display: none;
+  }
+
+  :root .settings-layout .add-rule {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px 20px;
+    padding: 0;
+    border: 0;
+    background: var(--surface);
+  }
+
+  :root .settings-layout .hostname-field {
+    grid-column: 1;
+  }
+
+  :root .settings-layout #add-rule-button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  :root .settings-layout .check-label {
+    grid-column: 1 / -1;
+    font-size: 15px;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .rule-row {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  :root .settings-layout .rule-hostname {
+    color: var(--ink);
+    font-size: 16px;
+  }
+
+  :root .settings-layout .rule-status {
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .tools-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  :root .settings-layout .tool-card {
+    padding: 0 0 28px;
+    border: 0;
+    border-bottom: 1px solid var(--ui-border);
+    border-radius: 0;
+  }
+
+  :root .settings-layout .tool-card h3 {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  :root .settings-layout .primary-button,
+  :root .settings-layout .secondary-button {
+    min-height: 44px;
+    border-radius: var(--ui-radius);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  :root .settings-page .page-attribution {
+    width: min(1160px, 100%);
+    margin-top: 36px;
+  }
+
+  @media (max-width: 1080px) {
+    .settings-layout {
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 32px;
+    }
+
+    :root .settings-layout .rule-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    :root .settings-layout .rule-row:last-child:nth-child(odd) {
+      grid-column: auto;
+    }
+  }
+}

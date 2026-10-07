@@ -12,7 +12,11 @@ const sharedFiles = [
   "popup.js",
   "options.html",
   "options.css",
+  "options-desktop.css",
   "options.js",
+  "about.html",
+  "about.css",
+  "about.js",
   "src",
   "assets"
 ];
@@ -34,4 +38,6 @@ for (const target of targets) {
   await writeFile(join(output, "manifest.json"), manifest);
 }
 
-console.log("Built Chrome and Firefox extensions in dist/.");
+console.log(`Built Chrome extension: ${join(dist, "chrome")}`);
+console.log(`Built Firefox extension: ${join(dist, "firefox")}`);
+console.log("Use the matching build path above. After rebuilding, reload the extension and reopen its settings.");
