@@ -257,7 +257,13 @@
     "Remove this site rule?",
     "Really delete this rule?",
     "Ready to remove this rule?",
-    "Confirm deleting this rule?"
+    "Confirm deleting this rule?",
+    "Remove this site rule permanently?",
+    "Delete this site-specific rule?",
+    "This rule will be deleted. Continue?",
+    "Remove the rule for {site}?",
+    "Deleting this rule can't be undone. Proceed?",
+    "Drop this rule?"
   ];
 
   const deletionPrompt = (hostname) => {
@@ -266,7 +272,7 @@
     for (let index = 0; index < hostname.length; index += 1) {
       hash = Math.imul(hash ^ hostname.charCodeAt(index), 16777619) >>> 0;
     }
-    return deletionPrompts[hash % deletionPrompts.length];
+    return deletionPrompts[hash % deletionPrompts.length].replace("{site}", hostname);
   };
 
   const setRuleButtonAction = (button, rule, action) => {

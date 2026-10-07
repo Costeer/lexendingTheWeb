@@ -294,7 +294,7 @@ test("cancel and Escape restore the original rule without persisting changes", a
   assert.equal(page.writes.length, 0);
 });
 
-test("confirmation messages use five stable domain-hashed variants across reloads", async () => {
+test("confirmation messages use eleven stable domain-hashed variants across reloads", async () => {
   const collect = async () => {
     const page = await openSettings({ count: 60, desktop: true });
     const prompts = new Map();
@@ -310,7 +310,15 @@ test("confirmation messages use five stable domain-hashed variants across reload
     return prompts;
   };
   const first = await collect();
-  assert.equal(new Set(first.values()).size, 5);
+  const templates = new Set([...first].map(([hostname, prompt]) => prompt.replace(hostname, "{site}")));
+  assert.equal(templates.size, 11);
+  assert.ok(templates.has("Remove the rule for {site}?"));
+  for (const [hostname, prompt] of first) {
+    assert.ok(!prompt.includes("{site}"));
+    if (prompt.startsWith("Remove the rule for ")) {
+      assert.equal(prompt, `Remove the rule for ${hostname}?`);
+    }
+  }
   assert.deepEqual(await collect(), first);
   const filtered = await openSettings({ count: 60 });
   filtered.get("#rule-search").value = "site42.example.com";
