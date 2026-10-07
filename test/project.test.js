@@ -95,6 +95,17 @@ test("popup and settings pages expose their core controls", async () => {
   assert.doesNotMatch(popup, /wordmark-classic/);
 });
 
+test("popup scope cards omit visible radio marks but retain native selection and card focus", async () => {
+  const [html, css] = await Promise.all([read("popup.html"), read("popup.css")]);
+  assert.doesNotMatch(html, /radio-mark/);
+  assert.doesNotMatch(css, /radio-mark/);
+  for (const value of ["body", "all"]) {
+    assert.match(html, new RegExp(`<input type="radio" name="scope" value="${value}"`));
+  }
+  assert.match(css, /\.choice-card\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/);
+  assert.match(css, /\.choice-card:has\(input:focus-visible\)/);
+});
+
 test("content script reacts to page and settings changes", async () => {
   const [contentSource, popupSource] = await Promise.all([
     read("src/content.js"),

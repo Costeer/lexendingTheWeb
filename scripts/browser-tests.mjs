@@ -279,6 +279,14 @@ try {
     await navigateExtension(`${origin}popup.html`);
     await wait("!document.querySelector('#enabled').disabled", "Popup initializes");
     assert.equal(await script("document.documentElement.dataset.theme"), "dark");
+    assert.equal(await script("document.querySelectorAll('#scope-fieldset .radio-mark').length"), 0);
+    await driver.findElement(By.css('#scope-fieldset label:has(input[value="body"])')).click();
+    await driver.wait(async () => (await saved()).scope === "body", 5000, "Clicking a scope card saves its value");
+    await driver.actions().sendKeys(Key.ARROW_RIGHT).perform();
+    await driver.wait(async () => (await saved()).scope === "all", 5000, "Arrow keys still select and save the next scope");
+    assert.equal(await script("document.activeElement.matches('input[name=scope][value=all]')"), true);
+    assert(await script("parseFloat(getComputedStyle(document.querySelector('#scope-fieldset .choice-card:has(input:checked)')).outlineWidth) > 0"), "Keyboard focus is visible on the whole card");
+    assert.equal(await script("[...document.querySelectorAll('#scope-fieldset .choice-card')].every(card=>getComputedStyle(card).gridTemplateColumns.split(' ').length === 1)"), true, "No empty radio column remains");
     await driver.manage().window().setRect({ width: 390, height: 844 });
     assert.equal(await script("document.documentElement.scrollWidth <= innerWidth + 1"), true);
     // Desktop windows have a minimum width. CDP supplies a real 320px viewport
