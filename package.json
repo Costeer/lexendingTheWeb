@@ -9,19 +9,21 @@
     "check": "node scripts/check.mjs",
     "lint:firefox": "addons-linter dist/firefox --warnings-as-errors",
     "test": "node scripts/test.mjs",
+    "test:browser": "node scripts/browser-tests.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "verify:chrome": "npm test && npm run check && npm run package",
     "verify:firefox": "npm test && npm run check && npm run package && npm run lint:firefox",
     "version": "node scripts/sync-version.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "license": "MIT",
   "devDependencies": {
     "fflate": "^0.8.3",
     "playwright": "^1.63.0",
-    "addons-linter": "^10.13.0"
+    "addons-linter": "^10.13.0",
+    "selenium-webdriver": "^4.50.0"
   },
   "overrides": {
     "source-map-js": "^1.2.2"

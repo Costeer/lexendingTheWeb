@@ -162,3 +162,19 @@ test("only extension pages can use the settings mutation channel", async () => {
   assert.equal(response.ok, true);
   assert.equal(writes[0].theme, "dark");
 });
+
+test("shortcut capacity failures show a toolbar error without dropping any rules", async () => {
+  const rules = Array.from({ length: 250 }, (_, index) => ({ hostname: `site${index}.example.com`, enabled: false }));
+  const { browser, writes } = createBackground({ stored: { siteRules: rules } });
+  const badges = [];
+  const titles = [];
+  browser.action.setBadgeText = async (value) => { badges.push(value); };
+  browser.action.setTitle = async (value) => { titles.push(value); };
+  await browser.commands.onCommand.listener("toggle-current-site");
+  assert.equal(writes.length, 0);
+  assert.equal(badges.at(-1).text, "!");
+  assert.match(titles.at(-1).title, /room/);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(badges.at(-1).text, "");
+});

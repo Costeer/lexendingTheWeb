@@ -17,7 +17,9 @@
   );
   const icons = { active: iconPaths(true), paused: iconPaths(false) };
   const tabStates = new Map();
+  const tabErrors = new Set();
   const tabRevisions = new Map();
+  let refreshRevision = 0;
   const advanceTab = (tabId) => {
     const revision = (tabRevisions.get(tabId) ?? 0) + 1;
     tabRevisions.set(tabId, revision);
@@ -35,24 +37,38 @@
 
   const setTabState = async (tabId, active) => {
     if (tabId === undefined) return;
-    if (tabStates.get(tabId) === active) return;
+    if (tabStates.get(tabId) === active && !tabErrors.has(tabId)) return;
     tabStates.set(tabId, active);
+    const hadError = tabErrors.delete(tabId);
 
     await Promise.all([
       extension.action.setIcon({ tabId, path: icons[active ? "active" : "paused"] }),
       extension.action.setTitle({
         tabId,
         title: `Lexend for the Web: ${active ? "active" : "paused"}`
-      })
+      }),
+      ...(hadError ? [extension.action.setBadgeText?.({ tabId, text: "" })] : [])
     ]).catch(() => {
       if (tabStates.get(tabId) === active) tabStates.delete(tabId);
+      if (hadError) tabErrors.add(tabId);
     });
+  };
+  const showTabError = async (tabId, error) => {
+    tabErrors.add(tabId);
+    await Promise.all([
+      extension.action.setBadgeText?.({ tabId, text: "!" }),
+      extension.action.setBadgeBackgroundColor?.({ tabId, color: "#D90000" }),
+      extension.action.setBadgeTextColor?.({ tabId, color: "#FFFFFF" }),
+      extension.action.setTitle({ tabId, title: `Lexend for the Web: ${error.message || "This site could not be toggled."}` })
+    ]).catch(() => { tabErrors.delete(tabId); });
   };
 
   const updateAllTabs = async () => {
+    const revision = ++refreshRevision;
     const settings = settingsApi.normalizeSettings(
       await extension.storage.sync.get(null)
     );
+    if (revision !== refreshRevision) return;
 
     await Promise.all([
       extension.action.setIcon({ path: icons[settings.enabled ? "active" : "paused"] }),
@@ -62,6 +78,7 @@
     ]);
 
     const tabs = await extension.tabs.query({});
+    if (revision !== refreshRevision) return;
     await Promise.all(tabs.map(async (tab) => {
       if (tab.id === undefined) return;
       if (!settings.enabled) {
@@ -88,7 +105,12 @@
     }
     if (!state?.ready || !settingsApi.validHostname(state.hostname)) return;
 
-    await store.mutate({ type: "toggleSite", hostname: state.hostname });
+    try {
+      await store.mutate({ type: "toggleSite", hostname: state.hostname });
+    } catch (error) {
+      await showTabError(tab.id, error);
+      throw error;
+    }
   };
 
   extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -148,6 +170,7 @@
 
   extension.tabs.onRemoved?.addListener((tabId) => {
     tabStates.delete(tabId);
+    tabErrors.delete(tabId);
     tabRevisions.delete(tabId);
   });
 

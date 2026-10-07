@@ -30,7 +30,7 @@
   --motion-fast: 140ms;
   --motion-base: 200ms;
   --motion-ease: cubic-bezier(.22, 1, .36, 1);
-  --accent: #FF0000;
+  --accent: #D90000;
   --accent-tint: #FFF2F2;
   --on-accent: #FFFFFF;
   --ink: #000000;
@@ -400,6 +400,21 @@ input[type="radio"] {
 
 /* Keep native high-contrast text when the OS suppresses background images. */
 @media (forced-colors: active) {
+  :root :is(.segment-group, .segments)::before {
+    display: none;
+  }
+  :root body :is(.segment-group, .segments) input:checked + span {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  :root body :is(.choice-card:has(input:checked), [aria-current="page"]) {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
   :root body :is(.about-lexend-link, .about-back-link, .about-links a,
     .mobile-about-link, .preview-attribution a, .quote-footer a,
     .inline-link, .text-link, .page-attribution a) {

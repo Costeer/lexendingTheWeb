@@ -144,6 +144,9 @@
       try {
         const state = await tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 });
         const hostname = state?.hostname?.trim().toLowerCase();
+        if (state?.error === "SETTINGS_LOAD_FAILED") {
+          return { hostname, supported: false, restricted: false, error: "This page couldn't load your settings. Reload the page to try again." };
+        }
         if (state?.ready && hostname) {
           return { hostname, supported: true, restricted: false };
         }
@@ -213,7 +216,8 @@
       await preferences.load();
       try { site = await getSiteContext(); }
       catch { site = { hostname: "", supported: false, restricted: true }; }
-      feedback.textContent = "";
+      if (site.error) showFeedback(site.error, true, 0);
+      else feedback.textContent = "";
       render();
     } catch (error) {
       console.error("Lexend for the Web could not load settings.", error);

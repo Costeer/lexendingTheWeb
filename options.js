@@ -96,6 +96,7 @@
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let failedOperation = null;
   let loadFailed = false;
+  let advancedPreferenceLoaded = false;
   let saveRevision = 0;
   let toastTimer;
   let readabilityAnimationToken = 0;
@@ -342,7 +343,7 @@
     row.classList.add("is-confirming-delete");
     setRuleButtonAction(button, rule, "cancel");
     const confirmButton = makeDeleteButton(rule, "confirm");
-    row.insertBefore(confirmButton, button);
+    row.append(confirmButton);
     pendingRuleDeletion = { row, domain, status, button, rule, originalContent, confirmButton };
   };
 
@@ -413,6 +414,7 @@
     renderReadability();
     renderRules();
     mutationControls.forEach((control) => { control.disabled = !preferences.loaded; });
+    advancedModeInput.disabled = !preferences.loaded || !advancedPreferenceLoaded;
     updateAddRuleState();
   };
 
@@ -425,21 +427,21 @@
     failedOperation = null;
     setSaveState("saving", "Saving…");
 
-      try {
-        await preferences.mutate(operation);
-        if (revision === saveRevision) {
-          failedOperation = null;
-          setSaveState("saved", "All changes saved");
-        }
-        return true;
-      } catch (error) {
-        console.error("Lexend for the Web could not save settings.", error);
-        if (revision === saveRevision) {
-          failedOperation = operation;
-          setSaveState("error", error.message || "Changes could not be saved");
-        }
-        return false;
+    try {
+      await preferences.mutate(operation);
+      if (revision === saveRevision) {
+        failedOperation = null;
+        setSaveState("saved", "All changes saved");
       }
+      return true;
+    } catch (error) {
+      console.error("Lexend for the Web could not save settings.", error);
+      if (revision === saveRevision) {
+        failedOperation = operation;
+        setSaveState("error", error.message || "Changes could not be saved");
+      }
+      return false;
+    }
   };
 
   const save = (changes) => persist({ type: "patch", changes });
@@ -466,7 +468,7 @@
   };
 
   advancedModeInput.addEventListener("change", async () => {
-    if (!preferences.loaded) return;
+    if (!preferences.loaded || !advancedPreferenceLoaded) return;
     renderReadabilityMode(true);
     if (!preferenceStorage) return;
     try {
@@ -704,6 +706,7 @@
 
   const loadSettings = async () => {
     loadFailed = false;
+    advancedPreferenceLoaded = false;
     failedOperation = null;
     setSaveState("loading", "Loading settings…");
     try {
@@ -716,9 +719,10 @@
           advancedModeInput.checked = false;
         }
       }
+      advancedPreferenceLoaded = true;
       renderReadabilityMode();
       render();
-      setSaveState("saved", "All changes saved");
+      if (saveRevision === 0) setSaveState("saved", "All changes saved");
     } catch (error) {
       loadFailed = true;
       console.error("Lexend for the Web could not load settings.", error);
