@@ -8,7 +8,7 @@
   const heading = (element) => /^H[1-6]$/.test(element.tagName) || element.getAttribute("role") === "heading";
   const control = (element) => element.matches("button,input,select,textarea,a[href],[role='button']");
   const rect = (value) => ({ left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width, height: value.height });
-  const visible = (element, style, allowViewportEscape = false) => {
+  const visible = (element, style, allowViewportEscape = false, styleFor = getComputedStyle) => {
     if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0 || !element.getClientRects().length) return false;
     if (element.checkVisibility && !element.checkVisibility({ contentVisibilityAuto: true })) return false;
     // Visually hidden labels, sprite replacement text and closed navigation
@@ -18,7 +18,7 @@
     let current = element;
     let escapedFixed = false;
     for (let depth = 0; current && depth < 10; depth++, current = current.parentElement ?? current.getRootNode()?.host) {
-      const css = current === element ? style : getComputedStyle(current);
+      const css = current === element ? style : styleFor(current);
       if (Number(css.opacity) === 0 || css.visibility === "hidden" || (css.clip !== "auto" && css.clip !== "")) return false;
       // A fixed descendant escapes scrolling ancestors' geometric clips until
       // an ancestor actually owns its containing block. Continue checking
@@ -49,7 +49,7 @@
     left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)),
     top: Math.min(...rects.map((r) => r.top)), bottom: Math.max(...rects.map((r) => r.bottom))
   } : null;
-  const directTextRects = (element) => {
+  const measureTextRects = (element) => {
     const result = [];
     for (const node of element.childNodes) {
       if (node.nodeType !== Node.TEXT_NODE || !node.textContent.trim()) continue;
@@ -74,11 +74,11 @@
     }
     return result;
   };
-  const snapshot = (element, allowViewportEscape = false) => {
-    const style = getComputedStyle(element);
-    if (!visible(element, style, allowViewportEscape)) return null;
+  const measureSnapshot = (element, allowViewportEscape, styleFor, textRects) => {
+    const style = styleFor(element);
+    if (!visible(element, style, allowViewportEscape, styleFor)) return null;
     const box = rect(element.getBoundingClientRect());
-    const texts = directTextRects(element);
+    const texts = textRects(element);
     return {
       box, texts, text: bounds(texts), scrollWidth: element.scrollWidth, scrollHeight: element.scrollHeight,
       clientWidth: element.clientWidth, clientHeight: element.clientHeight,
@@ -128,6 +128,37 @@
     const maskedScrollOffsets = new Map();
     const originalStylePresence = new Map();
     let canvas;
+    // Repeated repair stages read the same boxes and ancestor styles. Reuse
+    // them only within this synchronous pass, and discard every measurement
+    // after any write: a child can change its siblings or a :has() ancestor.
+    let measurements = null;
+    const freshMeasurements = () => ({
+      styles: new WeakMap(), snapshots: [new WeakMap(), new WeakMap()],
+      textRects: new WeakMap(), containedRects: new WeakMap()
+    });
+    const invalidateMeasurements = () => { if (measurements) measurements = freshMeasurements(); };
+    const withMeasurements = (callback) => {
+      const previous = measurements;
+      measurements = freshMeasurements();
+      try { return callback(); }
+      finally { measurements = previous; }
+    };
+    const styleFor = (element, pseudo = null) => {
+      if (!measurements || pseudo) return getComputedStyle(element, pseudo);
+      if (!measurements.styles.has(element)) measurements.styles.set(element, getComputedStyle(element));
+      return measurements.styles.get(element);
+    };
+    const directTextRects = (element) => {
+      if (!measurements) return measureTextRects(element);
+      if (!measurements.textRects.has(element)) measurements.textRects.set(element, measureTextRects(element));
+      return measurements.textRects.get(element);
+    };
+    const snapshot = (element, allowViewportEscape = false) => {
+      if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects);
+      const cache = measurements.snapshots[Number(allowViewportEscape)];
+      if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects));
+      return cache.get(element);
+    };
     const write = (element, property, value, category) => {
       let properties = edits.get(element);
       if (!properties) {
@@ -138,7 +169,10 @@
         value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property)
       });
       const original = properties.get(property);
-      element.style.setProperty(property, value, "important");
+      if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== "important") {
+        element.style.setProperty(property, value, "important");
+        invalidateMeasurements();
+      }
       original.applied = element.style.getPropertyValue(property);
       original.appliedPriority = "important";
       mark(element, "data-lexend-layout-repair", category);
@@ -150,7 +184,7 @@
       }
     };
     const writePanelConstraint = (element, property, value) => {
-      const css = getComputedStyle(element);
+      const css = styleFor(element);
       const properties = css.transitionProperty.split(",").map((item) => item.trim());
       const durations = css.transitionDuration.split(",").map((item) => item.trim());
       const delays = css.transitionDelay.split(",").map((item) => item.trim());
@@ -173,10 +207,14 @@
       if (!values.has(name)) values.set(name, { value: element.getAttribute(name) });
       const previous = element.getAttribute(name);
       const next = name === "data-lexend-layout-repair" ? [...new Set([...(previous?.split(" ") ?? []), value])].join(" ") : value;
-      element.setAttribute(name, next);
+      if (previous !== next) {
+        element.setAttribute(name, next);
+        invalidateMeasurements();
+      }
       values.get(name).applied = next;
     };
     const restore = () => {
+      invalidateMeasurements();
       for (const [element, offset] of maskedScrollOffsets) {
         const owned = edits.get(element)?.get("overflow-x");
         if (owned && element.style.getPropertyValue("overflow-x") === owned.applied) element.scrollLeft = offset;
@@ -194,7 +232,7 @@
         // The owned zero-duration constraints remain active until restored
         // geometry has resolved. Releasing `all` first would animate our old
         // repair back toward the author height and contaminate a recapture.
-        if (transitions.length) void getComputedStyle(element).height;
+        if (transitions.length) void styleFor(element).height;
         for (const [property, original] of transitions) restoreProperty(property, original);
         if (!element.getAttribute("style") && !originalStylePresence.get(element)) element.removeAttribute("style");
       }
@@ -212,7 +250,7 @@
       }
       tableWrappers.clear();
     };
-    const capture = (roots = [document.documentElement]) => {
+    const captureBaseline = (roots = [document.documentElement]) => {
       restore();
       baseline = new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
       return withStylesDisabled(() => {
@@ -236,12 +274,14 @@
                 if (childState && !baseline.has(child)) baseline.set(child, childState);
               }
             }
-            descendants.set(element, [...(descendants.get(element) ?? []), element]);
+            if (!descendants.has(element)) descendants.set(element, []);
+            descendants.get(element).push(element);
             let parent = ancestor(element);
             // Include containing panels and siblings, even when they have no
             // direct text. Stop before document-wide reflow constraints.
             for (let depth = 0; parent && depth < 8 && parent !== document.documentElement && parent !== document.body; depth++, parent = ancestor(parent)) {
-              descendants.set(parent, [...(descendants.get(parent) ?? []), element]);
+              if (!descendants.has(parent)) descendants.set(parent, []);
+              descendants.get(parent).push(element);
               if (!baseline.has(parent)) {
                 const parentState = snapshot(parent);
                 if (parentState) baseline.set(parent, parentState);
@@ -283,7 +323,7 @@
           if (Math.abs(state.box.top) > EPSILON || Math.abs(state.box.bottom - innerHeight) > EPSILON
               || state.box.width < innerWidth * 0.8 || ["auto", "scroll"].includes(state.overflowY)) continue;
           if ([...element.querySelectorAll("*")].some((child) => {
-            const css = getComputedStyle(child), box = child.getBoundingClientRect();
+            const css = styleFor(child), box = child.getBoundingClientRect();
             return ["auto", "scroll"].includes(css.overflowY) && child.clientHeight > 0
               && child.scrollHeight > child.clientHeight + EPSILON && box.top >= state.box.top - EPSILON
               && box.bottom <= state.box.bottom + EPSILON;
@@ -300,7 +340,7 @@
           // A purely geometric spacer can intentionally have visibility:hidden
           // while still reserving flow space. Its empty contents stay hidden;
           // only the matching footprint participates in this relationship.
-          const css = getComputedStyle(sibling), old = { box: rect(sibling.getBoundingClientRect()), position: css.position };
+          const css = styleFor(sibling), old = { box: rect(sibling.getBoundingClientRect()), position: css.position };
           if (css.display === "none" || !["static", "relative"].includes(old.position) || Math.abs(old.box.top - state.box.top) > EPSILON
               || Math.abs(old.box.height - state.box.height) > EPSILON || old.box.width < state.box.width * 0.9) continue;
           panelReservations.set(panel, { sibling, before: old });
@@ -311,12 +351,12 @@
         for (const [mask, state] of baseline) {
           if (!["hidden", "clip"].includes(state.overflowY) || mask.children.length !== 1
               || state.box.height < 8 || state.box.height > innerHeight * 0.5) continue;
-          const track = mask.firstElementChild, css = getComputedStyle(track);
+          const track = mask.firstElementChild, css = styleFor(track);
           if (!css.display.includes("flex") || css.flexDirection !== "column" || track.children.length < 2 || track.children.length > 12
               || track.querySelector("input,button,select,textarea,a[href],img,video,canvas,[role='button']")) continue;
           const matrix = new DOMMatrixReadOnly(css.transform);
           if (!matrix.is2D || matrix.a !== 1 || matrix.b !== 0 || matrix.c !== 0 || matrix.d !== 1 || matrix.f >= -EPSILON) continue;
-          const frames = [...track.children].map((element) => ({ element, box: element.getBoundingClientRect(), css: getComputedStyle(element) }));
+          const frames = [...track.children].map((element) => ({ element, box: element.getBoundingClientRect(), css: styleFor(element) }));
           if (frames.some((frame) => !["static", "relative"].includes(frame.css.position) || !frame.element.textContent.trim())) continue;
           const active = frames.reduce((best, frame) => intersection(frame.box, state.box) > intersection(best.box, state.box) ? frame : best);
           const visibleHeight = Math.min(active.box.bottom, state.box.bottom) - Math.max(active.box.top, state.box.top);
@@ -335,9 +375,9 @@
       });
     };
     const pseudoBox = (element, name) => {
-      const css = getComputedStyle(element, `::${name}`);
+      const css = styleFor(element, `::${name}`);
       if (css.position !== "absolute" || css.transform !== "none" || !css.content
-          || getComputedStyle(element).position === "static"
+          || styleFor(element).position === "static"
           || /^(?:none|normal|counter\(|attr\(|url\()/i.test(css.content) || css.content.length < 4) return null;
       let width = parseFloat(css.width), left = parseFloat(css.left);
       if (!Number.isFinite(width) || !Number.isFinite(left) || width < 8 || width > innerWidth - 8) return null;
@@ -347,7 +387,7 @@
       if (!/^-?[\d.]+(?:px|%)?$/.test(translate)) return null;
       const offset = parseFloat(translate) * (translate.endsWith("%") ? width / 100 : 1);
       const marginLeft = parseFloat(css.marginLeft) || 0;
-      left += element.getBoundingClientRect().left + (parseFloat(getComputedStyle(element).borderLeftWidth) || 0) + marginLeft + offset;
+      left += element.getBoundingClientRect().left + (parseFloat(styleFor(element).borderLeftWidth) || 0) + marginLeft + offset;
       return { left, right: left + width, width, marginLeft };
     };
     const repairPseudoTooltips = () => {
@@ -363,7 +403,7 @@
       canvas ??= document.createElement("canvas");
       const context = canvas.getContext("2d");
       if (!context) return 0;
-      const css = getComputedStyle(element);
+      const css = styleFor(element);
       context.font = `${css.fontStyle} ${css.fontWeight} ${state.fontSize}px ${css.fontFamily}`;
       const rendered = css.textTransform === "uppercase" ? text.toLocaleUpperCase() : css.textTransform === "lowercase" ? text.toLocaleLowerCase() : text;
       return context.measureText(rendered).width + Math.max(0, [...rendered].length - 1) * state.letterSpacing;
@@ -423,14 +463,14 @@
           for (let depth = 0; branch && depth < 4; depth++) {
             const parent = ancestor(branch);
             if (!parent) break;
-            const parentCss = getComputedStyle(parent), parentBox = parent.getBoundingClientRect();
+            const parentCss = styleFor(parent), parentBox = parent.getBoundingClientRect();
             if (["hidden", "clip"].includes(parentCss.overflowX)) rightLimit = Math.min(rightLimit, parentBox.right - 2);
             for (const sibling of parent.children) {
               if (sibling === branch) continue;
               const box = sibling.getBoundingClientRect();
               if (box.left >= now.box.right - 1 && box.top < now.box.bottom - 2 && box.bottom > now.box.top + 2) {
                 const siblingText = bounds(containedRects(sibling));
-                const padding = parseFloat(getComputedStyle(sibling).paddingLeft) || 0;
+                const padding = parseFloat(styleFor(sibling).paddingLeft) || 0;
                 const occupiedLeft = siblingText?.left > box.left ? siblingText.left : box.left + padding;
                 rightLimit = Math.min(rightLimit, occupiedLeft - 4);
               }
@@ -459,19 +499,19 @@
         return;
       }
       if (longest > available - Math.max(4, now.letterSpacing * 2) || brokenWord) {
-        const containerCss = getComputedStyle(container);
+        const containerCss = styleFor(container);
         const safeParentWidth = parentState ? Math.max(0, Math.min(
           parentState.box.width - parentState.paddingLeft - parentState.paddingRight,
           parentState.box.right - parentState.paddingRight - containerState.box.left - (parseFloat(containerCss.marginRight) || 0),
           innerWidth - Math.max(0, containerState.box.left))) : available;
         if (safeParentWidth > available + EPSILON && containerState.box.width < safeParentWidth - EPSILON) {
-          const inlineGroup = containerState.display.startsWith("inline") && parent && [...parent.children].some((sibling) => sibling !== container && getComputedStyle(sibling).display.startsWith("inline"));
+          const inlineGroup = containerState.display.startsWith("inline") && parent && [...parent.children].some((sibling) => sibling !== container && styleFor(sibling).display.startsWith("inline"));
           const siblingsWidth = inlineGroup ? [...parent.children].filter((sibling) => {
-            const css = getComputedStyle(sibling);
+            const css = styleFor(sibling);
             return sibling !== container && css.display.startsWith("inline") && !["absolute", "fixed"].includes(css.position)
               && sibling.getBoundingClientRect().left >= containerState.box.right - EPSILON;
           }).reduce((sum, sibling) => {
-            const css = getComputedStyle(sibling);
+            const css = styleFor(sibling);
             return sum + sibling.getBoundingClientRect().width + (parseFloat(css.marginLeft) || 0) + (parseFloat(css.marginRight) || 0);
           }, 0) : 0;
           const targetWidth = Math.max(available, Math.min(safeParentWidth - siblingsWidth, longest + containerState.paddingLeft + containerState.paddingRight + 4));
@@ -489,7 +529,7 @@
           for (let depth = 0; branch && depth < 8; depth++) {
             const outer = ancestor(branch);
             if (!outer || outer.matches("body,html")) break;
-            const css = getComputedStyle(outer), box = outer.getBoundingClientRect();
+            const css = styleFor(outer), box = outer.getBoundingClientRect();
             if (["hidden", "clip"].includes(css.overflowX)) rightLimit = Math.min(rightLimit, box.right - 1);
             for (const sibling of outer.children) {
               if (sibling === branch) continue;
@@ -529,7 +569,7 @@
           || now.fontSize <= before.fontSize + 0.1 || !now.text || !before.text) return;
       let clip = ancestor(element);
       for (let depth = 0; clip && depth < 4; depth++, clip = ancestor(clip)) {
-        const css = getComputedStyle(clip);
+        const css = styleFor(clip);
         if (!["hidden", "clip"].includes(css.overflowX)) continue;
         const old = baseline.get(clip), box = clip.getBoundingClientRect();
         if (!old || !old.box.width || box.width < 16
@@ -593,7 +633,7 @@
       if (now.display === "inline-block" && !["absolute", "fixed"].includes(now.position)
           && before.box.right <= innerWidth + EPSILON && now.box.right > innerWidth + EPSILON
           && now.box.left >= 0 && now.fontSize > before.fontSize + 0.1) {
-        const parent = ancestor(element), css = parent ? getComputedStyle(parent) : null;
+        const parent = ancestor(element), css = parent ? styleFor(parent) : null;
         const available = Math.max(0, Math.min(innerWidth - now.box.left,
           parent ? parent.getBoundingClientRect().right - (parseFloat(css.paddingRight) || 0) - now.box.left : innerWidth));
         if (available > 32) {
@@ -627,7 +667,7 @@
       const expandedConstraint = now.box.height > before.box.height + EPSILON && ["hidden", "clip"].includes(before.overflowY);
       if ((clamped || tall > oldTall + EPSILON || expandedConstraint) && !hasVisualBackground(element)) {
         for (const pseudo of ["before", "after"]) {
-          const css = getComputedStyle(element, `::${pseudo}`);
+          const css = styleFor(element, `::${pseudo}`);
           const empty = ['""', "''"].includes(css.content);
           const fading = `${css.backgroundImage} ${css.maskImage ?? css.webkitMaskImage ?? "none"}`;
           if (empty && css.position === "absolute" && /(?:linear|radial)-gradient\(/.test(fading)
@@ -639,7 +679,7 @@
       }
       if (element.matches("input,select")) {
         const parent = ancestor(element);
-        const parentCss = parent ? getComputedStyle(parent) : null;
+        const parentCss = parent ? styleFor(parent) : null;
         const available = Math.max(0, Math.min(parent ? parent.clientWidth - (parseFloat(parentCss.paddingLeft) || 0) - (parseFloat(parentCss.paddingRight) || 0) : innerWidth,
           innerWidth - Math.max(0, now.box.left) - 2));
         // Native fields do not expose placeholder or selected-option clipping
@@ -662,12 +702,12 @@
     };
     const containedText = (container) => descendants.get(container) ?? [];
     const heightForBox = (element, outerHeight) => {
-      const css = getComputedStyle(element);
+      const css = styleFor(element);
       const inset = css.boxSizing === "border-box" ? 0 : [css.paddingTop, css.paddingBottom, css.borderTopWidth, css.borderBottomWidth]
         .reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
       return Math.ceil(Math.max(0, outerHeight - inset));
     };
-    const containedRects = (container, original = false) => containedText(container).flatMap((item) => {
+    const measureContainedRects = (container, original) => containedText(container).flatMap((item) => {
       for (const { track, active } of maskedTickers.values()) {
         if (track.contains(item) && item !== active && !active.contains(item)) return [];
       }
@@ -676,7 +716,7 @@
       // contain the overlay in the DOM. Keep measuring the overlay itself.
       for (let branch = item; branch && branch !== container; branch = ancestor(branch)) {
         const old = baseline.get(branch), owner = baseline.get(container);
-        const position = original ? old?.position : getComputedStyle(branch).position;
+        const position = original ? old?.position : styleFor(branch).position;
         if (position === "fixed") return [];
         // An authored popup may intentionally protrude from its anchor/header.
         // It owns its enlarged text; a visible-overflow anchor has no flow
@@ -691,7 +731,7 @@
       let parent = ancestor(item);
       for (let depth = 0; parent && parent !== container && depth < 10; depth++, parent = ancestor(parent)) {
         const state = original ? baseline.get(parent) : null;
-        const css = original ? state : getComputedStyle(parent);
+        const css = original ? state : styleFor(parent);
         if (!css) continue;
         const scrollX = ["auto", "scroll"].includes(css.overflowX), scrollY = ["auto", "scroll"].includes(css.overflowY);
         if (!scrollX && !scrollY) continue;
@@ -705,6 +745,11 @@
       }
       return boxes;
     });
+    const containedRects = (container, original = false) => {
+      if (original || !measurements) return measureContainedRects(container, original);
+      if (!measurements.containedRects.has(container)) measurements.containedRects.set(container, measureContainedRects(container, false));
+      return measurements.containedRects.get(container);
+    };
     const overflowing = (container, state) => {
       const boxes = containedRects(container);
       const text = bounds(boxes);
@@ -713,7 +758,7 @@
     };
     const hasVisualBackground = (element) => {
       if (visualContainers.has(element)) return visualContainers.get(element);
-      const visual = (item) => item.matches("img,picture,video,svg,canvas") || getComputedStyle(item).backgroundImage !== "none";
+      const visual = (item) => item.matches("img,picture,video,svg,canvas") || styleFor(item).backgroundImage !== "none";
       let result = visual(element);
       if (!result) {
         const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT);
@@ -728,11 +773,11 @@
       return result;
     };
     const needsDefiniteHeight = (element, now) => {
-      if (/url\(/.test(getComputedStyle(element).backgroundImage)) return true;
+      if (/url\(/.test(styleFor(element).backgroundImage)) return true;
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT);
       let child, count = 0;
       while ((child = walker.nextNode()) && count++ < 256) {
-        const css = getComputedStyle(child);
+        const css = styleFor(child);
         if (/url\(/.test(css.backgroundImage)) return true;
         if (!child.matches("img,picture,video,canvas,svg")) continue;
         const box = baseline.get(child)?.box ?? child.getBoundingClientRect();
@@ -744,7 +789,7 @@
       return false;
     };
     const expandContainer = (element, now, additional, category) => {
-      const css = getComputedStyle(element);
+      const css = styleFor(element);
       const definite = Number.parseFloat(css.height);
       // Percentage-height image layers need a definite containing-block height.
       // 'auto' can erase photographs or collapse background layers to zero.
@@ -763,7 +808,7 @@
             || now.box.height <= before.box.height + EPSILON || needsDefiniteHeight(element, now)
             || element.children.length > 8) continue;
         for (const child of element.children) {
-          const css = getComputedStyle(child), box = child.getBoundingClientRect();
+          const css = styleFor(child), box = child.getBoundingClientRect();
           const fading = `${css.backgroundImage} ${css.maskImage ?? "none"}`;
           if (css.position !== "absolute" || css.pointerEvents !== "none" || child.textContent.trim()
               || child.querySelector("img,svg,video,canvas,input,button,a,[tabindex]")
@@ -774,7 +819,7 @@
           // A flex excerpt can shrink again after its parent's height changes.
           // Once its truncation mask is removed, reserve the whole text height.
           const flowBottom = Math.max(now.box.top, ...[...element.children]
-            .filter((item) => !["absolute", "fixed"].includes(getComputedStyle(item).position))
+            .filter((item) => !["absolute", "fixed"].includes(styleFor(item).position))
             .map((item) => item.getBoundingClientRect().bottom));
           write(element, "min-height", `${heightForBox(element, Math.max(before.box.height, flowBottom - now.box.top + now.paddingBottom + now.borderBottom))}px`, "expand");
         }
@@ -831,8 +876,8 @@
         if (now.position === "fixed" || element.matches("dialog,[role='dialog'],[aria-modal='true']")) continue;
         // Ignore transformed art/canvas and large pre-existing scrolling tracks.
         if (now.transform !== "none" && !new DOMMatrixReadOnly(now.transform).isIdentity && !textElements.has(element)) continue;
-        const hasAbsolute = [...element.children].some((child) => ["absolute", "fixed"].includes(getComputedStyle(child).position));
-        const css = getComputedStyle(element);
+        const hasAbsolute = [...element.children].some((child) => ["absolute", "fixed"].includes(styleFor(child).position));
+        const css = styleFor(element);
         if (css.height !== "auto") {
           const growth = Math.max(0, overflow - baselineTextOverflow, flowGrowth);
           expandContainer(element, now, growth, "expand");
@@ -846,7 +891,7 @@
       }
     };
     const branchBounds = (element) => {
-      const texts = ["auto", "scroll"].includes(getComputedStyle(element).overflowY)
+      const texts = ["auto", "scroll"].includes(styleFor(element).overflowY)
         ? [] : containedRects(element);
       return bounds(texts) ?? rect(element.getBoundingClientRect());
     };
@@ -854,7 +899,7 @@
       for (const [parent, before] of baseline) {
         if (parent.children.length < 2 || parent.children.length > 16) continue;
         const children = [...parent.children].filter((child) => baseline.has(child)
-          && baseline.get(child).position !== "fixed" && visible(child, getComputedStyle(child))
+          && baseline.get(child).position !== "fixed" && visible(child, styleFor(child))
           // Full-cover empty artwork is an overlay, not a flow column. Its
           // intentional overlap cannot wrap a viewport's sidebar/content row.
           && !(baseline.get(child).position === "absolute" && !containedText(child).length
@@ -922,7 +967,7 @@
                 previous.getBoundingClientRect().bottom + gap - child.getBoundingClientRect().top
               );
               if (delta > EPSILON) {
-                const top = parseFloat(getComputedStyle(child).top) || child.offsetTop;
+                const top = parseFloat(styleFor(child).top) || child.offsetTop;
                 write(child, "top", `${Math.ceil(top + delta)}px`, "reflow");
               }
             }
@@ -943,7 +988,7 @@
               const current = branchBounds(preceding), box = child.getBoundingClientRect();
               if (current.right <= box.left || current.left >= box.right) continue;
               const delta = current.bottom + Math.max(2, old.box.top - previous.bottom) - box.top;
-              if (delta > EPSILON && delta < innerHeight * 0.5) write(child, "top", `${Math.ceil((parseFloat(getComputedStyle(child).top) || child.offsetTop) + delta)}px`, "reflow");
+              if (delta > EPSILON && delta < innerHeight * 0.5) write(child, "top", `${Math.ceil((parseFloat(styleFor(child).top) || child.offsetTop) + delta)}px`, "reflow");
             }
           }
           for (const child of children) {
@@ -976,13 +1021,13 @@
           // Restore that measured gap instead of inventing a site-specific gap.
           for (let i = 0; i < children.length - 1; i++) {
             const a = children[i], b = children[i + 1];
-            if (!["static", "relative"].includes(getComputedStyle(a).position) || !["static", "relative"].includes(getComputedStyle(b).position)) continue;
+            if (!["static", "relative"].includes(styleFor(a).position) || !["static", "relative"].includes(styleFor(b).position)) continue;
             const oldA = baseline.get(a).contentBounds ?? baseline.get(a).box;
             const oldB = baseline.get(b).contentBounds ?? baseline.get(b).box;
             const newA = branchBounds(a), newB = branchBounds(b);
             const gap = oldB.top - oldA.bottom, currentGap = newB.top - newA.bottom;
             if (oldB.top > oldA.top && gap >= -EPSILON && currentGap < gap - EPSILON && Math.min(newA.right, newB.right) > Math.max(newA.left, newB.left)) {
-              const margin = parseFloat(getComputedStyle(b).marginTop) || 0;
+              const margin = parseFloat(styleFor(b).marginTop) || 0;
               write(b, "margin-top", `${Math.ceil(margin + gap - currentGap)}px`, "reflow");
             }
           }
@@ -1041,11 +1086,11 @@
             if (current.box.bottom <= Math.min(innerHeight, panel.getBoundingClientRect().bottom) + EPSILON) continue;
             if (containedText(group).some((item) => !item.closest("button,input[type='button'],input[type='submit']"))) continue;
             let background = ancestor(group);
-            while (background && getComputedStyle(background).backgroundColor === "rgba(0, 0, 0, 0)") background = ancestor(background);
+            while (background && styleFor(background).backgroundColor === "rgba(0, 0, 0, 0)") background = ancestor(background);
             write(group, "position", "sticky", "panel-actions");
             write(group, "bottom", "0", "panel-actions");
             write(group, "z-index", "1", "panel-actions");
-            write(group, "background-color", background ? getComputedStyle(background).backgroundColor : "white", "panel-actions");
+            write(group, "background-color", background ? styleFor(background).backgroundColor : "white", "panel-actions");
             write(panel, "scroll-padding-bottom", `${Math.ceil(current.box.height)}px`, "panel-actions");
           }
         }
@@ -1053,7 +1098,7 @@
         if (bounded && (bounded.box.top < 0 || bounded.box.bottom > innerHeight)) {
           // Preserve the author's horizontal centering and transforms. Move
           // only the measured vertical excess after applying the scroll bound.
-          const css = getComputedStyle(panel);
+          const css = styleFor(panel);
           const top = parseFloat(css.top);
           const target = Math.max(0, Math.min(bounded.box.top, innerHeight - bounded.box.height));
           if (Number.isFinite(top)) write(panel, "top", `${top + target - bounded.box.top}px`, "bounded-panel");
@@ -1064,7 +1109,7 @@
         // Fixed/absolute footers must participate in dialog scrolling, rather
         // than covering its explanation or leaving their controls offscreen.
         for (const child of panel.querySelectorAll("*")) {
-          const childStyle = getComputedStyle(child);
+          const childStyle = styleFor(child);
           if (!["absolute", "fixed"].includes(childStyle.position) || !child.querySelector("button,input,[role='button']")) continue;
           if (!containedText(child).length || child.getBoundingClientRect().width < now.box.width * 0.45) continue;
           write(child, "position", "relative", "bounded-panel");
@@ -1100,7 +1145,7 @@
         if (!parent) continue;
         // Give enlarged cells a keyboard-accessible horizontal viewport rather
         // than squeezing prose, numbers or native form controls into tiny cells.
-        const padding = parseFloat(getComputedStyle(parent).paddingRight) || 0;
+        const padding = parseFloat(styleFor(parent).paddingRight) || 0;
         const available = Math.max(80, innerWidth - Math.max(0, now.box.left) - padding);
         let viewport;
         if (parent !== document.body && parent !== document.documentElement && parent.children.length === 1 && !parent.matches("td,th")) {
@@ -1108,6 +1153,7 @@
         } else {
           viewport = document.createElement("div");
           table.before(viewport); viewport.append(table);
+          invalidateMeasurements();
           viewport.tabIndex = 0;
           viewport.setAttribute("role", "region");
           viewport.setAttribute("aria-label", table.caption?.textContent.trim() || "Scrollable table");
@@ -1141,12 +1187,12 @@
             && topClip < Math.max(48, now.fontSize * 2) && oldText.top > before.box.top - Math.max(48, before.fontSize * 2)
             && oldText.bottom > before.box.top + EPSILON && container.children.length <= 8) {
           const branch = [...container.children].find((item) => {
-            const css = getComputedStyle(item);
+            const css = styleFor(item);
             return parseFloat(css.marginTop) < 0 && !["absolute", "fixed"].includes(css.position)
               && containedText(item).length && item.getBoundingClientRect().top < now.box.top;
           });
           if (branch) {
-            write(branch, "margin-top", `${parseFloat(getComputedStyle(branch).marginTop) + topClip + 2}px`, "expose-text-top");
+            write(branch, "margin-top", `${parseFloat(styleFor(branch).marginTop) + topClip + 2}px`, "expose-text-top");
             write(container, "min-height", `${heightForBox(container, now.box.height + topClip + 2)}px`, "expose-text-top");
           }
         }
@@ -1197,7 +1243,7 @@
         if (growth <= previous + EPSILON && now.fontSize <= before.fontSize + 0.1) continue;
         let parent = ancestor(element), imageContainer = null;
         for (let depth = 0; parent && depth < 6; depth++, parent = ancestor(parent)) {
-          const style = getComputedStyle(parent);
+          const style = styleFor(parent);
           const images = [...parent.querySelectorAll(":scope > img,:scope > video,:scope > picture > img,:scope > div > img,:scope > div > picture > img,:scope > div > div > img,:scope > div > div > picture > img")];
           const hasImage = /url\(/.test(style.backgroundImage) || images.some((image) => intersection(image.getBoundingClientRect(), element.getBoundingClientRect()) > 0);
           if (hasImage) { imageContainer = parent; break; }
@@ -1221,7 +1267,7 @@
         return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
       }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
       const pseudoPaint = (element) => ["::before", "::after"].some((pseudo) => {
-        const css = getComputedStyle(element, pseudo);
+        const css = styleFor(element, pseudo);
         if (["none", "normal"].includes(css.content) || css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0) return false;
         return css.backgroundImage !== "none" || (rgb(css.backgroundColor)?.alpha ?? 0) > 0;
       });
@@ -1233,7 +1279,7 @@
         if (!now?.text || !foreground || foreground.alpha !== 1) continue;
         let background = null, safe = true;
         for (let current = element, depth = 0; current && depth < 24; current = ancestor(current), depth++) {
-          const css = getComputedStyle(current);
+          const css = styleFor(current);
           if (Number(css.opacity) < 1 || css.filter !== "none" || css.mixBlendMode !== "normal"
               || css.backgroundImage !== "none" || (css.backdropFilter && css.backdropFilter !== "none")) { safe = false; break; }
           if (pseudoPaint(current)) { safe = false; break; }
@@ -1253,7 +1299,7 @@
         // their authored colors; their effective background is not established.
         if (contrast >= 2) continue;
         for (let current = ancestor(element); current; current = ancestor(current)) {
-          const css = getComputedStyle(current);
+          const css = styleFor(current);
           if (Number(css.opacity) < 1 || css.filter !== "none" || css.mixBlendMode !== "normal" || pseudoPaint(current)) { safe = false; break; }
         }
         if (safe) write(element, "color", surface > 0.179 ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)", "solid-text-contrast");
@@ -1321,9 +1367,9 @@
     const repairMediaFootprints = () => {
       for (const [element, before] of baseline) {
         let parent = ancestor(element);
-        while (parent && getComputedStyle(parent).display === "contents") parent = ancestor(parent);
+        while (parent && styleFor(parent).display === "contents") parent = ancestor(parent);
         if (!parent || before.box.width < 40) continue;
-        const display = getComputedStyle(parent).display;
+        const display = styleFor(parent).display;
         if (!display.includes("flex") && !display.includes("grid")) continue;
         const box = element.getBoundingClientRect();
         const threshold = before.box.width >= (baseline.get(parent)?.box.width ?? Infinity) * 0.85 ? 0.85 : 0.5;
@@ -1344,7 +1390,7 @@
     const repairFloatingBounds = () => {
       for (const [parent, before] of baseline) {
         if (before.box.height < 32 || parent.children.length > 32) continue;
-        const children = [...parent.children].filter((child) => baseline.has(child) && getComputedStyle(child).float !== "none");
+        const children = [...parent.children].filter((child) => baseline.has(child) && styleFor(child).float !== "none");
         if (children.length < 2 || children.some((child) => baseline.get(child).box.bottom > before.box.bottom + EPSILON)) continue;
         const now = snapshot(parent);
         if (!now || ["auto", "scroll"].includes(now.overflowY)) continue;
@@ -1355,12 +1401,12 @@
         write(parent, "height", "auto", "float-containment");
       }
     };
-    const repair = () => {
+    const repairLayout = () => {
       if (!baseline.size) return;
       for (const [mask, { track, active, offset }] of maskedTickers) {
         if (!mask.isConnected || !active.isConnected) continue;
         const before = baseline.get(mask), box = active.getBoundingClientRect();
-        const matrix = new DOMMatrixReadOnly(getComputedStyle(track).transform);
+        const matrix = new DOMMatrixReadOnly(styleFor(track).transform);
         const height = Math.max(before.authoredHeight, box.height + before.paddingTop + before.paddingBottom);
         write(mask, "height", `${Math.ceil(height)}px`, "active-ticker-frame");
         write(mask, "max-height", "none", "active-ticker-frame");
@@ -1392,7 +1438,7 @@
       for (const element of textElements) {
         const old = baseline.get(element);
         if (!old || !element.isConnected) continue;
-        const css = getComputedStyle(element);
+        const css = styleFor(element);
         if (css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0) continue;
         oldBoxes.push(...old.texts, ...(control(element) ? [old.box] : []));
         currentBoxes.push(...directTextRects(element), ...(control(element) ? [rect(element.getBoundingClientRect())] : []));
@@ -1424,6 +1470,8 @@
       if (requiredHeight > limit) return null;
       return { baselineHeight: frameQualification.baselineHeight, requiredHeight, viewportHeight };
     };
+    const capture = (roots) => withMeasurements(() => captureBaseline(roots));
+    const repair = () => withMeasurements(repairLayout);
     return Object.freeze({ capture, repair, restore, getFrameRequirement, refresh: (roots) => { capture(roots); repair(); } });
   };
 

@@ -514,8 +514,14 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
    await page.waitForTimeout(150);
    assert.equal(await page.locator("#centered-caption").evaluate(element=>element.clientHeight),centeredHeight,"strong centered-caption growth retains its original fit qualification and baseline height across refreshes");
   }
-  await page.waitForFunction(()=>document.querySelector("#below-caption").clientHeight>100,{},{timeout:5000});
   const belowChild=page.frames().find(frame=>frame.url().endsWith("/below-caption"));
+  // Font decoding and authenticated resize replies settle in separate tasks.
+  // The first enlarged height can still belong to the fallback font's metrics.
+  await belowChild.waitForFunction(()=>{
+   const range=document.createRange();range.selectNodeContents(document.querySelector("p"));
+   const box=range.getBoundingClientRect();
+   return innerHeight>100 && box.top>=0 && box.bottom<=innerHeight;
+  },{},{timeout:5000});
   const belowGlyphs=await belowChild.locator("p").evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);return{top:range.getBoundingClientRect().top,bottom:range.getBoundingClientRect().bottom,viewport:innerHeight};});
   assert.ok(belowGlyphs.top>=0 && belowGlyphs.bottom<=belowGlyphs.viewport,"a request arriving below the fold retains every enlarged caption glyph before native reveal");
   await page.locator("#below-caption").scrollIntoViewIfNeeded();
