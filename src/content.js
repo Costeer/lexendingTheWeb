@@ -23,7 +23,7 @@
   const TEXT_ATTRIBUTE = "data-lexend-text";
   const PROTECTED_ATTRIBUTE = "data-lexend-protected";
   const managedElements = new Map();
-  const eligibleTextElements = new Set();
+  const eligibleTextRoots = new Map();
   const transitionRules = new Map();
   const transitionAttributes = ["data-lexend-transition", "data-lexend-before-transition", "data-lexend-after-transition"];
   const settledFontFaces = new WeakSet();
@@ -290,7 +290,14 @@
     `;
   };
 
-  const getEffectiveSettings = () => settingsApi.resolveSite(settings, getEffectiveHostname());
+  let effectiveCache;
+  const getEffectiveSettings = () => {
+    const hostname = getEffectiveHostname();
+    if (effectiveCache?.settings !== settings || effectiveCache.hostname !== hostname) {
+      effectiveCache = { settings, hostname, value: settingsApi.resolveSite(settings, hostname) };
+    }
+    return effectiveCache.value;
+  };
   const isActive = () => getEffectiveSettings().active;
   const composedParent = (element) => element.parentElement
     ?? (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
@@ -325,10 +332,14 @@
     }
     return content;
   };
-  const ownTextContent = (element) => [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent).join("");
-  const hasEmptyPaintClip = (element, style) => {
+  const ownTextContent = (element) => {
+    let text = "";
+    for (const node of element.childNodes) if (node.nodeType === Node.TEXT_NODE) text += node.textContent;
+    return text;
+  };
+  const hasEmptyPaintClip = (element, style, styleFor = getComputedStyle) => {
     for (let current = element; current; current = composedParent(current)) {
-      const css = current === element ? style : getComputedStyle(current);
+      const css = current === element ? style : styleFor(current);
       // Legacy visually-hidden links can have a sizable border box while their
       // absolute-positioned paint clip is empty. Preserve that hidden state's
       // metrics; a focus event remeasures once the page reveals the label.
@@ -341,7 +352,7 @@
     }
     return false;
   };
-  const isImageReplacementText = (element, style) => {
+  const isImageReplacementText = (element, style, styleFor = getComputedStyle) => {
     const alpha = style.color.match(/rgba\([^)]*,\s*([\d.]+)\s*\)/)?.[1];
     if (style.backgroundClip.includes("text")
         || style.webkitBackgroundClip?.includes("text")) return false;
@@ -352,7 +363,7 @@
       if (!style.backgroundImage.includes("url(")) return false;
       let fixed = false;
       for (let current = element; current; current = composedParent(current)) {
-        if (getComputedStyle(current).position === "fixed") { fixed = true; break; }
+        if (styleFor(current).position === "fixed") { fixed = true; break; }
       }
       if (!fixed) return false;
       const boxes = [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
@@ -362,7 +373,7 @@
     // Accessible labels behind a sprite/image are deliberately unpainted. Their
     // typography must not enlarge the replacement artwork's fixed geometry.
     for (let current = element, depth = 0; current && depth < 3; depth++, current = composedParent(current)) {
-      const css = current === element ? style : getComputedStyle(current);
+      const css = current === element ? style : styleFor(current);
       if (css.backgroundClip.includes("text") || css.webkitBackgroundClip?.includes("text")) return false;
       if (css.backgroundImage !== "none" || current.querySelector("img,picture,svg")) return true;
     }
@@ -372,14 +383,22 @@
     node.nodeType === Node.TEXT_NODE && node.textContent.trim()
   ));
   const isTextControl = (element) => element.matches("textarea,select,option,button,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color'])");
-  const allElements = (root) => [
-    ...(root instanceof Element ? [root] : []),
-    ...root.querySelectorAll("*")
-  ].filter((element) => element instanceof Element && element.style && !ownStyleIds.includes(element.id)
-    && (root instanceof ShadowRoot || Boolean(element.closest("body"))));
-  const collectTextElements = (root) => new Set([...eligibleTextElements].filter((element) => (
-    element.isConnected && (element === root || element.getRootNode() === root || root.contains(element))
-  )));
+  const allElements = function* (root) {
+    const scope = root === document.documentElement ? document.body : root;
+    if (!scope || (root instanceof ShadowRoot && hasProtectedAncestor(root.host))) return;
+    // Freeze the typography at each semantic boundary. Its descendants then
+    // inherit the original font naturally; thousands of editor tokens need no
+    // overrides, pseudo measurements, or clone-recovery attributes of their own.
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (element) => !element.style || ownStyleIds.includes(element.id)
+        || element.matches("script,style,template,noscript") || element.parentElement?.matches(protectedSelector)
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    if (scope instanceof Element) yield scope;
+    let element;
+    while ((element = walker.nextNode())) yield element;
+  };
+  const collectTextElements = (root) => eligibleTextRoots.get(root) ?? new Set();
 
   // Keep only the properties we own. Page updates to unrelated inline styles
   // remain intact when settings change or the extension is switched off.
@@ -529,7 +548,7 @@
       if (!state.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
     }
     managedElements.clear();
-    eligibleTextElements.clear();
+    eligibleTextRoots.clear();
     transitionRules.clear();
   };
   const withExtensionStylesDisabled = (callback) => {
@@ -593,16 +612,21 @@
   const measureTypography = (roots) => {
     const effective = getEffectiveSettings();
     const measurements = [];
-    roots.forEach((root) => allElements(root).forEach((element) => {
-      const style = getComputedStyle(element);
+    const styles = new WeakMap();
+    const styleFor = (element) => {
+      if (!styles.has(element)) styles.set(element, getComputedStyle(element));
+      return styles.get(element);
+    };
+    for (const root of roots) for (const element of allElements(root)) {
+      const style = styleFor(element);
       const semanticProtection = hasProtectedAncestor(element);
       const inScope = effective.scope === "all" || !isHeading(element);
       const text = ownTextContent(element);
       const mixedGlyphProse = containsPrivateGlyph(text) && !onlyPrivateGlyphs(text);
       const protectedText = semanticProtection || codeFont.test(style.fontFamily)
         || (!mixedGlyphProse && protectedFont(style)) || onlyPrivateGlyphs(text)
-        || isImageReplacementText(element, style) || hasEmptyPaintClip(element, style) || !inScope;
-      const target = !protectedText && inScope && (directText(element) || isTextControl(element));
+        || isImageReplacementText(element, style, styleFor) || hasEmptyPaintClip(element, style, styleFor) || !inScope;
+      const target = !protectedText && inScope && (Boolean(text.trim()) || isTextControl(element));
       const pseudos = [];
       // Generated text can be the only label, or an icon whose family would
       // otherwise inherit Lexend from its newly converted parent.
@@ -619,8 +643,11 @@
       if (protectedText || target || pseudos.length || typography.transition !== null) measurements.push({
         element, protected: protectedText, target, noTracking: /\p{Script=Arabic}/u.test(text), typography, pseudos
       });
-      if (target) eligibleTextElements.add(element);
-    }));
+      if (target) {
+        if (!eligibleTextRoots.has(root)) eligibleTextRoots.set(root, new Set());
+        eligibleTextRoots.get(root).add(element);
+      }
+    }
     return measurements;
   };
   const applyTypography = (measurements) => {
@@ -682,8 +709,13 @@
       const scale = protectedText ? 1 : settings.textScale / 100;
       // Joining Arabic glyphs gain no readability from added tracking, and a
       // fixed label can lose its first character when tracking is applied.
+      const scalePixels = (value) => value.endsWith("px") ? `${parseFloat(value) * scale}px` : value;
       const spacing = !protectedText && settings.letterSpacing > 0
-        ? noTracking ? "0px" : `${settings.letterSpacing}em` : values.spacing;
+        ? noTracking ? "0px" : `${settings.letterSpacing}em` : scalePixels(values.spacing);
+      // Computed unitless/em line heights arrive in pixels. Keep the site's
+      // reading rhythm when scaling its letters instead of squeezing enlarged
+      // glyphs into the old line box. `normal` remains font-dependent.
+      const line = !protectedText && settings.lineHeight > 0 ? String(settings.lineHeight) : scalePixels(values.line);
       // Site fonts must resolve their own private-use icons before Nerd Fonts:
       // unrelated icon sets can assign different artwork to the same codepoint.
       // Semantic opt-outs and code keep their original families unchanged.
@@ -692,14 +724,14 @@
         : `"Lexend for the Web", ${values.family}${fallback}`;
       setProperty(element, `--lexend-${prefix}family`, family);
       setProperty(element, `--lexend-${prefix}size`, `${parseFloat(values.size) * scale}px`);
-      setProperty(element, `--lexend-${prefix}line`, !protectedText && settings.lineHeight > 0 ? String(settings.lineHeight) : values.line);
+      setProperty(element, `--lexend-${prefix}line`, line);
       setProperty(element, `--lexend-${prefix}spacing`, spacing);
       if (!prefix) {
         // Inline important declarations also defeat author inline-important
         // typography while retaining its exact value for disable/refresh.
         setProperty(element, "font-family", family, "important");
         setProperty(element, "font-size", `${parseFloat(values.size) * scale}px`, "important");
-        setProperty(element, "line-height", !protectedText && settings.lineHeight > 0 ? String(settings.lineHeight) : values.line, "important");
+        setProperty(element, "line-height", line, "important");
         setProperty(element, "letter-spacing", spacing, "important");
       }
     };
@@ -813,7 +845,7 @@
       }
       layout?.restore();
       if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
-      recoverClonedTypography([document.documentElement, ...styledRoots]);
+      recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
       [...styledRoots].forEach((root) => { if (!root.isConnected) styledRoots.delete(root); });
       applyToRoot(document.documentElement);
@@ -897,7 +929,7 @@
   };
   const queueRefresh = (urgent = false) => {
     urgent = urgent === true;
-    if (refreshing) return;
+    if (refreshing || !isActive()) return;
     if (refreshTimer !== null) {
       if (!urgent || refreshUrgent) return;
       clearTimeout(refreshTimer);
@@ -923,8 +955,14 @@
   };
 
   const applySettings = (nextSettings) => {
-    revealedAutoContent = new WeakSet();
+    const previous = getEffectiveSettings();
+    const previousTypography = settings;
     settings = settingsApi.normalizeSettings(nextSettings);
+    const effective = getEffectiveSettings();
+    if (refreshRevision > 0 && lastRefreshError === null && previous.active === effective.active
+        && (!effective.active || previous.scope === effective.scope
+          && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) return;
+    revealedAutoContent = new WeakSet();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = null;
     refresh();
@@ -977,6 +1015,7 @@
     return true;
   };
   const observer = new MutationObserver((mutations) => {
+    if (!isActive()) return;
     const authored = mutations.filter((mutation) => !ownStyleIds.includes(mutation.target.id)
       && !ownStyleIds.includes(mutation.target.parentElement?.id) && !fittingCounterMutation(mutation));
     if (!authored.length) return;
