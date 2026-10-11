@@ -791,14 +791,36 @@
     const expandContainer = (element, now, additional, category) => {
       const css = styleFor(element);
       const definite = Number.parseFloat(css.height);
+      const before = baseline.get(element);
       // Percentage-height image layers need a definite containing-block height.
       // 'auto' can erase photographs or collapse background layers to zero.
       if (needsDefiniteHeight(element, now) && Number.isFinite(definite)) {
         write(element, "height", `${Math.ceil(definite + Math.max(0, additional))}px`, category);
+        write(element, "max-height", "none", category);
       } else {
+        // Removing a height can erase flex/grid space or invalidate children's
+        // percentage heights, even below a header, inside a narrow column, or
+        // after scrolling. Measure that effect instead of matching a viewport.
+        const children = [...element.children].filter((child) =>
+          !["absolute", "fixed"].includes(styleFor(child).position))
+          .map((child) => ({ child, height: child.getBoundingClientRect().height }));
         write(element, "height", "auto", category);
+        write(element, "max-height", "none", category);
+        const expanded = element.getBoundingClientRect();
+        const lostSpace = expanded.height < now.box.height - 0.5
+          || children.some(({ child, height }) => child.getBoundingClientRect().height < height - EPSILON);
+        if (lostSpace && Number.isFinite(definite)) {
+          // Glyphs may exceed a tight line box without overflowing its page.
+          // Only new scrollable overflow warrants more height; counting glyph
+          // bounds here repeatedly grows bottom-aligned layouts on each pass.
+          const oldOverflow = before ? Math.max(0, before.scrollHeight - before.clientHeight) : 0;
+          const growth = Math.max(0, now.scrollHeight - now.clientHeight - oldOverflow);
+          // Retain fractional CSS pixels. Rounding a viewport height upward
+          // can create a scrollbar and narrow the entire page at browser zoom.
+          const height = Math.max(definite + growth, parseFloat(styleFor(element).height) || 0);
+          write(element, "height", `${height}px`, category);
+        }
       }
-      write(element, "max-height", "none", category);
     };
     const repairExpandedFades = () => {
       for (const [element, before] of baseline) {
