@@ -95,6 +95,48 @@ CI runs both browsers on pull requests and checks dependency advisories. The
 narrow-window tests cover responsive layout, not Firefox Android's browser chrome;
 the Android add-on still needs device testing before release.
 
+### Additional regression checks
+
+`npm test` also runs reproducible generated settings/rule cases, cached-page
+restoration checks, and a 12-cycle dynamic feed stress test. CI repeats the full
+suite nightly at 03:17 UTC, with 100 stress cycles. To run the longer test locally:
+
+```sh
+LEXEND_STRESS_CYCLES=100 node --test test/typography-stress.test.mjs
+```
+
+After packaging, `npm run test:packages` checks both ZIPs against their build
+folders and validates runtime references, linked assets, and font licenses.
+The installed Chrome suite loads the extracted release ZIP and also restarts
+the browser with the same profile to check saved preferences and site pauses.
+Both installed browsers test back/forward navigation after preferences change.
+
+The interface suite runs axe accessibility scans, keyboard deletion checks,
+asset/error checks, and screenshot comparisons in light and dark themes at
+desktop and mobile widths. It loads built interface files with simulated browser
+APIs; the installed-browser suite exercises real extension APIs separately.
+Run it with `npm run test:ui`. It creates an isolated build in
+`dist/ui-tests/build`, without deleting release packages or browser results.
+Reports, failure screenshots and traces are saved under `dist/ui-tests/`.
+
+Screenshot baselines in `test/ui/snapshots/` were generated using the same pinned
+Playwright Ubuntu image as CI. For matching results on another OS, use Docker:
+
+```sh
+docker run --rm --ipc=host \
+  -e CI=true -v "$PWD:/work" -w /work \
+  mcr.microsoft.com/playwright:v1.63.0-noble \
+  bash -lc 'npm ci && npm run test:ui'
+```
+
+For an intentional visual change, use `npm run test:ui:update` in that same
+container, inspect the changed PNGs, and commit them with the change. Normal CI
+runs fail for missing or changed baselines and never update them automatically.
+When upgrading Playwright, update both pinned dependencies, both workflow image
+references, this Docker command, and the reviewed baselines together. Pull
+requests and releases must pass the interface suite; failure reports are uploaded
+as GitHub Actions artifacts.
+
 ### Load in Chrome
 
 1. Run `npm run build`.

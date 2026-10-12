@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Builder, By, Key } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import firefox from "selenium-webdriver/firefox.js";
+import { unzipSync } from "fflate";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const browserName = process.argv[2] ?? "chrome";
@@ -21,6 +22,9 @@ const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
 const artifactDirectory = join(root, "dist/browser-tests", browserName);
 await mkdir(artifactDirectory, { recursive: true });
 const profile = await mkdtemp(join(tmpdir(), "lexend-browser-tests-"));
+const extensionDirectory = join(profile, "extension");
+const { version } = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const archive = join(root, "dist/releases", `lexend-the-web-${browserName}-v${version}.zip`);
 let driver;
 const checks = [];
 const check = async (name, run) => { await run(); checks.push(name); console.log(`PASS ${browserName}: ${name}`); };
@@ -65,28 +69,40 @@ const measurements = () => script(() => Object.fromEntries(["rem", "nested", "fi
   return [id, { size: parseFloat(style.fontSize), family: style.fontFamily, padding: parseFloat(style.paddingTop) }];
 })));
 
-try {
-  // Selenium Manager resolves current browser/driver versions. Chrome for
-  // Testing retains unpacked-extension loading support; ordinary Chrome does not.
-  process.env.SE_FORCE_BROWSER_DOWNLOAD ??= "true";
-  process.env.SE_AVOID_STATS ??= "true";
+const createDriver = () => {
   const builder = new Builder().forBrowser(browserName);
   if (browserName === "chrome") {
-    const extensionDirectory = join(root, "dist/chrome");
     const options = new chrome.Options().setBrowserVersion("stable").addArguments(
       "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,900",
-      `--user-data-dir=${profile}`, `--disable-extensions-except=${extensionDirectory}`, `--load-extension=${extensionDirectory}`
+      `--user-data-dir=${join(profile, "chrome-profile")}`, `--disable-extensions-except=${extensionDirectory}`, `--load-extension=${extensionDirectory}`
     );
     builder.setChromeOptions(options);
   } else {
     builder.setFirefoxOptions(new firefox.Options().setBrowserVersion("stable"));
     builder.setFirefoxService(new firefox.ServiceBuilder().addArguments("--allow-system-access"));
   }
-  driver = await builder.build();
+  return builder.build();
+};
+
+try {
+  // Selenium Manager resolves current browser/driver versions. Chrome for
+  // Testing retains unpacked-extension loading support; ordinary Chrome does not.
+  process.env.SE_FORCE_BROWSER_DOWNLOAD ??= "true";
+  process.env.SE_AVOID_STATS ??= "true";
+  if (browserName === "chrome") {
+    // Exercise the release artifact rather than assuming the unpackaged build
+    // is equivalent. Firefox installs its release ZIP directly below.
+    for (const [path, contents] of Object.entries(unzipSync(await readFile(archive)))) {
+      assert(!path.startsWith("/") && !path.split("/").includes("..") && !path.includes("\\"), `Unsafe ZIP path: ${path}`);
+      const destination = join(extensionDirectory, path);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, contents);
+    }
+  }
+  driver = await createDriver();
   await driver.manage().setTimeouts({ script: 20000 });
   if (browserName === "firefox") {
-    const { version } = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-    await driver.installAddon(join(root, "dist/releases", `lexend-the-web-firefox-v${version}.zip`), true);
+    await driver.installAddon(archive, true);
   }
   await driver.manage().window().setRect({ width: 1280, height: 900 });
   await driver.get(fixtureUrl);
@@ -242,6 +258,28 @@ try {
     await patch({ enabled: true });
   });
 
+  await check("back and forward navigation reconcile preferences changed while away", async () => {
+    await driver.switchTo().window(websiteTab);
+    await driver.get(`${fixtureUrl}history-start`);
+    await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend')", "History page initializes");
+    await driver.get(`${fixtureUrl}history-next`);
+    await driver.switchTo().window(optionsTab);
+    await patch({ enabled: false, textScale: 120 });
+    await driver.switchTo().window(websiteTab);
+    await driver.navigate().back();
+    await wait("location.pathname === '/history-start' && !getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend')", "Returning pages honor paused settings");
+    assert.equal((await measurements()).rem.size, 20);
+    await driver.switchTo().window(optionsTab);
+    await patch({ enabled: true });
+    await driver.switchTo().window(websiteTab);
+    await driver.navigate().forward();
+    await wait("location.pathname === '/history-next' && parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 24", "Forward navigation scales exactly once");
+    assert((await measurements()).rem.family.includes("Lexend"));
+    assert.equal(await script("document.querySelectorAll('#lexend-the-web-styles').length <= 1"), true);
+    await driver.switchTo().window(optionsTab);
+    await patch({ textScale: 100 });
+  });
+
   await check("desktop navigation, narrow layout, and dark About navigation remain stable", async () => {
     for (const id of ["readability-panel", "rules-panel", "appearance-panel", "tools-panel", "readability-panel"]) {
       await driver.findElement(By.css(`[data-settings-panel="${id}"]`)).click();
@@ -377,6 +415,41 @@ try {
     assert(result.viewportWidth >= 360 && result.viewportWidth < 380, "Toolbar width stays intrinsic, not collapsed or full-page");
     assert.equal(result.spacing, .08);
     assert.equal(result.feedback, "");
+  });
+
+  if (browserName === "chrome") await check("browser restart preserves custom preferences, site pauses and a working writer", async () => {
+    await patch({ theme: "dark", scope: "all", textScale: 127, lineHeight: 1.73, letterSpacing: .057 });
+    await extensionCall(async () => {
+      const result = await chrome.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: {
+        type: "addRule", rule: { hostname: "127.0.0.1", enabled: false, includeSubdomains: false }
+      } });
+      if (!result.ok) throw new Error(result.message);
+    });
+    const before = await saved();
+    await driver.quit();
+    driver = await createDriver();
+    await driver.manage().setTimeouts({ script: 20000 });
+    await driver.get(fixtureUrl);
+    const restartedWebsite = await driver.getWindowHandle();
+    await driver.switchTo().newWindow("tab");
+    const restartedOptions = await driver.getWindowHandle();
+    await navigateExtension(`${origin}options.html`);
+    await wait("!document.querySelector('#dark-theme').disabled", "Settings initialize after a full browser restart");
+    assert.deepEqual(await saved(), before, "Reopening must not overwrite custom values or site rules");
+    assert.equal(await script("document.documentElement.dataset.theme"), "dark");
+    assert.equal(await script("document.querySelector('#text-scale').value"), "127");
+    await driver.switchTo().window(restartedWebsite);
+    assert(!((await measurements()).rem.family.includes("Lexend")), "Saved site pause survives restart");
+    assert.equal((await measurements()).rem.size, 20);
+    await driver.switchTo().window(restartedOptions);
+    await extensionCall(async () => {
+      const result = await chrome.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: {
+        type: "removeRule", hostname: "127.0.0.1"
+      } });
+      if (!result.ok) throw new Error(result.message);
+    });
+    await driver.switchTo().window(restartedWebsite);
+    await wait("Math.abs(parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) - 25.4) < .03", "Writer and live page updates work after restarting");
   });
   await writeFile(join(artifactDirectory, "results.json"), JSON.stringify({ browserName, checks, installedExtension: true }, null, 2));
 } catch (error) {

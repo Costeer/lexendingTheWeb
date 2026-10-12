@@ -6,13 +6,17 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:ui-tests": "node scripts/build.mjs --ui-tests",
     "check": "node scripts/check.mjs",
     "lint:firefox": "addons-linter dist/firefox --warnings-as-errors",
     "test": "node scripts/test.mjs",
     "test:browser": "node scripts/browser-tests.mjs",
+    "test:ui": "npm run build:ui-tests && playwright test",
+    "test:ui:update": "npm run build:ui-tests && playwright test --update-snapshots",
+    "test:packages": "node scripts/test-packages.mjs",
     "package": "npm run build && node scripts/package.mjs",
-    "verify:chrome": "npm test && npm run check && npm run package",
-    "verify:firefox": "npm test && npm run check && npm run package && npm run lint:firefox",
+    "verify:chrome": "npm test && npm run check && npm run package && npm run test:packages",
+    "verify:firefox": "npm test && npm run check && npm run package && npm run test:packages && npm run lint:firefox",
     "version": "node scripts/sync-version.mjs"
   },
   "engines": {
@@ -20,9 +24,11 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "fflate": "^0.8.3",
-    "playwright": "^1.63.0",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.63.0",
     "addons-linter": "^10.13.0",
+    "fflate": "^0.8.3",
+    "playwright": "1.63.0",
     "selenium-webdriver": "^4.50.0"
   },
   "overrides": {

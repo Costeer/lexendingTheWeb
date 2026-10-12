@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
   contents: read
@@ -12,6 +14,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      LEXEND_STRESS_CYCLES: ${{ github.event_name == 'schedule' && '100' || '12' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -24,11 +29,37 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run package
+      - run: npm run test:packages
       - run: npm run lint:firefox
       - uses: actions/upload-artifact@v6
         with:
           name: browser-packages
           path: dist/releases/*.zip
+          if-no-files-found: error
+
+  interfaces:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Baselines and comparisons use this exact browser, fonts and OS image.
+    # Update this tag alongside both Playwright dependencies and the baselines.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ui
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: interface-regressions
+          path: |
+            dist/ui-tests/results/
+            dist/ui-tests/report/
           if-no-files-found: error
 
   browsers:
