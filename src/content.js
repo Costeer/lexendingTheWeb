@@ -22,7 +22,9 @@
   const codeFont = /monospace|mono\b|menlo|monaco|consolas|courier|iosevka|fira[\s-]*code|source[\s-]*code/i;
   const TEXT_ATTRIBUTE = "data-lexend-text";
   const PROTECTED_ATTRIBUTE = "data-lexend-protected";
+  const FONT_ATTRIBUTE = "data-lexend-font";
   const managedElements = new Map();
+  const authorFontFamilies = new Map();
   const eligibleTextRoots = new Map();
   const transitionRules = new Map();
   const transitionAttributes = ["data-lexend-transition", "data-lexend-before-transition", "data-lexend-after-transition"];
@@ -274,6 +276,9 @@
       letter-spacing: var(--lexend-${prefix}spacing) !important;
     `;
     return `
+      [${FONT_ATTRIBUTE}] { font-family: var(--lexend-family) !important; }
+      [data-lexend-before='font']::before { font-family: var(--lexend-before-family) !important; }
+      [data-lexend-after='font']::after { font-family: var(--lexend-after-family) !important; }
       [${TEXT_ATTRIBUTE}] { ${converted()} }
       [${PROTECTED_ATTRIBUTE}] { ${preserved()} }
       [data-lexend-before='text']::before { ${converted("before-")} }
@@ -286,6 +291,9 @@
       /* Slotted light-DOM text belongs to an inner shadow cascade. Important
          author ::slotted declarations outrank outer inline-important styles. */
       @layer lexend-slotted-typography {
+        ::slotted([${FONT_ATTRIBUTE}]) { font-family: var(--lexend-family) !important; }
+        ::slotted([data-lexend-before='font'])::before { font-family: var(--lexend-before-family) !important; }
+        ::slotted([data-lexend-after='font'])::after { font-family: var(--lexend-after-family) !important; }
         ::slotted([${TEXT_ATTRIBUTE}]), ::slotted([${PROTECTED_ATTRIBUTE}]) { ${converted()} }
         ::slotted([data-lexend-before='text'])::before, ::slotted([data-lexend-before='protected'])::before { ${converted("before-")} }
         ::slotted([data-lexend-after='text'])::after, ::slotted([data-lexend-after='protected'])::after { ${converted("after-")} }
@@ -317,7 +325,7 @@
     return false;
   };
   const primaryFont = (family) => family.split(",")[0].replace(/["']/g, "").trim();
-  const protectedFont = (style) => iconFont.test(primaryFont(style.fontFamily)) || codeFont.test(style.fontFamily);
+  const protectedFont = (family) => iconFont.test(primaryFont(family)) || codeFont.test(family);
   const privateGlyphs = /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/gu;
   const containsPrivateGlyph = (text) => /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u.test(text);
   const onlyPrivateGlyphs = (text) => containsPrivateGlyph(text) && !text.replace(privateGlyphs, "").replace(/[\s"']/g, "");
@@ -469,11 +477,14 @@
     // cloneNode copies inline overrides but not WeakMap/Map ownership. Carry a
     // small author-state record so cloned cards start from the page's baseline.
     const clones = [];
-    roots.forEach((root) => root.querySelectorAll("[data-lexend-original-typography]").forEach((element) => {
+    roots.forEach((root) => [
+      ...(root.matches?.("[data-lexend-original-typography]") ? [root] : []),
+      ...root.querySelectorAll("[data-lexend-original-typography]")
+    ].forEach((element) => {
       if (managedElements.has(element)) return;
       try {
         const original = JSON.parse(element.getAttribute("data-lexend-original-typography"));
-        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, "data-lexend-before", "data-lexend-after"]) element.removeAttribute(attribute);
+        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after"]) element.removeAttribute(attribute);
         original.properties.filter(([name]) => name !== "transition-property").forEach(([name, value, priority]) => {
           if (value) element.style.setProperty(name, value, priority);
           else element.style.removeProperty(name);
@@ -496,7 +507,7 @@
           if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
           else element.style.removeProperty(transition[0]);
         }
-        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
+        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
         if (!original.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
       } catch { /* Do not trust unrelated malformed page attributes. */ }
     }
@@ -556,6 +567,7 @@
       if (!state.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
     }
     managedElements.clear();
+    authorFontFamilies.clear();
     eligibleTextRoots.clear();
     transitionRules.clear();
   };
@@ -612,12 +624,12 @@
       duration: list("duration"), delay: list("delay"), timing: list("timing") }
       : { property: "none", duration: "0s", delay: "0s", timing: "ease" };
   };
-  const readTypography = (style) => ({
-    family: style.fontFamily, size: style.fontSize,
+  const readTypography = (style, family = style.fontFamily) => ({
+    family, size: style.fontSize,
     line: style.lineHeight, spacing: style.letterSpacing,
     transition: withoutTypographyTransitions(style)
   });
-  const measureTypography = (roots) => {
+  const measureTypography = (roots, newOnly = false) => {
     const effective = getEffectiveSettings();
     const measurements = [];
     const styles = new WeakMap();
@@ -626,13 +638,15 @@
       return styles.get(element);
     };
     for (const root of roots) for (const element of allElements(root)) {
+      if (newOnly && managedElements.has(element)) continue;
       const style = styleFor(element);
+      const family = newOnly ? authorFontFamilies.get(style.fontFamily) ?? style.fontFamily : style.fontFamily;
       const semanticProtection = hasProtectedAncestor(element);
       const inScope = effective.scope === "all" || !isHeading(element);
       const text = ownTextContent(element);
       const mixedGlyphProse = containsPrivateGlyph(text) && !onlyPrivateGlyphs(text);
-      const protectedText = semanticProtection || codeFont.test(style.fontFamily)
-        || (!mixedGlyphProse && protectedFont(style)) || onlyPrivateGlyphs(text)
+      const protectedText = semanticProtection || codeFont.test(family)
+        || (!mixedGlyphProse && protectedFont(family)) || onlyPrivateGlyphs(text)
         || isImageReplacementText(element, style, styleFor) || hasEmptyPaintClip(element, style, styleFor) || !inScope;
       const target = !protectedText && inScope && (Boolean(text.trim()) || isTextControl(element));
       const pseudos = [];
@@ -643,11 +657,12 @@
         if (["none", "normal", '""', "''"].includes(pseudoStyle.content)) continue;
         const paintedContent = paintedGeneratedContent(pseudoStyle.content);
         const mixedPseudo = containsPrivateGlyph(paintedContent) && !onlyPrivateGlyphs(paintedContent);
-        pseudos.push({ pseudo, noTracking: /\p{Script=Arabic}/u.test(paintedContent), protected: protectedText || codeFont.test(pseudoStyle.fontFamily)
-          || (!mixedPseudo && protectedFont(pseudoStyle)) || onlyPrivateGlyphs(paintedContent),
-          inScope, typography: { ...readTypography(pseudoStyle), symbols: !semanticProtection && !codeFont.test(pseudoStyle.fontFamily) && containsPrivateGlyph(paintedContent) } });
+        const pseudoFamily = newOnly ? authorFontFamilies.get(pseudoStyle.fontFamily) ?? pseudoStyle.fontFamily : pseudoStyle.fontFamily;
+        pseudos.push({ pseudo, noTracking: /\p{Script=Arabic}/u.test(paintedContent), protected: protectedText || codeFont.test(pseudoFamily)
+          || (!mixedPseudo && protectedFont(pseudoFamily)) || onlyPrivateGlyphs(paintedContent),
+          inScope, typography: { ...readTypography(pseudoStyle, pseudoFamily), symbols: !semanticProtection && !codeFont.test(pseudoFamily) && containsPrivateGlyph(paintedContent) } });
       }
-      const typography = { ...readTypography(style), symbols: !semanticProtection && !codeFont.test(style.fontFamily) && containsPrivateGlyph(text) };
+      const typography = { ...readTypography(style, family), symbols: !semanticProtection && !codeFont.test(family) && containsPrivateGlyph(text) };
       if (protectedText || target || pseudos.length || typography.transition !== null) measurements.push({
         element, protected: protectedText, target, noTracking: /\p{Script=Arabic}/u.test(text), typography, pseudos
       });
@@ -658,7 +673,7 @@
     }
     return measurements;
   };
-  const applyTypography = (measurements) => {
+  const applyTypography = (measurements, fontOnly = false) => {
     measurements.forEach(({ typography, pseudos }) => {
       for (const values of [typography, ...pseudos.map(({ typography }) => typography)]) {
         if (values.transition !== null && !transitionRules.has(values.transition.property)) {
@@ -730,7 +745,12 @@
       const fallback = `, "${SYMBOLS_FAMILY}"`;
       const family = protectedText ? values.family + (values.symbols ? fallback : "")
         : `"Lexend for the Web", ${values.family}${fallback}`;
+      authorFontFamilies.set(family, values.family);
       setProperty(element, `--lexend-${prefix}family`, family);
+      if (fontOnly) {
+        if (!prefix) setProperty(element, "font-family", family, "important");
+        return;
+      }
       setProperty(element, `--lexend-${prefix}size`, `${parseFloat(values.size) * scale}px`);
       setProperty(element, `--lexend-${prefix}line`, line);
       setProperty(element, `--lexend-${prefix}spacing`, spacing);
@@ -745,12 +765,12 @@
     };
     measurements.forEach(({ element, protected: protectedText, target, noTracking, typography, pseudos }) => {
       if (protectedText || target) {
-        setAttribute(element, protectedText ? PROTECTED_ATTRIBUTE : TEXT_ATTRIBUTE, "");
+        setAttribute(element, fontOnly ? FONT_ATTRIBUTE : protectedText ? PROTECTED_ATTRIBUTE : TEXT_ATTRIBUTE, "");
         applyValues(element, typography, protectedText, "", noTracking);
       }
       pseudos.forEach(({ pseudo, protected: protectedPseudo, noTracking: pseudoNoTracking, inScope, typography: values }) => {
         if (!protectedPseudo && !inScope) return;
-        setAttribute(element, `data-lexend-${pseudo}`, protectedPseudo ? "protected" : "text");
+        setAttribute(element, `data-lexend-${pseudo}`, fontOnly ? "font" : protectedPseudo ? "protected" : "text");
         applyValues(element, values, protectedPseudo, `${pseudo}-`, pseudoNoTracking);
       });
       const state = managedElements.get(element);
@@ -799,6 +819,33 @@
         visitShadowRoots(element.shadowRoot);
       }
     });
+  };
+  const applyIncomingFonts = (branches, fontOnly = true) => {
+    if (!isActive() || !document.documentElement || !branches.size) return;
+    observer.disconnect();
+    try {
+      applyToRoot(document.documentElement);
+      const roots = new Set(branches);
+      for (const branch of branches) {
+        if (branch.shadowRoot) { applyToRoot(branch.shadowRoot); roots.add(branch.shadowRoot); }
+        const previousRoots = new Set(styledRoots);
+        visitShadowRoots(branch);
+        if (branch.shadowRoot) visitShadowRoots(branch.shadowRoot);
+        for (const root of styledRoots) if (!previousRoots.has(root)) roots.add(root);
+        // A mutation can originate inside an already discovered shadow tree.
+        const tree = branch.getRootNode();
+        if (tree instanceof ShadowRoot) applyToRoot(tree);
+      }
+      recoverClonedTypography(roots);
+      // Resolve inherited families through the exact stacks we applied. New
+      // code and icons keep the author's family without temporarily stripping
+      // typography from the rest of the page or rerunning geometry repairs.
+      const measurements = measureTypography(roots, true);
+      applyTypography(measurements, fontOnly);
+    } catch (error) {
+      lastRefreshError = error instanceof Error ? error.message : String(error);
+      console.warn("Lexend for the Web could not apply incoming fonts.", error);
+    } finally { observeRoots(); }
   };
   const refresh = (preserveHidden = false) => {
     refreshTimer = null;
@@ -943,7 +990,7 @@
     const duration = finished - started;
     // Large pages can spend hundreds of milliseconds in a full repair. Give
     // the site four times that duration to handle input and paint before the
-    // next automatic pass. Small pages retain immediate text conversion.
+    // next automatic pass. Incoming text receives its font independently.
     nextRefreshTime = finished + (duration > 50 ? duration * 4 : 0);
   };
   const runQueuedRefresh = () => {
@@ -970,8 +1017,8 @@
       if (!urgent || refreshUrgent) return;
       clearTimeout(refreshTimer);
     }
-    // Text can upgrade a style batch, but cannot bypass the expensive-page
-    // cooldown. Keep a fixed deadline so a continuous feed cannot starve it.
+    // Fonts have already been applied to incoming text. Keep layout repairs
+    // on a fixed deadline so a continuous feed cannot starve or flood them.
     refreshUrgent = urgent;
     refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
   };
@@ -989,7 +1036,7 @@
     }).catch(() => {});
   };
 
-  const applySettings = (nextSettings) => {
+  const applySettings = (nextSettings, deferLayout = false) => {
     const previous = getEffectiveSettings();
     const previousTypography = settings;
     settings = settingsApi.normalizeSettings(nextSettings);
@@ -1000,7 +1047,11 @@
     revealedAutoContent = new WeakSet();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = null;
-    refresh();
+    if (deferLayout && effective.active) {
+      applyIncomingFonts(new Set(document.documentElement ? [document.documentElement] : []), false);
+      observeRoots();
+      queueRefresh();
+    } else refresh();
     notifyState();
   };
   const fittingCounterMutation = (mutation) => {
@@ -1068,6 +1119,24 @@
       return !fittingCounterMutation(mutation);
     });
     if (!authored.length) return;
+    const incoming = new Set();
+    for (const mutation of authored) {
+      if (mutation.type === "characterData") incoming.add(mutation.target.parentElement);
+      if (mutation.type === "childList") for (const node of mutation.addedNodes) {
+        if (node instanceof Element) incoming.add(node);
+        else if (node.nodeType === Node.TEXT_NODE) incoming.add(node.parentElement);
+      }
+    }
+    // Parser and framework batches can mention both a branch and its children.
+    // Classify each new element once, before the next paint, without waiting
+    // for the full-page repair cooldown.
+    for (const element of incoming) {
+      if (!element?.isConnected || ownStyleIds.includes(element.id)
+          || element.matches("script,style,template,noscript")) { incoming.delete(element); continue; }
+      for (let parent = composedParent(element); parent; parent = composedParent(parent)) {
+        if (incoming.has(parent)) { incoming.delete(element); break; }
+      }
+    }
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
     if (changedStyles.size) {
@@ -1075,6 +1144,7 @@
       try { changedStyles.forEach(retainOverwrittenTypography); }
       finally { observeRoots(); }
     }
+    applyIncomingFonts(incoming);
     const ariaOnly = authored.every((mutation) => mutation.type === "attributes" && mutation.attributeName === "aria-hidden");
     invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
       ariaOnly ? authored : null);
@@ -1087,7 +1157,7 @@
       console.warn("Lexend for the Web could not load settings; using defaults.", error);
       initialSettings = settingsApi.defaults;
     }
-    applySettings(initialSettings);
+    applySettings(initialSettings, true);
     window.addEventListener("resize", invalidateAutoContent, { passive: true });
     window.addEventListener("message", receiveFrameRequirement);
     document.addEventListener("focusin", (event) => {

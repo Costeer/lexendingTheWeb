@@ -4,14 +4,14 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
 
-const prepare = async (page, html) => {
+const prepare = async (page, html, { settings = {}, beforeStart, settle = true } = {}) => {
   await page.route("http://performance.test/**", async (route) => {
     await route.fulfill({ body: await readFile(resolve(`.${new URL(route.request().url()).pathname}`)), contentType: "font/woff2" });
   });
   await page.setContent(html);
-  await page.evaluate(() => {
+  await page.evaluate((settings) => {
     const storage = [], runtime = [];
-    globalThis.__settings = { enabled: true, scope: "all", textScale: 100 };
+    globalThis.__settings = { enabled: true, scope: "all", textScale: 100, ...settings };
     globalThis.chrome = {
       runtime: { getURL: (path) => `http://performance.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
       storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => storage.push(fn) } }
@@ -22,11 +22,122 @@ const prepare = async (page, html) => {
       storage.forEach((fn) => fn(changes, "sync"));
     };
     globalThis.__state = () => { let state; runtime.forEach((fn) => fn({ type: "LEXEND_GET_STATE" }, null, (value) => { state = value; })); return state; };
-  });
-  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) await page.addScriptTag({ path: resolve(`src/${name}.js`) });
+  }, settings);
+  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+    if (name === "content") await beforeStart?.(page);
+    await page.addScriptTag({ path: resolve(`src/${name}.js`) });
+  }
+  if (!settle) return;
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => __state()?.healthy && !__state().pending);
 };
+
+test("startup paints loaded Lexend before any full-page layout work", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    const beforeStart = (page) => page.evaluate(() => {
+      // Hold every scheduled task: the font must not depend on running one.
+      globalThis.__tasks = new Map();
+      let id = 0;
+      globalThis.setTimeout = (callback) => { __tasks.set(++id, callback); return id; };
+      globalThis.clearTimeout = (id) => __tasks.delete(id);
+      const create = LexendLayout.create;
+      globalThis.__layoutWork = 0;
+      globalThis.LexendLayout = { create: (options) => {
+        const layout = create(options);
+        return { ...layout,
+          capture: (...args) => { __layoutWork++; return layout.capture(...args); },
+          repair: (...args) => { __layoutWork++; return layout.repair(...args); }
+        };
+      } };
+    });
+    const html = '<!doctype html><style>body{font:20px/28px Arial}</style><p>Repository description</p><pre>const answer = 42;</pre>';
+    await prepare(page, html, { settings: { textScale: 120 }, beforeStart, settle: false });
+    const result = await page.evaluate(async () => {
+      const family = getComputedStyle(document.querySelector("p")).fontFamily;
+      await document.fonts.ready;
+      return { family, loaded: document.fonts.check('400 24px "Lexend for the Web"', 'Repository'),
+        size: getComputedStyle(document.querySelector("p")).fontSize,
+        code: getComputedStyle(document.querySelector("pre")).fontFamily,
+        work: __layoutWork, state: __state() };
+    });
+    assert.match(result.family, /Lexend/);
+    assert.equal(result.loaded, true, "bundled glyphs load while layout work is still parked");
+    assert.equal(result.size, "24px");
+    assert.doesNotMatch(result.code, /Lexend/);
+    assert.equal(result.work, 0, "neither baseline capture nor repair blocks the first font application");
+    assert.equal(result.state.refreshRevision, 0);
+    assert.equal(result.state.pending, true);
+    await page.evaluate(() => __update({ enabled: false }));
+    assert.equal(await page.locator("p").getAttribute("style"), null);
+    assert.equal(await page.evaluate(() => __tasks.size), 0, "pausing cancels the deferred initial repair");
+
+    const paused = await browser.newPage();
+    await prepare(paused, html, { settings: { enabled: false }, beforeStart, settle: false });
+    assert.doesNotMatch(await paused.locator("p").evaluate((element) => getComputedStyle(element).fontFamily), /Lexend/);
+    assert.equal(await paused.evaluate(() => __tasks.size), 0, "disabled startup never queues font application");
+  } finally { await browser.close(); }
+});
+
+test("incoming branches get fonts before timers while preserving author families and clone restoration", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await prepare(page, `<!doctype html><style>
+      body {font:20px/28px Arial} #incoming {font-size:1.2em}
+      #incoming::before {content:'x';font-family:TestIcons}
+      h2,code,[data-lexend-ignore] {font:inherit}
+    </style><div id="parent">Repository description</div><main>${"<p>Existing page content</p>".repeat(200)}</main>`,
+    { settings: { scope: "body", textScale: 120 } });
+    const result = await page.evaluate(async () => {
+      globalThis.__tasks = new Map();
+      let id = 0;
+      globalThis.setTimeout = (callback) => { __tasks.set(++id, callback); return id; };
+      globalThis.clearTimeout = (id) => __tasks.delete(id);
+      const revision = __state().refreshRevision;
+      const existingChanges = [];
+      const existingObserver = new MutationObserver((records) => existingChanges.push(...records));
+      existingObserver.observe(document.querySelector("main"), { attributes: true, subtree: true });
+      document.querySelector("#parent").insertAdjacentHTML("beforeend", `<span id="incoming">New navigation label
+        <code>const answer = 42;</code><span data-lexend-ignore>Original prose</span>
+        <h2>Original heading</h2><span id="shadow"></span></span>`);
+      document.querySelector("#shadow").attachShadow({ mode: "open" }).innerHTML = '<span>New shadow label</span>';
+      await Promise.resolve();
+      const incoming = document.querySelector("#incoming");
+      const family = (element, pseudo = null) => getComputedStyle(element, pseudo).fontFamily;
+      const fonts = [incoming, incoming.querySelector("code"), incoming.querySelector("[data-lexend-ignore]"), incoming.querySelector("h2")].map((element) => family(element));
+      const pseudo = family(incoming, "::before");
+      const shadow = family(document.querySelector("#shadow").shadowRoot.querySelector("span"));
+      const clone = incoming.cloneNode(true);
+      clone.id = "cloned-label";
+      document.querySelector("#parent").append(clone);
+      await Promise.resolve();
+      const clonedFont = family(clone);
+      const state = __state();
+      const existingWrites = existingChanges.length;
+      existingObserver.disconnect();
+      __update({ enabled: false });
+      return { fonts, pseudo, shadow, clonedFont, revision, state, existingWrites, tasks: __tasks.size,
+        originalStyle: incoming.getAttribute("style"), cloneStyle: clone.getAttribute("style"),
+        restored: [family(incoming), family(clone)], markers: document.querySelectorAll('[data-lexend-font],[data-lexend-original-typography]').length };
+    });
+    assert.match(result.fonts[0], /Lexend/);
+    assert.deepEqual(result.fonts.slice(1), ["Arial", "Arial", "Arial"], "code, opt-outs, and excluded headings inherit author families");
+    assert.equal(result.pseudo, "TestIcons");
+    assert.match(result.shadow, /Lexend/);
+    assert.equal(result.clonedFont.match(/Lexend for the Web/g)?.length, 1, "clones recover the author family before conversion");
+    assert.equal(result.state.refreshRevision, result.revision, "new text does not trigger a synchronous full-page repair");
+    assert.equal(result.state.pending, true);
+    assert.equal(result.state.healthy, true);
+    assert.equal(result.existingWrites, 0, "incoming text never rewrites the existing page to find its author family");
+    assert.equal(result.tasks, 0);
+    assert.equal(result.originalStyle, null);
+    assert.equal(result.cloneStyle, null);
+    assert.deepEqual(result.restored, ["Arial", "Arial"]);
+    assert.equal(result.markers, 0);
+  } finally { await browser.close(); }
+});
 
 test("animated labels restore their font guards in a bounded number of style recalculations", async () => {
   const browser = await chromium.launch({ headless: true });
@@ -195,6 +306,7 @@ test("expensive refreshes leave input time during continuous text updates withou
       await Promise.resolve();
       main.innerHTML = "<p>First incoming caption</p>";
       await Promise.resolve();
+      const immediateFont = getComputedStyle(main.firstElementChild).fontFamily;
       const firstDelay = Math.min(...[...tasks.values()].map((task) => task.due)) - now;
       const pending = __state().pending;
       for (let i = 0; i < 100; i++) {
@@ -212,9 +324,10 @@ test("expensive refreshes leave input time during continuous text updates withou
       main.innerHTML = "<p>Last caption</p>";
       await Promise.resolve();
       __update({ enabled: false });
-      return { firstDelay, pending, during, captures, final, converted, paused: __state(), tasks: tasks.size };
+      return { firstDelay, immediateFont, pending, during, captures, final, converted, paused: __state(), tasks: tasks.size };
     });
     assert.ok(result.firstDelay >= 400, "urgent text must respect the measured expensive-refresh budget");
+    assert.match(result.immediateFont, /Lexend/, "fonts apply before the expensive-page repair cooldown expires");
     assert.equal(result.pending, true);
     assert.ok(result.during > 0 && result.during <= 3, `100 feed updates caused ${result.during} repairs during the stream`);
     assert.equal(result.converted, true, "the final inserted text is converted after the burst");
