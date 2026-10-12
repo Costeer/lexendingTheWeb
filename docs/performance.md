@@ -33,8 +33,45 @@ A further experiment removed duplicate inline custom properties from ordinary
 text. It produced no consistent timing improvement and complicated later slot
 assignment, so the full declarations were retained.
 
-The regression test checks a deterministic work budget, proportional spacing,
-protected descendants, pause/resume, and unrelated settings updates:
+Continuous page updates also need a work budget. After a refresh takes more
+than 50 ms, automatic updates leave four times that duration for the website
+before another pass. Text insertions can still accelerate a pending style
+update, but cannot bypass this cooldown. The deadline stays fixed during a
+burst, so incoming updates cannot postpone conversion indefinitely. Explicit
+preference changes, including pause and resume, still apply immediately.
+New text on an expensive page can therefore wait briefly for conversion.
+
+Mutation batches whose final class/style values are unchanged no longer
+schedule a refresh. Font transition guards are measured together before any
+are released, and scroll offsets are collected before writing anchoring
+styles. These changes avoid repeated style calculations within one refresh.
+A 200-label fixture with `transition: all .2s` went from 204 style
+recalculations per preference refresh to 4.
+
+In a separate local Chromium run with 500 such labels and text changing every
+20 ms for about 2.2 seconds, automatic refreshes fell from 13 to 2. Chromium's
+main-thread task time fell from 2.257 seconds to 0.432 seconds (about 81%).
+This is a single synthetic busy-page measurement, not a guarantee for every
+site; individual full-page repairs still run synchronously.
+
+GitHub's responsive navigation exposed a separate feedback loop: hidden links
+still reserve space, and the site measures their size to populate its overflow
+menu. Removing their layout repairs during a refresh alternated their heights,
+which restarted navigation measurement and rebuilt the open menu indefinitely.
+Automatic refreshes now retain repairs on `visibility: hidden` elements that
+still have layout boxes. Revealing those elements remeasures them, and explicit
+preference changes or pausing still restore their original styles. Elements
+removed from layout with `display: none` do not retain repairs.
+
+Temporary `aria-hidden` changes are also coalesced across observer deliveries.
+If they settle back to their original values before the queued pass, no full
+refresh is needed. Persistent changes and accompanying content updates still
+refresh normally. The regression fixture uses a real ResizeObserver and an
+overflow menu to check that loading and clicking settle without a loop.
+
+The regression tests check the scheduling budget with a controlled clock,
+unchanged mutation batches, browser style-recalculation counts, proportional
+spacing, protected descendants, pause/resume, and unrelated settings updates:
 
 ```sh
 node --test test/typography-performance.test.mjs

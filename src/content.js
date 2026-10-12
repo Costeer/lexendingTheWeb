@@ -32,6 +32,9 @@
   let refreshUrgent = false;
   let refreshRevision = 0;
   let refreshing = false;
+  let nextRefreshTime = 0;
+  let refreshRequired = false;
+  const pendingAriaChanges = new Map();
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
@@ -481,15 +484,17 @@
     // Inherited font changes can animate in nontext wrappers between a cloned
     // control and its label. Restore the whole branch before releasing guards.
     for (const { element, original } of clones) {
+      if (original.properties.some(([name]) => name === "transition-property")) getComputedStyle(element).fontSize;
+      for (const pseudo of ["before", "after"]) {
+        if (element.hasAttribute(`data-lexend-${pseudo}-transition`)) getComputedStyle(element, `::${pseudo}`).fontSize;
+      }
+    }
+    for (const { element, original } of clones) {
       try {
         const transition = original.properties.find(([name]) => name === "transition-property");
         if (transition) {
-          getComputedStyle(element).fontSize;
           if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
           else element.style.removeProperty(transition[0]);
-        }
-        for (const pseudo of ["before", "after"]) {
-          if (element.hasAttribute(`data-lexend-${pseudo}-transition`)) getComputedStyle(element, `::${pseudo}`).fontSize;
         }
         for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
         if (!original.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
@@ -527,21 +532,24 @@
     // guard, including guards on wrappers that never receive Lexend themselves.
     // A microsecond transition still retains its previous computed font during
     // this synchronous measurement and would otherwise scale a child twice.
-    for (const { state, element, restoreProperty, restoreAttribute } of restorations) {
+    for (const { state, element } of restorations) {
       // Font transitions outrank even inline !important. Restore the authored
       // typography and flush it while font transitions are still suppressed;
       // otherwise a transient animated size becomes the next scaled baseline.
       const transition = state.properties.get("transition-property");
-      if (transition) {
-        getComputedStyle(element).fontSize;
-        restoreProperty(transition, "transition-property");
-      }
+      if (transition) getComputedStyle(element).fontSize;
       // Generated content owns its own transitions; a host flush alone does
       // not settle the tooltip's delayed font values. Keep the guards until
       // authored pseudo typography has also been computed.
       for (const pseudo of ["before", "after"]) {
         if (state.attributes.has(`data-lexend-${pseudo}-transition`)) getComputedStyle(element, `::${pseudo}`).fontSize;
       }
+    }
+    // Resolve all guarded fonts in one read phase. Releasing a guard between
+    // reads forces a new style calculation for every animated label.
+    for (const { state, element, restoreProperty, restoreAttribute } of restorations) {
+      const transition = state.properties.get("transition-property");
+      if (transition) restoreProperty(transition, "transition-property");
       for (const name of transitionAttributes) {
         if (state.attributes.has(name)) restoreAttribute(state.attributes.get(name), name);
       }
@@ -778,10 +786,10 @@
   };
   const observeRoots = () => {
     observer.observe(document, { childList: true, subtree: true, characterData: true, characterDataOldValue: true,
-      attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+      attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
     styledRoots.forEach((root) => {
       if (root instanceof ShadowRoot) observer.observe(root, { childList: true, subtree: true,
-        characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+        characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
     });
   };
   const visitShadowRoots = (root) => {
@@ -792,10 +800,13 @@
       }
     });
   };
-  const refresh = () => {
+  const refresh = (preserveHidden = false) => {
     refreshTimer = null;
     refreshUrgent = false;
+    refreshRequired = false;
+    pendingAriaChanges.clear();
     if (refreshing || !document.documentElement) return;
+    const started = performance.now();
     refreshing = true;
     if (retentionTimer !== null) clearTimeout(retentionTimer);
     retentionTimer = null;
@@ -810,7 +821,6 @@
     const scrollPosition = { x: scrollX, y: scrollY };
     const rootStyle = document.documentElement.style;
     const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: document.documentElement.hasAttribute("style") };
-    rootStyle.setProperty("overflow-anchor", "none", "important");
     const body = document.body;
     const primaryBodyScroller = body && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
       && body.clientHeight >= innerHeight * 0.8 && body.clientHeight <= innerHeight + 64
@@ -818,7 +828,6 @@
     const bodyScroll = primaryBodyScroller ? { x: body.scrollLeft, y: body.scrollTop,
       value: body.style.getPropertyValue("overflow-anchor"), priority: body.style.getPropertyPriority("overflow-anchor"),
       hadStyle: body.hasAttribute("style") } : null;
-    if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
     const nestedScrollers = new Map();
     for (const root of new Set([document.documentElement, ...styledRoots])) {
       root.querySelectorAll("*").forEach((element) => {
@@ -827,9 +836,13 @@
         nestedScrollers.set(element, { x: element.scrollLeft, y: element.scrollTop,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
           hadStyle: element.hasAttribute("style"), table: ownedTableChild(element) });
-        element.style.setProperty("overflow-anchor", "none", "important");
       });
     }
+    // Read every scroll offset before changing styles; interleaving these
+    // writes with geometry reads forces layout repeatedly on dashboard pages.
+    rootStyle.setProperty("overflow-anchor", "none", "important");
+    if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
+    for (const element of nestedScrollers.keys()) element.style.setProperty("overflow-anchor", "none", "important");
     let refreshError = null;
     try {
       for (const frame of resizedFrames.keys()) {
@@ -843,7 +856,7 @@
         // close-state mutations, even when typography remains enabled.
         if (hidden) restoreFrame(frame);
       }
-      layout?.restore();
+      layout?.restore({ preserveHidden });
       if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
@@ -855,7 +868,7 @@
         let measurements;
         withExtensionStylesDisabled(() => {
           measurements = measureTypography(roots);
-          layout?.capture(roots);
+          layout?.capture(roots, { preserveHidden });
         });
         applyTypography(measurements);
         layout?.repair(settings);
@@ -926,23 +939,45 @@
       }
       notifyFrameRequirement();
     }
+    const finished = performance.now();
+    const duration = finished - started;
+    // Large pages can spend hundreds of milliseconds in a full repair. Give
+    // the site four times that duration to handle input and paint before the
+    // next automatic pass. Small pages retain immediate text conversion.
+    nextRefreshTime = finished + (duration > 50 ? duration * 4 : 0);
   };
-  const queueRefresh = (urgent = false) => {
+  const runQueuedRefresh = () => {
+    // Responsive navigation can temporarily hide and reveal the same links
+    // across separate observer deliveries while measuring them. Restoring
+    // typography restarts that measurement, so refreshing an unchanged final
+    // state would create a feedback loop even with a refresh cooldown.
+    const changed = !refreshRequired && [...pendingAriaChanges].some(([element, value]) =>
+      element.isConnected && element.getAttribute("aria-hidden") !== value);
+    if (refreshRequired || changed) { refresh(true); return; }
+    refreshTimer = null;
+    refreshUrgent = false;
+    pendingAriaChanges.clear();
+  };
+  const queueRefresh = (urgent = false, ariaChanges = null) => {
     urgent = urgent === true;
     if (refreshing || !isActive()) return;
+    if (ariaChanges) {
+      for (const mutation of ariaChanges) {
+        if (!pendingAriaChanges.has(mutation.target)) pendingAriaChanges.set(mutation.target, mutation.oldValue);
+      }
+    } else refreshRequired = true;
     if (refreshTimer !== null) {
       if (!urgent || refreshUrgent) return;
       clearTimeout(refreshTimer);
     }
-    // Newly inserted/replaced prose must convert in the next task, without
-    // waiting behind a continuously animated style-only mutation batch. Keep
-    // style/geometry changes coalesced and measure descendants atomically.
+    // Text can upgrade a style batch, but cannot bypass the expensive-page
+    // cooldown. Keep a fixed deadline so a continuous feed cannot starve it.
     refreshUrgent = urgent;
-    refreshTimer = setTimeout(refresh, urgent ? 0 : 100);
+    refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
   };
-  const invalidateAutoContent = (urgent = false) => {
+  const invalidateAutoContent = (urgent = false, ariaChanges = null) => {
     revealedAutoContent = new WeakSet();
-    queueRefresh(urgent === true);
+    queueRefresh(urgent === true, ariaChanges);
   };
 
   const notifyState = () => {
@@ -1016,8 +1051,22 @@
   };
   const observer = new MutationObserver((mutations) => {
     if (!isActive()) return;
-    const authored = mutations.filter((mutation) => !ownStyleIds.includes(mutation.target.id)
-      && !ownStyleIds.includes(mutation.target.parentElement?.id) && !fittingCounterMutation(mutation));
+    // Frameworks frequently assign the same class/style again or change it
+    // and restore it within one task. Compare the first old value with the
+    // final value, rather than rebuilding the page for each notification.
+    const attributes = new Map();
+    const authored = mutations.filter((mutation) => {
+      if (!mutation.target.isConnected || ownStyleIds.includes(mutation.target.id)
+          || ownStyleIds.includes(mutation.target.parentElement?.id)) return false;
+      if (mutation.type === "attributes") {
+        let names = attributes.get(mutation.target);
+        if (!names) attributes.set(mutation.target, names = new Set());
+        if (names.has(mutation.attributeName)) return false;
+        names.add(mutation.attributeName);
+        if (mutation.oldValue === mutation.target.getAttribute(mutation.attributeName)) return false;
+      }
+      return !fittingCounterMutation(mutation);
+    });
     if (!authored.length) return;
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
@@ -1026,7 +1075,9 @@
       try { changedStyles.forEach(retainOverwrittenTypography); }
       finally { observeRoots(); }
     }
-    invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"));
+    const ariaOnly = authored.every((mutation) => mutation.type === "attributes" && mutation.attributeName === "aria-hidden");
+    invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
+      ariaOnly ? authored : null);
   });
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
