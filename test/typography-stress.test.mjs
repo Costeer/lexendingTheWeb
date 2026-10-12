@@ -3,6 +3,7 @@ import test from "node:test";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import { instrumentContent } from "./helpers/conversation.mjs";
 
 const cycles = Number(process.env.LEXEND_STRESS_CYCLES ?? 12);
 if (!Number.isInteger(cycles) || cycles < 1 || cycles > 1000) throw new Error("LEXEND_STRESS_CYCLES must be an integer from 1 to 1000");
@@ -49,10 +50,14 @@ test("repeated feed replacement and pause/resume settle within a bounded amount 
       replaceFeed(0);
     });
     for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
-      await page.addScriptTag({ path: resolve(`src/${name}.js`) });
+      const path = resolve(`src/${name}.js`);
+      if (name === "content") await page.addScriptTag({ content: instrumentContent(await readFile(path, "utf8")) });
+      else await page.addScriptTag({ path });
     }
     await page.evaluate(() => document.fonts.ready);
     await page.waitForFunction(() => state()?.healthy && !state().pending);
+    const client = await page.context().newCDPSession(page);
+    let warmHeap, warmNodes;
     for (let iteration = 0; iteration < cycles; iteration++) {
       const scale = iteration % 2 ? 110 : 130;
       await page.evaluate(({ iteration, scale }) => {
@@ -74,6 +79,23 @@ test("repeated feed replacement and pause/resume settle within a bounded amount 
       assert(active.shadowSizes.every((size) => Math.abs(size - 16 * scale / 100) < .03), `cycle ${iteration}: shadow typography must scale exactly once`);
       assert.equal(active.code, "14px");
       assert.equal(active.duplicateStyles, false);
+      const retained = await page.evaluate(() => __collections());
+      assert.equal(retained.detached, 0, `cycle ${iteration}: detached typography owners`);
+      assert.equal(retained.eligibleDetached, 0, `cycle ${iteration}: detached text candidates`);
+      assert.equal(retained.detachedRoots, 0, `cycle ${iteration}: detached shadow roots`);
+      assert.equal(retained.detachedAuto, 0, `cycle ${iteration}: detached auto-content targets`);
+      assert.equal(retained.styledRoots, 21, "only the document and current 20 shadow roots remain");
+      if (iteration === 2 || iteration === cycles - 1) {
+        await client.send("HeapProfiler.collectGarbage");
+        const heap = (await client.send("Runtime.getHeapUsage")).usedSize;
+        const nodes = (await client.send("Memory.getDOMCounters")).nodes;
+        if (warmHeap !== undefined) {
+          assert.ok(heap < warmHeap + 1_000_000, `post-GC heap grew from ${warmHeap} to ${heap} bytes`);
+          assert.ok(nodes <= warmNodes + 20, `live DOM grew from ${warmNodes} to ${nodes} nodes`);
+        }
+        warmHeap = heap;
+        warmNodes = nodes;
+      }
       await page.evaluate(() => update({ enabled: false }));
       await page.waitForFunction(() => !state().pending);
       const paused = await page.evaluate((iteration) => {

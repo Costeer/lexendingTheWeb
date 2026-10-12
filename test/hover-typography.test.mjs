@@ -147,7 +147,7 @@ test("hover rerenders retain converted typography before paint and preserve new 
       author.disconnect();
       return writes;
     });
-    assert.ok(deferredFeedbackWrites>0&&deferredFeedbackWrites<=32,"deferred observer feedback exhausts a finite write budget and releases the task queue");
+    assert.ok(deferredFeedbackWrites>0&&deferredFeedbackWrites<=32,`deferred observer feedback exhausts a finite write budget and releases the task queue: ${deferredFeedbackWrites} writes`);
     await page.waitForFunction(()=>__state().healthy&&!__state().pending);
     const counterValues = await page.locator("#description").evaluate(e=>{
       const context=document.createElement("canvas").getContext("2d");

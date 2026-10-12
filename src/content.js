@@ -28,6 +28,8 @@
   const authorFontFamilies = new Map();
   const eligibleTextRoots = new Map();
   const transitionRules = new Map();
+  const retainedStyleRules = new Map();
+  let retainedStyleId = 0;
   const transitionAttributes = ["data-lexend-transition", "data-lexend-before-transition", "data-lexend-after-transition"];
   const settledFontFaces = new WeakSet();
   const settledBundledFaces = new Set();
@@ -38,6 +40,7 @@
   let nextRefreshTime = 0;
   let refreshRequired = false;
   const pendingAriaChanges = new Map();
+  const pendingStyleChanges = new Map();
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
@@ -437,10 +440,73 @@
     property.appliedValue = element.style.getPropertyValue(name);
     property.appliedPriority = element.style.getPropertyPriority(name);
   };
+  // Compare author declarations, not the temporary typography overrides a
+  // framework may remove when it reapplies its style prop. Restoring an
+  // unchanged author style must not restart a full-page baseline/repair cycle.
+  const authorStyle = document.createElement("span").style;
+  const authorStyleSignature = (element, cssText) => {
+    authorStyle.cssText = cssText ?? "";
+    for (const [name, property] of managedElements.get(element)?.properties ?? []) {
+      if (authorStyle.getPropertyValue(name) !== property.appliedValue
+          || authorStyle.getPropertyPriority(name) !== property.appliedPriority) continue;
+      if (property.value) authorStyle.setProperty(name, property.value, property.priority);
+      else authorStyle.removeProperty(name);
+    }
+    // Declaration order is immaterial after CSSOM has resolved shorthands.
+    return JSON.stringify([...authorStyle].sort().map(name =>
+      [name, authorStyle.getPropertyValue(name), authorStyle.getPropertyPriority(name)]));
+  };
+  const retainTypographyInStylesheet = (element, state) => {
+    // This notification may contain a newer author declaration than the
+    // inline write it answered. Keep it for future edits, cloning and pause.
+    for (const [name, property] of state.properties) {
+      const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+      if (value === property.appliedValue && priority === property.appliedPriority) continue;
+      property.value = value;
+      property.priority = priority;
+    }
+    setAttribute(element, "data-lexend-original-typography", JSON.stringify({
+      hadStyle: state.hadStyle,
+      properties: [...state.properties].map(([name, { value, priority }]) => [name, value, priority])
+    }));
+    if (state.retainedStyle) return;
+    // A style-prop observer can immediately remove our inline declarations
+    // again. Keep this element's values in our existing reversible stylesheet
+    // instead of repeatedly fighting that observer or refreshing the page.
+    const root = element.getRootNode();
+    const sheet = (root instanceof ShadowRoot ? root : document.documentElement)
+      .querySelector(`#${STYLE_ID}`)?.sheet;
+    if (!sheet) return;
+    const id = String(++retainedStyleId);
+    const index = sheet.insertRule(`[data-lexend-retained='${id}'] {}`, sheet.cssRules.length);
+    const style = sheet.cssRules[index].style;
+    for (const [name, property] of state.properties) {
+      style.setProperty(name, property.appliedValue, property.appliedPriority);
+    }
+    if (!retainedStyleRules.has(sheet)) retainedStyleRules.set(sheet, []);
+    retainedStyleRules.get(sheet).push(index);
+    state.retainedStyle = true;
+    setAttribute(element, "data-lexend-retained", id);
+  };
   const retainOverwrittenTypography = (element) => {
     const state = managedElements.get(element);
-    if (!state || !element.isConnected || retainedTypography.has(element)
-        || (retentionWrites.get(element) ?? 0) >= 32 || !isActive()) return;
+    if (!state || !element.isConnected || !isActive()) return;
+    // The stylesheet handles repeated copies of the same author baseline.
+    // A later, genuinely different declaration still gets immediate retention
+    // while the scheduled pass measures its new typography.
+    if (state.retainedStyle && ![...state.properties].some(([name, property]) => {
+      const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+      return (value !== property.appliedValue || priority !== property.appliedPriority)
+        && (value !== property.value || priority !== property.priority);
+    })) return;
+    if (retainedTypography.has(element) || (retentionWrites.get(element) ?? 0) >= 32) {
+      if ([...state.properties].some(([name, property]) =>
+        element.style.getPropertyValue(name) !== property.appliedValue
+        || element.style.getPropertyPriority(name) !== property.appliedPriority)) {
+        retainTypographyInStylesheet(element, state);
+      }
+      return;
+    }
     let overwritten = false;
     state.properties.forEach((property, name) => {
       const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
@@ -485,7 +551,7 @@
       if (managedElements.has(element)) return;
       try {
         const original = JSON.parse(element.getAttribute("data-lexend-original-typography"));
-        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after"]) element.removeAttribute(attribute);
+        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", "data-lexend-retained"]) element.removeAttribute(attribute);
         original.properties.filter(([name]) => name !== "transition-property").forEach(([name, value, priority]) => {
           if (value) element.style.setProperty(name, value, priority);
           else element.style.removeProperty(name);
@@ -514,6 +580,25 @@
     }
   };
   const clearTypography = () => {
+    // Preserve font-transition guards while removing a contested element's
+    // stylesheet fallback. Otherwise releasing that rule can animate toward
+    // the native font and make the next capture measure an intermediate size.
+    if (retainedStyleRules.size) for (const [element, state] of managedElements) {
+      if (!state.retainedStyle) continue;
+      for (const [name, property] of state.properties) {
+        if (!name.startsWith("transition-")) continue;
+        const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+        if (value !== property.appliedValue || priority !== property.appliedPriority) {
+          property.value = value;
+          property.priority = priority;
+        }
+        element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+      }
+    }
+    for (const [sheet, indices] of retainedStyleRules) {
+      for (const index of indices.reverse()) sheet.deleteRule(index);
+    }
+    retainedStyleRules.clear();
     const restorations = [];
     managedElements.forEach((state, element) => {
       const restoreAttribute = (value, name) => {
@@ -853,6 +938,7 @@
     refreshUrgent = false;
     refreshRequired = false;
     pendingAriaChanges.clear();
+    pendingStyleChanges.clear();
     if (refreshing || !document.documentElement) return;
     const started = performance.now();
     refreshing = true;
@@ -998,22 +1084,32 @@
     // Responsive navigation can temporarily hide and reveal the same links
     // across separate observer deliveries while measuring them. Restoring
     // typography restarts that measurement, so refreshing an unchanged final
-    // state would create a feedback loop even with a refresh cooldown.
-    const changed = !refreshRequired && [...pendingAriaChanges].some(([element, value]) =>
-      element.isConnected && element.getAttribute("aria-hidden") !== value);
+    // state would create a feedback loop even with a refresh cooldown. Theme
+    // observers can likewise add/remove inline variables in separate tasks.
+    const changed = !refreshRequired && ([...pendingAriaChanges].some(([element, value]) =>
+      element.isConnected && element.getAttribute("aria-hidden") !== value)
+      || [...pendingStyleChanges].some(([element, value]) => element.isConnected
+        && authorStyleSignature(element, element.getAttribute("style")) !== value));
     if (refreshRequired || changed) { refresh(true); return; }
     refreshTimer = null;
     refreshUrgent = false;
     pendingAriaChanges.clear();
+    pendingStyleChanges.clear();
   };
-  const queueRefresh = (urgent = false, ariaChanges = null) => {
+  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null) => {
     urgent = urgent === true;
     if (refreshing || !isActive()) return;
     if (ariaChanges) {
       for (const mutation of ariaChanges) {
         if (!pendingAriaChanges.has(mutation.target)) pendingAriaChanges.set(mutation.target, mutation.oldValue);
       }
-    } else refreshRequired = true;
+    }
+    if (styleChanges) {
+      for (const [element, value] of styleChanges) {
+        if (!pendingStyleChanges.has(element)) pendingStyleChanges.set(element, value);
+      }
+    }
+    if (!ariaChanges && !styleChanges) refreshRequired = true;
     if (refreshTimer !== null) {
       if (!urgent || refreshUrgent) return;
       clearTimeout(refreshTimer);
@@ -1023,9 +1119,9 @@
     refreshUrgent = urgent;
     refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
   };
-  const invalidateAutoContent = (urgent = false, ariaChanges = null) => {
+  const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null) => {
     revealedAutoContent = new WeakSet();
-    queueRefresh(urgent === true, ariaChanges);
+    queueRefresh(urgent === true, ariaChanges, styleChanges);
   };
 
   const notifyState = () => {
@@ -1121,11 +1217,18 @@
     });
     if (!authored.length) return;
     const incoming = new Set();
+    const incomingText = (node) => {
+      // Existing text already owns its font. A character edit adds no element
+      // or shadow root to discover; walking its entire parent subtree on each
+      // token bypasses the full-refresh budget without applying any new font.
+      const parent = node.parentElement;
+      if (parent && !managedElements.has(parent)) incoming.add(parent);
+    };
     for (const mutation of authored) {
-      if (mutation.type === "characterData") incoming.add(mutation.target.parentElement);
+      if (mutation.type === "characterData") incomingText(mutation.target);
       if (mutation.type === "childList") for (const node of mutation.addedNodes) {
         if (node instanceof Element) incoming.add(node);
-        else if (node.nodeType === Node.TEXT_NODE) incoming.add(node.parentElement);
+        else if (node.nodeType === Node.TEXT_NODE) incomingText(node);
       }
     }
     // Parser and framework batches can mention both a branch and its children.
@@ -1138,6 +1241,14 @@
         if (incoming.has(parent)) { incoming.delete(element); break; }
       }
     }
+    const styleChanges = new Map();
+    const needsRefresh = authored.filter((mutation) => {
+      if (mutation.type !== "attributes" || mutation.attributeName !== "style") return true;
+      const before = authorStyleSignature(mutation.target, mutation.oldValue);
+      if (before === authorStyleSignature(mutation.target, mutation.target.getAttribute("style"))) return false;
+      styleChanges.set(mutation.target, before);
+      return true;
+    });
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
     if (changedStyles.size) {
@@ -1146,9 +1257,12 @@
       finally { observeRoots(); }
     }
     applyIncomingFonts(incoming);
-    const ariaOnly = authored.every((mutation) => mutation.type === "attributes" && mutation.attributeName === "aria-hidden");
-    invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
-      ariaOnly ? authored : null);
+    if (!needsRefresh.length) return;
+    const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes"
+      && ["aria-hidden", "style"].includes(mutation.attributeName));
+    invalidateAutoContent(needsRefresh.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
+      coalescible ? needsRefresh.filter(mutation => mutation.attributeName === "aria-hidden") : null,
+      coalescible ? styleChanges : null);
   });
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
