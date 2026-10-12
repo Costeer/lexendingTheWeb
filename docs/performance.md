@@ -67,10 +67,26 @@ and 4,000 bounding-box reads for its large-page fixture.
 Continuous page updates also need a work budget. After a refresh takes more
 than 50 ms, automatic updates leave four times that duration for the website
 before another pass. Text insertions can still accelerate a pending style
-update, but cannot bypass this cooldown. The deadline stays fixed during a
-burst, so incoming updates cannot postpone conversion indefinitely. Explicit
-preference changes, including pause and resume, still apply immediately.
-New text on an expensive page can therefore wait briefly for conversion.
+update, but layout repairs cannot bypass this cooldown. The deadline stays
+fixed during a burst, so incoming updates cannot postpone repairs indefinitely.
+Explicit preference changes, including pause and resume, still apply immediately.
+
+Font application runs separately from that budget. Startup applies typography
+and starts loading the bundled fonts before scheduling the first layout capture
+and repair. Parser and navigation mutations apply font families to incoming
+branches synchronously in the mutation observer, before the next paint. A slow
+repair on a page such as GitHub therefore does not hold new text in its original
+font for the duration of the cooldown.
+
+The incoming pass reuses the author-font classification for code, icons,
+headings, opt-outs, generated text, and shadow content. It maps the exact font
+stacks applied by the extension back to their author families when classifying
+new descendants. This avoids inherited Lexend in protected children without
+rewriting existing text or measuring the whole page. It changes only families
+until the scheduled pass measures sizes and geometry together. Both passes keep reversible author
+state, including cloned content, so pausing also restores text inserted during
+the cooldown. Startup can apply sizing immediately because no previous layout
+repairs are present.
 
 Mutation batches whose final class/style values are unchanged no longer
 schedule a refresh. Font transition guards are measured together before any
@@ -103,7 +119,9 @@ overflow menu to check that loading and clicking settle without a loop.
 The regression tests check deterministic style and geometry read budgets,
 the scheduling budget with a controlled clock, unchanged mutation batches,
 browser style-recalculation counts, proportional spacing, protected
-descendants, pause/resume, and unrelated settings updates:
+descendants, pause/resume, and unrelated settings updates. Startup and insertion
+regressions hold scheduled tasks to verify that font application and bundled
+font loading do not depend on running a layout repair:
 
 ```sh
 node --test test/typography-performance.test.mjs
