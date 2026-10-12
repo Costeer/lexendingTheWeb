@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
+import { conversationHtml, instrumentContent } from "./helpers/conversation.mjs";
 
-const prepare = async (page, html, { settings = {}, beforeStart, settle = true } = {}) => {
+const prepare = async (page, html, { settings = {}, beforeStart, settle = true, inspect = false } = {}) => {
   await page.route("http://performance.test/**", async (route) => {
     await route.fulfill({ body: await readFile(resolve(`.${new URL(route.request().url()).pathname}`)), contentType: "font/woff2" });
   });
@@ -25,7 +26,9 @@ const prepare = async (page, html, { settings = {}, beforeStart, settle = true }
   }, settings);
   for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
     if (name === "content") await beforeStart?.(page);
-    await page.addScriptTag({ path: resolve(`src/${name}.js`) });
+    const path = resolve(process.env.LEXEND_TEST_SOURCE ?? ".", `src/${name}.js`);
+    if (inspect && name === "content") await page.addScriptTag({ content: instrumentContent(await readFile(path, "utf8")) });
+    else await page.addScriptTag({ path });
   }
   if (!settle) return;
   await page.evaluate(() => document.fonts.ready);
@@ -448,4 +451,155 @@ test("large pages reuse measurements, preserve protected branches, and rest whil
   } finally {
     await browser.close();
   }
+});
+
+
+test("conversation style feedback settles across cooldowns while fonts, streaming and author changes survive", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await prepare(page, conversationHtml(), { settings: { textScale: 120 }, settle: false });
+    await page.evaluate(() => document.fonts.ready);
+    // Do not wait for pending=false first: the broken implementation never
+    // settles. Observe several real cooldowns, including a delayed restart.
+    await page.waitForTimeout(1500);
+    const before = await page.evaluate(() => __state());
+    await page.waitForTimeout(4000);
+    const after = await page.evaluate(() => __state());
+    assert.equal(after.pending, false, "author restoration must not perpetually queue full-page work");
+    assert.equal(after.refreshRevision, before.refreshRevision, "an idle conversation stays idle across cooldowns");
+    assert.equal(after.healthy, true);
+    const typography = await page.locator("#author-label").evaluate(element => ({
+      family: getComputedStyle(element).fontFamily, size: getComputedStyle(element).fontSize
+    }));
+    assert.match(typography.family, /Lexend/);
+    assert.equal(typography.size, "19.2px", "the competing style owner does not remove converted sizing");
+    await page.evaluate(() => {
+      const clone = document.querySelector("#author-label").cloneNode(true);
+      clone.id = "cloned-action";
+      document.querySelector("main").append(clone);
+    });
+    await page.waitForFunction(() => !__state().pending);
+    assert.equal(await page.locator("#cloned-action").getAttribute("data-lexend-retained"), null,
+      "a clone cannot inherit the contested element's private stylesheet rule");
+    assert.equal(await page.locator("#cloned-action").evaluate(e => getComputedStyle(e).fontSize), "19.2px");
+    const incoming = await page.evaluate(async () => {
+      document.querySelector("main").insertAdjacentHTML("beforeend", '<article id="stream"><p>Incoming reply</p><pre>const preserved = true;</pre></article>');
+      await Promise.resolve();
+      return getComputedStyle(document.querySelector("#stream p")).fontFamily;
+    });
+    assert.match(incoming, /Lexend/, "streamed content receives Lexend before scheduled layout work");
+    await page.getByRole("textbox", { name: "Message" }).fill("Typing remains responsive");
+    await page.evaluate(() => scrollTo(0, 300));
+    await page.waitForFunction(() => !__state().pending);
+    assert.doesNotMatch(await page.locator("#stream pre").evaluate(e => getComputedStyle(e).fontFamily), /Lexend/);
+    const revision = await page.evaluate(() => {
+      const revision = __state().refreshRevision;
+      __authorStyle = "font-size: 22px; color: rgb(56, 34, 12);";
+      document.querySelector("#author-label").style.cssText = __authorStyle;
+      return revision;
+    });
+    await page.waitForFunction(revision => __state().refreshRevision > revision && !__state().pending, revision);
+    assert.equal(await page.locator("#author-label").evaluate(e => getComputedStyle(e).fontSize), "26.4px", "genuine author changes still get a new baseline");
+    await page.evaluate(() => __update({ enabled: false }));
+    const paused = await page.locator("#author-label").evaluate(e => ({ style: e.style.cssText, marker: e.hasAttribute("data-lexend-retained"), family: getComputedStyle(e).fontFamily }));
+    assert.equal(paused.style, "font-size: 22px; color: rgb(56, 34, 12);");
+    assert.equal(paused.marker, false);
+    assert.equal(paused.family, "Arial");
+    assert.equal(await page.locator("#cloned-action").getAttribute("style"), "color: rgb(12, 34, 56);");
+    await page.evaluate(() => __update({ enabled: true }));
+    await page.waitForFunction(() => !__state().pending);
+    assert.match(await page.locator("#author-label").evaluate(e => getComputedStyle(e).fontFamily), /Lexend/);
+  } finally { await browser.close(); }
+});
+
+test("streaming existing text does not repeatedly rediscover the conversation subtree", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await prepare(page, '<!doctype html><style>body{font:16px/24px Arial}</style><main>Streaming status: '
+      + '<p>Existing reply</p>'.repeat(200) + '</main>', { inspect: true });
+    const result = await page.evaluate(async () => {
+      // Hold the repair deadline to isolate synchronous observer work.
+      globalThis.__tasks = new Map();
+      let id = 0;
+      globalThis.setTimeout = callback => { __tasks.set(++id, callback); return id; };
+      globalThis.clearTimeout = id => __tasks.delete(id);
+      const main = document.querySelector('main');
+      const before = __probe.incomingNodes;
+      for (let i = 0; i < 100; i++) { main.firstChild.data += 'word '; await Promise.resolve(); }
+      const visited = __probe.incomingNodes - before;
+      // Replacing a text node is also an existing-font update, but a new
+      // element still requires classification before the queued repair.
+      main.firstChild.replaceWith(document.createTextNode('Reply completed. '));
+      await Promise.resolve();
+      const replacedVisits = __probe.incomingNodes - before;
+      main.insertAdjacentHTML('beforeend', '<p id="new">New reply <code>const preserved = true;</code></p>');
+      await Promise.resolve();
+      const family = getComputedStyle(document.querySelector('#new')).fontFamily;
+      const code = getComputedStyle(document.querySelector('#new code')).fontFamily;
+      const pending = __state().pending;
+      __update({ enabled: false });
+      return { visited, replacedVisits, family, code, pending, tasks: __tasks.size };
+    });
+    assert.equal(result.visited, 0, "100 tokens in existing text must not scan all 200 replies 100 times");
+    assert.equal(result.replacedVisits, 0);
+    assert.match(result.family, /Lexend/);
+    assert.doesNotMatch(result.code, /Lexend/);
+    assert.equal(result.pending, true, "the final layout repair remains scheduled");
+    assert.equal(result.tasks, 0, "pause cancels the outstanding work");
+  } finally { await browser.close(); }
+});
+
+test("temporary theme declarations coalesce across deliveries without hiding persistent changes", { timeout: 20000 }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await prepare(page, conversationHtml({ feedback: false }), { settle: false, beforeStart: page => page.evaluate(() => {
+      const label = document.querySelector('#author-label');
+      // Model a theme observer that recalculates temporary inline variables
+      // after typography writes, then restores its final style next frame.
+      // Real Dark Reader was also exercised separately by the profiler.
+      const observer = new MutationObserver(records => {
+        if (!records.some(m => !m.oldValue?.includes('--lexend-family')) || !label.style.getPropertyValue('--lexend-family')) return;
+        observer.disconnect();
+        label.style.setProperty('--theme-text', '#ddd');
+        requestAnimationFrame(() => {
+          label.style.removeProperty('--theme-text');
+          observer.observe(label, { attributes: true, attributeFilter: ['style'], attributeOldValue: true });
+        });
+      });
+      observer.observe(label, { attributes: true, attributeFilter: ['style'], attributeOldValue: true });
+    }) });
+    await page.waitForTimeout(1500);
+    const revision = await page.evaluate(() => __state().refreshRevision);
+    await page.waitForTimeout(3000);
+    assert.equal(await page.evaluate(() => __state().refreshRevision), revision);
+    assert.equal(await page.evaluate(() => __state().pending), false);
+    await page.evaluate(async () => {
+      const label = document.querySelector('#author-label');
+      label.style.setProperty('--theme-text', '#ddd');
+      await Promise.resolve();
+      label.style.removeProperty('--theme-text');
+      label.style.fontSize = '25px';
+    });
+    await page.waitForFunction(revision => __state().refreshRevision > revision && !__state().pending, revision);
+    assert.equal(await page.locator('#author-label').evaluate(e => getComputedStyle(e).fontSize), '25px');
+  } finally { await browser.close(); }
+});
+
+test("contested animated typography keeps native baselines across preferences and pause", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await prepare(page, conversationHtml({ turns: 1 }).replace('p {margin:0}', '#author-label {transition:all .2s} p {margin:0}'));
+    for (const textScale of [120, 110, 130]) {
+      await page.evaluate(textScale => __update({ textScale }), textScale);
+      await page.waitForFunction(() => !__state().pending);
+      assert.equal(await page.locator('#author-label').evaluate(e => parseFloat(getComputedStyle(e).fontSize)), 16 * textScale / 100);
+    }
+    await page.evaluate(() => __update({ enabled: false }));
+    assert.equal(await page.locator('#author-label').evaluate(e => getComputedStyle(e).fontSize), '16px');
+    assert.equal(await page.locator('#author-label').getAttribute('style'), 'color: rgb(12, 34, 56);');
+  } finally { await browser.close(); }
 });

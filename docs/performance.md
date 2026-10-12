@@ -136,3 +136,160 @@ npm run verify:firefox
 npm run test:browser -- chrome
 npm run test:browser -- firefox
 ```
+
+## Conversation feedback investigation (2026-10-12)
+
+The reported ChatGPT hang occurred on another device. Its authenticated
+conversation, incident settings, performance trace and heap snapshot were not
+available here. The reported 160.5% CPU and approximately 1.5–2 GB renderer
+memory remain incident evidence, not measurements reproduced by this fixture.
+The original incident's precise trigger is still unconfirmed.
+
+The investigation used source revision
+`cc5e738f32f2f25fc3cd6b54d06a5e4ed99b00b4`, rather than assuming the installed
+0.5.0 extension was that build. The locally stored settings were scope `all`,
+text scale `100`, line height `0`, letter spacing `0`, and one disabled rule for
+`www.canva.com`. These are this device's settings, not confirmed incident
+settings. Profiling used the same typography settings and no matching site rule;
+regressions and installed-extension verification also exercise 120% sizing.
+
+Two defects were reproduced independently of the unavailable conversation:
+
+- An idempotent page observer restores an inline style after Lexend writes it.
+  Typography retention answers it, and its restoration invalidates the whole
+  page again. Each full refresh restarts the exchange after the cooldown. The
+  old source completed 14 refreshes in the 12-second capture and remained
+  pending. The first quiet-looking interval did not establish that it settled.
+- Editing text whose parent is already managed still runs shadow discovery,
+  clone recovery and subtree classification synchronously. In the profiling
+  fixture, 100 token updates visited 48,100 elements and spent about 397 ms in
+  incoming-font processing, even though those edits introduced no elements.
+
+The CPU profile attributes about 2.47 seconds inclusively to `refresh`, of which
+about 1.68 seconds is in `repairLayout` and 0.45 seconds in `captureBaseline`.
+Prominent stacks are `repairContainers` / `repairText` → `snapshot` →
+`measureSnapshot`, visibility checks and text rectangle measurements. The
+trace records 44 layouts (358 ms total) and 1,738 style recalculations (58 ms).
+These are nested measurements, not additive totals. Typography-retention writes
+and incoming-font work are small in the idle-feedback capture; the expensive
+operation is the repeated page-wide layout pass. Frame sizing does not cause
+this reproduction. A separate large fixture with automatic content visibility
+settled without the style observer.
+
+The fix compares author-style declarations after removing Lexend's applied
+values from the comparison. It coalesces temporary style changes across
+observer deliveries until the queued deadline, including changes that return
+to their baseline. Real style changes, content updates, explicit preferences,
+and layout repairs remain enabled. This also handles a reproduced interaction
+with Dark Reader's temporary inline colour variables; it does not special-case
+ChatGPT, Dark Reader names, or hostnames.
+
+For an element whose author observer repeatedly removes inline typography,
+Lexend keeps its declarations in the existing reversible stylesheet. This
+avoids another write exchange while retaining typography and sizing. The
+latest author baseline is still recorded, subsequent author edits are handled,
+and refresh/pause remove the temporary rules. Clones discard the original
+owner's rule marker. Existing text edits no longer enter subtree discovery;
+new elements still receive fonts before the scheduled full repair.
+
+The fixture is synthetic and is not a saved ChatGPT DOM. Dark Reader 4.9.133
+was exercised in dynamic mode in an isolated profile. Adding Stylus 2.4.14
+loaded its default configuration, with no matching userstyle; arbitrary
+userstyles and the other device's extension settings remain unverified.
+
+### Controlled measurements
+
+Headless Chromium 153.0.8010.12, 1280 × 800, 120 synthetic replies. The
+idle comparison excludes the first two seconds and spans approximately ten
+seconds of the same fixture; runs were sequential. CPU is percent of one
+logical core for the test browser's renderers, not whole-browser CPU.
+
+| Metric during idle window | Disabled | Reported source | Fixed |
+| --- | ---: | ---: | ---: |
+| Renderer CPU | 1.2% | 27.7% | 1.1% |
+| Main-thread task time | 2.6 ms | 2209.0 ms | 3.8 ms |
+| Additional full refreshes | 0 | 12 | 0 |
+| Renderer RSS at end, before forced GC | 113.8 MiB | 219.3 MiB | 155.7 MiB |
+
+The final incoming-font comparison was approximately 397 ms / 48,100 element
+visits before versus 0.1 ms / zero visits after, for 100 edits to existing
+text. New branches still receive fonts immediately.
+
+After replacements 6 and 12, fixed-build post-GC V8 heap was 3.29 and 3.47 MiB,
+with exactly 1,718 live DOM nodes both times and no detached entries in the
+inspected typography, eligible-text, shadow-root or automatic-content maps.
+Heap after the subsequent stream was 3.39 MiB. The reported source also had
+stable DOM counts and approximately 3.48 MiB heap at both replacement samples.
+These results show allocation/renderer-memory churn in this reproduction,
+not evidence of the reported device's JavaScript heap leak.
+
+A separate 48-replacement run kept 1,718 live DOM nodes at replacements 24
+and 48, with post-GC heaps of 3.55 and 3.62 MiB and zero detached entries in
+the inspected collections. After streaming, heap was 3.49 MiB. This bounds the
+observed retention for this workload; it cannot establish the remote incident's
+heap behaviour.
+
+Validation: 14 focused tests and all 202 project tests passed, as did static
+checks and the build. The exact built resources also passed isolated Helium
+verification alone and with Dark Reader dynamic mode plus default Stylus.
+
+### Reproduce the evidence
+
+The profiler writes `summary.json`, a DevTools `cpu.cpuprofile`, and a Chromium
+`trace.json`. `LEXEND_HEAP_SNAPSHOT=true` also writes `heap.heapsnapshot` after
+replacements settle and garbage collection. Its temporary instrumentation is
+in `test/helpers/conversation.mjs`; it is not shipped in the content script.
+Counters include observer deliveries, mutation types/targets, subtree sizes,
+refresh and retention call counts/durations, frame notifications, and collection
+sizes/detached entries. The traces retain scheduling call stacks.
+
+Run comparisons sequentially on an otherwise quiet machine:
+
+```sh
+mkdir -p /tmp/lexend-reported-source/src
+for file in settings adaptive-controls adaptive-layout content; do
+  git show "cc5e738:src/$file.js" > "/tmp/lexend-reported-source/src/$file.js"
+done
+LEXEND_PROFILE_SOURCE=/tmp/lexend-reported-source \
+  LEXEND_PROFILE_OUT=/tmp/lexend-before node scripts/profile-conversation.mjs
+LEXEND_HEAP_SNAPSHOT=true LEXEND_PROFILE_OUT=/tmp/lexend-after \
+  node scripts/profile-conversation.mjs
+LEXEND_ENABLED=false LEXEND_PROFILE_CYCLES=0 \
+  LEXEND_PROFILE_OUT=/tmp/lexend-disabled node scripts/profile-conversation.mjs
+```
+
+Use `LEXEND_PROFILE_EXTENSIONS` with a JSON array of unpacked extension paths
+for isolated interaction checks. `LEXEND_STYLE_SAMPLES=true` adds a bounded
+sample of old/current inline styles. The synthetic fixture contains no account
+or conversation data. CPU timing uses the renderer process CPU-time delta;
+main-thread task time is reported separately. RSS is process memory, and
+post-GC V8 heap is not interchangeable with RSS. Profiling itself has overhead.
+
+The new performance tests fail against the reported source:
+
+```sh
+LEXEND_TEST_SOURCE=/tmp/lexend-reported-source node --test \
+  --test-name-pattern='conversation style feedback|streaming existing|temporary theme' \
+  test/typography-performance.test.mjs
+```
+
+Run the fixed regressions and ordinary project checks:
+
+```sh
+node --test test/typography-performance.test.mjs test/typography-stress.test.mjs test/navigation-lifecycle.test.mjs
+npm test
+npm run check
+npm run build
+node scripts/verify-conversation-extension.mjs
+```
+
+The last command loads this checkout's `dist/chrome` in a fresh browser profile,
+fetches the actual extension resources to compare SHA-256 hashes with source,
+and exercises idle settling, 120% sizing, streaming, protected code, typing,
+pause/resume and navigation. `LEXEND_CHROMIUM_EXECUTABLE` can name a Helium
+launcher; `LEXEND_EXTRA_EXTENSION_PATHS` accepts additional unpacked extensions.
+Local Helium is 0.15.3.1 (Chromium 151.0.7922.108), not the reported 0.18.2.1.
+The normal Helium session and `/home/costeer/git/lexendingTheWeb/dist/chrome`
+are separate from this worktree's tested build. Retesting the affected
+conversation requires loading this rebuilt checkout on the affected device;
+version 0.5.0 alone does not identify the tested code.
