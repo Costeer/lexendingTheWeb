@@ -19,7 +19,7 @@ class Element {
     this.className = "";
     this.value = "";
     this.checked = false;
-    this.classList = { add() {}, remove() {} };
+    this.classList = { add() {}, remove() {}, toggle() {} };
   }
   append(...children) {
     children.forEach((child) => { child.parent = this; });
@@ -62,7 +62,8 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   const inputs = new Map(Object.entries({
     basicTextScale: [100, 110, 120],
     basicLineHeight: [0, 1.5, 2],
-    basicLetterSpacing: [0, 0.04, 0.08]
+    basicLetterSpacing: [0, 0.04, 0.08],
+    previewMode: ["reading", "compare", "glyphs"]
   }).map(([name, values]) => [
     `input[name="${name}"]`,
     values.map((value) => Object.assign(new Element(), { value: String(value) }))
@@ -148,6 +149,44 @@ test("settings retain the dark navigation cache while loading, then honor synced
   const stale = await openSettings({ cachedTheme: "dark", getSettings: async () => ({ theme: "light" }) });
   assert.equal(stale.root.dataset.theme, "light", "the cache does not override synced settings");
   assert.equal(stale.cache.get("lexend-ui-theme"), "light");
+});
+
+test("preview modes and custom samples stay local while the comparison baseline stays fixed", async () => {
+  const page = await openSettings({ desktop: true });
+  const modes = page.inputs.get('input[name="previewMode"]');
+  const select = (value) => {
+    modes.forEach((input) => { input.checked = input.value === value; });
+    modes.find((input) => input.checked).emit("change");
+  };
+  select("compare");
+  assert.equal(page.get("#preview-original").hidden, false);
+  assert.equal(page.get("#preview-reading").hidden, false);
+  assert.equal(page.get("#preview-original-copy").textContent, page.get("#preview-copy").textContent);
+  page.change({ textScale: { newValue: 140 }, lineHeight: { newValue: 2 }, letterSpacing: { newValue: .08 } });
+  assert.equal(page.get("#preview-copy").style.fontSize, "25.2px");
+  assert.equal(page.get("#preview-copy").style.lineHeight, 2);
+  assert.equal(page.get("#preview-original-copy").style.fontSize, "18px");
+  select("glyphs");
+  assert.equal(page.get("#preview-reading").hidden, true);
+  assert.equal(page.get("#preview-glyphs").hidden, false);
+  assert.equal(page.get("#preview-attribution").hidden, true);
+  page.get("#preview-text").value = "<b>My own reading sample</b>";
+  page.get("#preview-text").emit("input");
+  assert.equal(page.get("#preview-glyphs").hidden, true, "typing brings the reading sample into view");
+  assert.equal(page.get("#preview-copy").textContent, "<b>My own reading sample</b>", "samples are plain text");
+  assert.equal(page.get("#preview-attribution").hidden, true, "custom text never inherits a quote attribution");
+  assert.equal(page.get("#preview-copy").lang, "");
+  page.get("#preview-text").value = "سارة أحمد";
+  page.get("#preview-text").emit("input");
+  assert.equal(page.get("#preview-copy").style.letterSpacing, "0em", "preview uses the content engine's Arabic tracking policy");
+  page.get("#preview-text").value = "";
+  page.get("#preview-text").emit("input");
+  assert.equal(page.get("#preview-copy").textContent, "“Preview”");
+  assert.equal(page.get("#preview-attribution").hidden, false);
+  page.resize(false);
+  assert.equal(page.get("#preview-copy").style.fontSize, "22.4px");
+  assert.equal(page.get("#preview-original-copy").style.fontSize, "16px");
+  assert.equal(page.writes.length, 0, "changing the specimen never writes synchronized preferences");
 });
 
 test("failed settings reads keep controls disabled and Retry reads without writing defaults", async () => {

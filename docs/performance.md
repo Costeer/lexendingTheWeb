@@ -33,6 +33,35 @@ A further experiment removed duplicate inline custom properties from ordinary
 text. It produced no consistent timing improvement and complicated later slot
 assignment, so the full declarations were retained.
 
+## Geometry and generated-text measurements
+
+A follow-up compared the existing optimized engine with two additional caches.
+The local Chromium specimen contained 80 reading cards and 500 code tokens
+(916 elements), at 1280 × 800. Each row used eight synchronous changes between
+110% and 120% text size after fonts loaded; timings include the complete refresh.
+
+| Approach | Median refresh | Computed-style reads | Bounding-box reads |
+| --- | ---: | ---: | ---: |
+| Existing optimized engine | 141 ms | 8,171 | 15,984 |
+| Cache boxes and box visibility; reuse styles in sibling checks | 132 ms | 7,211 | 2,001 |
+| Also cache generated-text styles | 126 ms | 5,297 | 2,001 |
+
+The retained changes remove about 87% of bounding-box reads and 35% of style
+reads on this specimen. Wall-clock improvement was about 11%; timings vary
+with browser, hardware, and page structure. These results are a separate
+comparison from the earlier table, with a different fixture.
+
+Boxes, box visibility, and `::before`/`::after` styles share the existing
+pass-local invalidation mechanism. Any repair write, including an attribute
+change or table wrapper insertion, discards all caches. Native capture and
+converted-layout repair still have separate caches. Nothing is reused across
+events, preference changes, or viewport changes.
+
+An additional experiment skipped repeated container-repair passes when no
+intervening writes occurred. It showed no consistent timing improvement and
+was removed. The regression budget now requires fewer than 7,000 style reads
+and 4,000 bounding-box reads for its large-page fixture.
+
 The regression test checks a deterministic work budget, proportional spacing,
 protected descendants, pause/resume, and unrelated settings updates:
 

@@ -261,6 +261,48 @@ try {
     await wait("[...document.querySelectorAll('.settings-panel')].filter(p=>!p.hidden).length === 1", "Desktop layout restores one section");
   });
 
+  await check("font specimens compare fixed defaults, accept local text, and fit narrow screens", async () => {
+    const previous = await saved();
+    await patch({ textScale: 140, lineHeight: 2, letterSpacing: .2 });
+    await driver.findElement(By.css('.preview-modes label:has(input[value="glyphs"])')).click();
+    assert.equal(await script("document.querySelector('#preview-reading').hidden"), true);
+    await extensionCall(() => document.fonts.ready.then(() => true));
+    assert.deepEqual(await script("[...document.querySelectorAll('.preview-specimen')].map(e=>getComputedStyle(e).fontWeight)"), ["400", "600", "800"]);
+    await driver.actions().sendKeys(Key.ARROW_LEFT).perform();
+    assert.equal(await script("document.querySelector('input[name=previewMode]:checked').value"), "compare", "Native arrow keys switch preview modes");
+    assert.equal(await script("document.querySelector('#preview-original').hidden"), false);
+    await driver.findElement(By.css('.preview-custom summary')).click();
+    const custom = await driver.findElement(By.id("preview-text"));
+    const sample = "A reading sample with <tags> & symbols.\nسارة أحمد";
+    const preferences = await saved();
+    await custom.sendKeys(sample);
+    assert.equal(await script("document.querySelector('#preview-copy').textContent"), sample);
+    assert.equal(await script("document.querySelector('#preview-original-copy').textContent"), sample);
+    assert.equal(await script("document.querySelector('#preview-attribution').hidden"), true);
+    await wait("getComputedStyle(document.querySelector('#preview-copy')).letterSpacing === 'normal' || parseFloat(getComputedStyle(document.querySelector('#preview-copy')).letterSpacing) === 0", "Arabic sample remains untracked");
+    assert.deepEqual(await saved(), preferences, "Preview text and modes never change stored preferences");
+    for (const width of [1280, 390, 320]) {
+      await driver.manage().window().setRect({ width, height: 900 });
+      await wait(`matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches === ${width >= 900}`, "Viewport reaches the requested layout");
+      await wait("document.documentElement.scrollWidth <= innerWidth + 1", "Preview fits the viewport");
+      const desktop = await script("matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches");
+      const base = desktop ? 18 : 16;
+      // Firefox quantizes computed sizes at fractional display scales (for
+      // example 25.1875px for an authored 25.2px). Allow subpixel rounding.
+      await wait(`Math.abs(parseFloat(getComputedStyle(document.querySelector('#preview-copy')).fontSize) - ${base * 1.4}) < .05`, "Live sample reflects text scaling");
+      const referenceSize = await script("parseFloat(getComputedStyle(document.querySelector('#preview-original-copy')).fontSize)");
+      assert(Math.abs(referenceSize - base) < .05, "Reference retains default size");
+    }
+    await script(() => {
+      const input = document.querySelector('#preview-text');
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    assert.equal(await script("document.querySelector('#preview-attribution').hidden"), false);
+    await driver.manage().window().setRect({ width: 1280, height: 900 });
+    await patch({ textScale: previous.textScale, lineHeight: previous.lineHeight, letterSpacing: previous.letterSpacing });
+  });
+
   if (browserName === "chrome") await check("forced colors retain a visible selected option and reduced motion disables transitions", async () => {
     await driver.sendDevToolsCommand("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }, { name: "prefers-reduced-motion", value: "reduce" }] });
     await wait("matchMedia('(forced-colors: active)').matches && getComputedStyle(document.querySelector('.segment-group input:checked + span')).backgroundColor !== 'rgba(0, 0, 0, 0)'", "Forced colors selection styles apply");
