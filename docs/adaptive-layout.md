@@ -40,8 +40,9 @@ fallback fonts.
 Pausing restores the styles the extension changed while keeping later updates
 made by the site. If a page still looks wrong, use **Pause here** in the popup.
 
-Layout measurements are reused within each synchronous pass and invalidated
-after a repair changes the page. Protected code and editor subtrees inherit
+Layout measurements, element boxes, and generated-text styles are reused within
+each synchronous pass and invalidated after a repair changes the page.
+Protected code and editor subtrees inherit
 their original typography from the boundary without styling every token.
 Paused pages skip refreshes; theme changes and rules for other sites also
 avoid remeasuring the page.

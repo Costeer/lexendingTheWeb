@@ -8,13 +8,15 @@
   const heading = (element) => /^H[1-6]$/.test(element.tagName) || element.getAttribute("role") === "heading";
   const control = (element) => element.matches("button,input,select,textarea,a[href],[role='button']");
   const rect = (value) => ({ left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width, height: value.height });
-  const visible = (element, style, allowViewportEscape = false, styleFor = getComputedStyle) => {
-    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0 || !element.getClientRects().length) return false;
+  const readBox = (element) => element.getBoundingClientRect();
+  const readHasBox = (element) => element.getClientRects().length > 0;
+  const visible = (element, style, allowViewportEscape = false, styleFor = getComputedStyle, boxFor = readBox, hasBox = readHasBox) => {
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0 || !hasBox(element)) return false;
     if (element.checkVisibility && !element.checkVisibility({ contentVisibilityAuto: true })) return false;
     // Visually hidden labels, sprite replacement text and closed navigation
     // panels remain hidden. Expansion must never turn them into page content.
     if ((style.clip !== "auto" && style.clip !== "") || style.clipPath === "inset(50%)" || parseFloat(style.textIndent) < -500) return false;
-    const box = element.getBoundingClientRect();
+    const box = boxFor(element);
     let current = element;
     let escapedFixed = false;
     for (let depth = 0; current && depth < 10; depth++, current = current.parentElement ?? current.getRootNode()?.host) {
@@ -28,7 +30,7 @@
           || /(?:transform|perspective|filter)/.test(css.willChange))) escapedFixed = false;
       if (escapedFixed) continue;
       const clippingX = ["hidden", "clip"].includes(css.overflowX), clippingY = ["hidden", "clip"].includes(css.overflowY);
-      const boundary = current.getBoundingClientRect();
+      const boundary = boxFor(current);
       // Focus-revealed accessibility links are often positioned far to the
       // left with a tiny box, rather than clipped. They have no painted page
       // footprint until the author brings them onscreen on keyboard focus.
@@ -74,10 +76,10 @@
     }
     return result;
   };
-  const measureSnapshot = (element, allowViewportEscape, styleFor, textRects) => {
+  const measureSnapshot = (element, allowViewportEscape, styleFor, textRects, boxFor, hasBox) => {
     const style = styleFor(element);
-    if (!visible(element, style, allowViewportEscape, styleFor)) return null;
-    const box = rect(element.getBoundingClientRect());
+    if (!visible(element, style, allowViewportEscape, styleFor, boxFor, hasBox)) return null;
+    const box = rect(boxFor(element));
     const texts = textRects(element);
     return {
       box, texts, text: bounds(texts), scrollWidth: element.scrollWidth, scrollHeight: element.scrollHeight,
@@ -133,8 +135,9 @@
     // after any write: a child can change its siblings or a :has() ancestor.
     let measurements = null;
     const freshMeasurements = () => ({
-      styles: new WeakMap(), snapshots: [new WeakMap(), new WeakMap()],
-      textRects: new WeakMap(), containedRects: new WeakMap()
+      styles: new WeakMap(), pseudoStyles: new WeakMap(), snapshots: [new WeakMap(), new WeakMap()],
+      textRects: new WeakMap(), containedRects: new WeakMap(),
+      boxes: new WeakMap(), hasBox: new WeakMap()
     });
     const invalidateMeasurements = () => { if (measurements) measurements = freshMeasurements(); };
     const withMeasurements = (callback) => {
@@ -144,9 +147,25 @@
       finally { measurements = previous; }
     };
     const styleFor = (element, pseudo = null) => {
-      if (!measurements || pseudo) return getComputedStyle(element, pseudo);
+      if (!measurements) return getComputedStyle(element, pseudo);
+      if (pseudo) {
+        if (!measurements.pseudoStyles.has(element)) measurements.pseudoStyles.set(element, new Map());
+        const styles = measurements.pseudoStyles.get(element);
+        if (!styles.has(pseudo)) styles.set(pseudo, getComputedStyle(element, pseudo));
+        return styles.get(pseudo);
+      }
       if (!measurements.styles.has(element)) measurements.styles.set(element, getComputedStyle(element));
       return measurements.styles.get(element);
+    };
+    const boxFor = (element) => {
+      if (!measurements) return readBox(element);
+      if (!measurements.boxes.has(element)) measurements.boxes.set(element, readBox(element));
+      return measurements.boxes.get(element);
+    };
+    const hasBox = (element) => {
+      if (!measurements) return readHasBox(element);
+      if (!measurements.hasBox.has(element)) measurements.hasBox.set(element, readHasBox(element));
+      return measurements.hasBox.get(element);
     };
     const directTextRects = (element) => {
       if (!measurements) return measureTextRects(element);
@@ -154,9 +173,9 @@
       return measurements.textRects.get(element);
     };
     const snapshot = (element, allowViewportEscape = false) => {
-      if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects);
+      if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, boxFor, hasBox);
       const cache = measurements.snapshots[Number(allowViewportEscape)];
-      if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects));
+      if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, boxFor, hasBox));
       return cache.get(element);
     };
     const write = (element, property, value, category) => {
@@ -337,7 +356,7 @@
           if (Math.abs(state.box.top) > EPSILON || Math.abs(state.box.bottom - innerHeight) > EPSILON
               || state.box.width < innerWidth * 0.8 || ["auto", "scroll"].includes(state.overflowY)) continue;
           if ([...element.querySelectorAll("*")].some((child) => {
-            const css = styleFor(child), box = child.getBoundingClientRect();
+            const css = styleFor(child), box = boxFor(child);
             return ["auto", "scroll"].includes(css.overflowY) && child.clientHeight > 0
               && child.scrollHeight > child.clientHeight + EPSILON && box.top >= state.box.top - EPSILON
               && box.bottom <= state.box.bottom + EPSILON;
@@ -354,7 +373,7 @@
           // A purely geometric spacer can intentionally have visibility:hidden
           // while still reserving flow space. Its empty contents stay hidden;
           // only the matching footprint participates in this relationship.
-          const css = styleFor(sibling), old = { box: rect(sibling.getBoundingClientRect()), position: css.position };
+          const css = styleFor(sibling), old = { box: rect(boxFor(sibling)), position: css.position };
           if (css.display === "none" || !["static", "relative"].includes(old.position) || Math.abs(old.box.top - state.box.top) > EPSILON
               || Math.abs(old.box.height - state.box.height) > EPSILON || old.box.width < state.box.width * 0.9) continue;
           panelReservations.set(panel, { sibling, before: old });
@@ -370,7 +389,7 @@
               || track.querySelector("input,button,select,textarea,a[href],img,video,canvas,[role='button']")) continue;
           const matrix = new DOMMatrixReadOnly(css.transform);
           if (!matrix.is2D || matrix.a !== 1 || matrix.b !== 0 || matrix.c !== 0 || matrix.d !== 1 || matrix.f >= -EPSILON) continue;
-          const frames = [...track.children].map((element) => ({ element, box: element.getBoundingClientRect(), css: styleFor(element) }));
+          const frames = [...track.children].map((element) => ({ element, box: boxFor(element), css: styleFor(element) }));
           if (frames.some((frame) => !["static", "relative"].includes(frame.css.position) || !frame.element.textContent.trim())) continue;
           const active = frames.reduce((best, frame) => intersection(frame.box, state.box) > intersection(best.box, state.box) ? frame : best);
           const visibleHeight = Math.min(active.box.bottom, state.box.bottom) - Math.max(active.box.top, state.box.top);
@@ -401,7 +420,7 @@
       if (!/^-?[\d.]+(?:px|%)?$/.test(translate)) return null;
       const offset = parseFloat(translate) * (translate.endsWith("%") ? width / 100 : 1);
       const marginLeft = parseFloat(css.marginLeft) || 0;
-      left += element.getBoundingClientRect().left + (parseFloat(styleFor(element).borderLeftWidth) || 0) + marginLeft + offset;
+      left += boxFor(element).left + (parseFloat(styleFor(element).borderLeftWidth) || 0) + marginLeft + offset;
       return { left, right: left + width, width, marginLeft };
     };
     const repairPseudoTooltips = () => {
@@ -477,11 +496,11 @@
           for (let depth = 0; branch && depth < 4; depth++) {
             const parent = ancestor(branch);
             if (!parent) break;
-            const parentCss = styleFor(parent), parentBox = parent.getBoundingClientRect();
+            const parentCss = styleFor(parent), parentBox = boxFor(parent);
             if (["hidden", "clip"].includes(parentCss.overflowX)) rightLimit = Math.min(rightLimit, parentBox.right - 2);
             for (const sibling of parent.children) {
               if (sibling === branch) continue;
-              const box = sibling.getBoundingClientRect();
+              const box = boxFor(sibling);
               if (box.left >= now.box.right - 1 && box.top < now.box.bottom - 2 && box.bottom > now.box.top + 2) {
                 const siblingText = bounds(containedRects(sibling));
                 const padding = parseFloat(styleFor(sibling).paddingLeft) || 0;
@@ -523,10 +542,10 @@
           const siblingsWidth = inlineGroup ? [...parent.children].filter((sibling) => {
             const css = styleFor(sibling);
             return sibling !== container && css.display.startsWith("inline") && !["absolute", "fixed"].includes(css.position)
-              && sibling.getBoundingClientRect().left >= containerState.box.right - EPSILON;
+              && boxFor(sibling).left >= containerState.box.right - EPSILON;
           }).reduce((sum, sibling) => {
             const css = styleFor(sibling);
-            return sum + sibling.getBoundingClientRect().width + (parseFloat(css.marginLeft) || 0) + (parseFloat(css.marginRight) || 0);
+            return sum + boxFor(sibling).width + (parseFloat(css.marginLeft) || 0) + (parseFloat(css.marginRight) || 0);
           }, 0) : 0;
           const targetWidth = Math.max(available, Math.min(safeParentWidth - siblingsWidth, longest + containerState.paddingLeft + containerState.paddingRight + 4));
           write(container, "box-sizing", "border-box", "fit-heading");
@@ -543,11 +562,11 @@
           for (let depth = 0; branch && depth < 8; depth++) {
             const outer = ancestor(branch);
             if (!outer || outer.matches("body,html")) break;
-            const css = styleFor(outer), box = outer.getBoundingClientRect();
+            const css = styleFor(outer), box = boxFor(outer);
             if (["hidden", "clip"].includes(css.overflowX)) rightLimit = Math.min(rightLimit, box.right - 1);
             for (const sibling of outer.children) {
               if (sibling === branch) continue;
-              const beside = sibling.getBoundingClientRect();
+              const beside = boxFor(sibling);
               if (beside.left >= containerState.box.right - 1 && beside.top < containerState.box.bottom - 2
                   && beside.bottom > containerState.box.top + 2) rightLimit = Math.min(rightLimit, beside.left - 2);
             }
@@ -585,7 +604,7 @@
       for (let depth = 0; clip && depth < 4; depth++, clip = ancestor(clip)) {
         const css = styleFor(clip);
         if (!["hidden", "clip"].includes(css.overflowX)) continue;
-        const old = baseline.get(clip), box = clip.getBoundingClientRect();
+        const old = baseline.get(clip), box = boxFor(clip);
         if (!old || !old.box.width || box.width < 16
             || before.text.left < old.box.left - 1 || before.text.right > old.box.right + 1) return;
         const over = Math.max(0, box.left - now.text.left, now.text.right - box.right);
@@ -649,7 +668,7 @@
           && now.box.left >= 0 && now.fontSize > before.fontSize + 0.1) {
         const parent = ancestor(element), css = parent ? styleFor(parent) : null;
         const available = Math.max(0, Math.min(innerWidth - now.box.left,
-          parent ? parent.getBoundingClientRect().right - (parseFloat(css.paddingRight) || 0) - now.box.left : innerWidth));
+          parent ? boxFor(parent).right - (parseFloat(css.paddingRight) || 0) - now.box.left : innerWidth));
         if (available > 32) {
           write(element, "box-sizing", "border-box", "viewport-fit");
           write(element, "max-width", `${Math.floor(available)}px`, "viewport-fit");
@@ -749,7 +768,7 @@
         if (!css) continue;
         const scrollX = ["auto", "scroll"].includes(css.overflowX), scrollY = ["auto", "scroll"].includes(css.overflowY);
         if (!scrollX && !scrollY) continue;
-        const box = original ? state.box : parent.getBoundingClientRect();
+        const box = original ? state.box : boxFor(parent);
         boxes = boxes.map((text) => ({ ...text,
           left: scrollX ? Math.max(text.left, box.left) : text.left,
           right: scrollX ? Math.min(text.right, box.right) : text.right,
@@ -794,7 +813,7 @@
         const css = styleFor(child);
         if (/url\(/.test(css.backgroundImage)) return true;
         if (!child.matches("img,picture,video,canvas,svg")) continue;
-        const box = baseline.get(child)?.box ?? child.getBoundingClientRect();
+        const box = baseline.get(child)?.box ?? boxFor(child);
         // Small quote glyphs and flow avatars do not need a definite height.
         // Treating them as photograph layers pins their growing prose parent.
         if (box.width * box.height >= now.box.width * now.box.height * 0.15
@@ -844,7 +863,7 @@
             || now.box.height <= before.box.height + EPSILON || needsDefiniteHeight(element, now)
             || element.children.length > 8) continue;
         for (const child of element.children) {
-          const css = styleFor(child), box = child.getBoundingClientRect();
+          const css = styleFor(child), box = boxFor(child);
           const fading = `${css.backgroundImage} ${css.maskImage ?? "none"}`;
           if (css.position !== "absolute" || css.pointerEvents !== "none" || child.textContent.trim()
               || child.querySelector("img,svg,video,canvas,input,button,a,[tabindex]")
@@ -856,7 +875,7 @@
           // Once its truncation mask is removed, reserve the whole text height.
           const flowBottom = Math.max(now.box.top, ...[...element.children]
             .filter((item) => !["absolute", "fixed"].includes(styleFor(item).position))
-            .map((item) => item.getBoundingClientRect().bottom));
+            .map((item) => boxFor(item).bottom));
           write(element, "min-height", `${heightForBox(element, Math.max(before.box.height, flowBottom - now.box.top + now.paddingBottom + now.borderBottom))}px`, "expand");
         }
       }
@@ -929,13 +948,13 @@
     const branchBounds = (element) => {
       const texts = ["auto", "scroll"].includes(styleFor(element).overflowY)
         ? [] : containedRects(element);
-      return bounds(texts) ?? rect(element.getBoundingClientRect());
+      return bounds(texts) ?? rect(boxFor(element));
     };
     const repairSiblings = () => {
       for (const [parent, before] of baseline) {
         if (parent.children.length < 2 || parent.children.length > 16) continue;
         const children = [...parent.children].filter((child) => baseline.has(child)
-          && baseline.get(child).position !== "fixed" && visible(child, styleFor(child))
+          && baseline.get(child).position !== "fixed" && visible(child, styleFor(child), false, styleFor, boxFor, hasBox)
           // Full-cover empty artwork is an overlay, not a flow column. Its
           // intentional overlap cannot wrap a viewport's sidebar/content row.
           && !(baseline.get(child).position === "absolute" && !containedText(child).length
@@ -960,7 +979,7 @@
           // Percentage-sized media can have a zero intrinsic flex basis. Do
           // not erase their measured footprint when relaxing text min-widths.
           for (const child of children) {
-            const old = baseline.get(child), box = child.getBoundingClientRect();
+            const old = baseline.get(child), box = boxFor(child);
             const threshold = old.box.width >= before.box.width * 0.85 ? 0.85 : 0.5;
             if (old.box.width < 40 || box.width >= old.box.width * threshold || !hasVisualBackground(child)) continue;
             const width = Math.min(old.box.width, parent.clientWidth);
@@ -1000,7 +1019,7 @@
               const gap = Math.max(2, oldChild.top - oldPrevious.bottom);
               const delta = Math.max(
                 branchBounds(previous).bottom + gap - branchBounds(child).top,
-                previous.getBoundingClientRect().bottom + gap - child.getBoundingClientRect().top
+                boxFor(previous).bottom + gap - boxFor(child).top
               );
               if (delta > EPSILON) {
                 const top = parseFloat(styleFor(child).top) || child.offsetTop;
@@ -1021,7 +1040,7 @@
               if (preceding === child || ["absolute", "fixed"].includes(baseline.get(preceding).position)) continue;
               const previous = baseline.get(preceding).contentBounds ?? baseline.get(preceding).box;
               if (previous.bottom > old.box.top + EPSILON) continue;
-              const current = branchBounds(preceding), box = child.getBoundingClientRect();
+              const current = branchBounds(preceding), box = boxFor(child);
               if (current.right <= box.left || current.left >= box.right) continue;
               const delta = current.bottom + Math.max(2, old.box.top - previous.bottom) - box.top;
               if (delta > EPSILON && delta < innerHeight * 0.5) write(child, "top", `${Math.ceil((parseFloat(styleFor(child).top) || child.offsetTop) + delta)}px`, "reflow");
@@ -1030,12 +1049,12 @@
           for (const child of children) {
             const image = child.matches("img,picture,video,canvas") || (!containedText(child).length && child.querySelector("img,picture,video,svg,canvas"));
             if (!image || !["absolute", "fixed"].includes(baseline.get(child).position)) continue;
-            const currentArt = child.getBoundingClientRect();
+            const currentArt = boxFor(child);
             const newlyCovered = children.some((sibling) => sibling !== child && containedText(sibling).length
               // Artwork already under painted text is a layered backdrop. A
               // larger caption does not turn that background into a flow row.
               && intersection(baseline.get(sibling).contentBounds ?? baseline.get(sibling).box, baseline.get(child).box) <= 8
-              && intersection(bounds(containedRects(sibling)) ?? sibling.getBoundingClientRect(), currentArt)
+              && intersection(bounds(containedRects(sibling)) ?? boxFor(sibling), currentArt)
                 > intersection(baseline.get(sibling).contentBounds ?? baseline.get(sibling).box, baseline.get(child).box) + 8);
             // Another pair's collision does not give every decorative image a
             // flow slot. Move only artwork actually reached by enlarged text.
@@ -1070,7 +1089,7 @@
           // Relative/fixed-height blocks can paint text into their next sibling.
           for (let i = 0; i < children.length - 1; i++) {
             const child = children[i];
-            const box = child.getBoundingClientRect();
+            const box = boxFor(child);
             const text = branchBounds(child);
             if (text.bottom > box.bottom + EPSILON && baseline.get(child).position !== "absolute") {
               write(child, "min-height", `${heightForBox(child, box.height + text.bottom - box.bottom + 4)}px`, "reflow");
@@ -1098,7 +1117,7 @@
         const grows = now.box.height > before.box.height + EPSILON || now.scrollHeight > before.scrollHeight + EPSILON;
         const missingControl = [...panel.querySelectorAll("button,input,select,a[href],[role='button']")].some((item) => {
           const old = baseline.get(item);
-          const box = item.getBoundingClientRect();
+          const box = boxFor(item);
           return old && old.box.bottom <= innerHeight + EPSILON && old.box.top >= -EPSILON && (box.bottom > innerHeight + EPSILON || box.top < -EPSILON || box.bottom > now.box.bottom + EPSILON);
         });
         const escapesViewport = now.box.top < -EPSILON || now.box.bottom > innerHeight + EPSILON;
@@ -1119,7 +1138,7 @@
             if (!group || group === panel || group !== group.parentElement?.lastElementChild) continue;
             const old = baseline.get(group), current = snapshot(group, true);
             if (!old || !current || old.box.bottom > before.box.bottom + EPSILON || old.box.bottom > innerHeight + EPSILON) continue;
-            if (current.box.bottom <= Math.min(innerHeight, panel.getBoundingClientRect().bottom) + EPSILON) continue;
+            if (current.box.bottom <= Math.min(innerHeight, boxFor(panel).bottom) + EPSILON) continue;
             if (containedText(group).some((item) => !item.closest("button,input[type='button'],input[type='submit']"))) continue;
             let background = ancestor(group);
             while (background && styleFor(background).backgroundColor === "rgba(0, 0, 0, 0)") background = ancestor(background);
@@ -1147,7 +1166,7 @@
         for (const child of panel.querySelectorAll("*")) {
           const childStyle = styleFor(child);
           if (!["absolute", "fixed"].includes(childStyle.position) || !child.querySelector("button,input,[role='button']")) continue;
-          if (!containedText(child).length || child.getBoundingClientRect().width < now.box.width * 0.45) continue;
+          if (!containedText(child).length || boxFor(child).width < now.box.width * 0.45) continue;
           write(child, "position", "relative", "bounded-panel");
           write(child, "inset", "auto", "bounded-panel");
           write(child, "height", "auto", "bounded-panel");
@@ -1158,7 +1177,7 @@
           // bound so newly revealed controls do not lose their bottom edge.
           const settled = snapshot(panel, true);
           if (settled) writePanelConstraint(panel, "height", `${Math.ceil(Math.min(limit, Math.max(settled.box.height, settled.scrollHeight)))}px`);
-          const reservation = panelReservations.get(panel), finalBox = panel.getBoundingClientRect();
+          const reservation = panelReservations.get(panel), finalBox = boxFor(panel);
           if (reservation?.sibling.isConnected && finalBox.height > before.box.height + EPSILON) {
             writePanelConstraint(reservation.sibling, "height", `${heightForBox(reservation.sibling,
               reservation.before.box.height + finalBox.height - before.box.height)}px`);
@@ -1225,7 +1244,7 @@
           const branch = [...container.children].find((item) => {
             const css = styleFor(item);
             return parseFloat(css.marginTop) < 0 && !["absolute", "fixed"].includes(css.position)
-              && containedText(item).length && item.getBoundingClientRect().top < now.box.top;
+              && containedText(item).length && boxFor(item).top < now.box.top;
           });
           if (branch) {
             write(branch, "margin-top", `${parseFloat(styleFor(branch).marginTop) + topClip + 2}px`, "expose-text-top");
@@ -1281,7 +1300,7 @@
         for (let depth = 0; parent && depth < 6; depth++, parent = ancestor(parent)) {
           const style = styleFor(parent);
           const images = [...parent.querySelectorAll(":scope > img,:scope > video,:scope > picture > img,:scope > div > img,:scope > div > picture > img,:scope > div > div > img,:scope > div > div > picture > img")];
-          const hasImage = /url\(/.test(style.backgroundImage) || images.some((image) => intersection(image.getBoundingClientRect(), element.getBoundingClientRect()) > 0);
+          const hasImage = /url\(/.test(style.backgroundImage) || images.some((image) => intersection(boxFor(image), boxFor(element)) > 0);
           if (hasImage) { imageContainer = parent; break; }
         }
         if (!imageContainer) continue;
@@ -1323,7 +1342,7 @@
           if (!color || (color.alpha > 0 && color.alpha < 1)) { safe = false; break; }
           if (color.alpha === 1) {
             const media = current.querySelectorAll("img,video,canvas,svg");
-            if (media.length > 128 || [...media].some((item) => intersection(item.getBoundingClientRect(), now.text) > 0)) safe = false;
+            if (media.length > 128 || [...media].some((item) => intersection(boxFor(item), now.text) > 0)) safe = false;
             background = color; break;
           }
         }
@@ -1386,11 +1405,11 @@
           }
           let container = parent;
           for (let depth = 0; container && depth < 6; depth++, container = ancestor(container)) {
-            const original = baseline.get(container), box = container.getBoundingClientRect();
+            const original = baseline.get(container), box = boxFor(container);
             if (!original || original.box.height < before.box.height * 0.8 || original.box.width < before.box.width) continue;
             const oldOverflow = Math.max(0, before.box.bottom - original.box.bottom);
             if (original.box.top > before.box.top + EPSILON || oldOverflow > Math.max(20, before.box.height * 0.05)) continue;
-            const additional = backdrop.getBoundingClientRect().bottom - box.bottom;
+            const additional = boxFor(backdrop).bottom - box.bottom;
             if (additional > EPSILON) {
               write(container, "min-height", `${heightForBox(container, box.height + additional)}px`, "border-backdrop");
               write(container, "height", "auto", "border-backdrop");
@@ -1407,7 +1426,7 @@
         if (!parent || before.box.width < 40) continue;
         const display = styleFor(parent).display;
         if (!display.includes("flex") && !display.includes("grid")) continue;
-        const box = element.getBoundingClientRect();
+        const box = boxFor(element);
         const threshold = before.box.width >= (baseline.get(parent)?.box.width ?? Infinity) * 0.85 ? 0.85 : 0.5;
         if (box.width >= before.box.width * threshold || !hasVisualBackground(element)) continue;
         const width = Math.min(before.box.width, parent.clientWidth);
@@ -1430,7 +1449,7 @@
         if (children.length < 2 || children.some((child) => baseline.get(child).box.bottom > before.box.bottom + EPSILON)) continue;
         const now = snapshot(parent);
         if (!now || ["auto", "scroll"].includes(now.overflowY)) continue;
-        const bottom = Math.max(...children.map((child) => child.getBoundingClientRect().bottom));
+        const bottom = Math.max(...children.map((child) => boxFor(child).bottom));
         const growth = bottom + now.paddingBottom + now.borderBottom - now.box.bottom;
         if (growth <= EPSILON || growth > innerHeight * 2) continue;
         write(parent, "min-height", `${heightForBox(parent, now.box.height + growth)}px`, "float-containment");
@@ -1441,12 +1460,12 @@
       if (!baseline.size) return;
       for (const [mask, { track, active, offset }] of maskedTickers) {
         if (!mask.isConnected || !active.isConnected) continue;
-        const before = baseline.get(mask), box = active.getBoundingClientRect();
+        const before = baseline.get(mask), box = boxFor(active);
         const matrix = new DOMMatrixReadOnly(styleFor(track).transform);
         const height = Math.max(before.authoredHeight, box.height + before.paddingTop + before.paddingBottom);
         write(mask, "height", `${Math.ceil(height)}px`, "active-ticker-frame");
         write(mask, "max-height", "none", "active-ticker-frame");
-        const delta = mask.getBoundingClientRect().top + offset - active.getBoundingClientRect().top;
+        const delta = boxFor(mask).top + offset - boxFor(active).top;
         if (Math.abs(delta) > 0.1) {
           write(track, "transform", `matrix(${matrix.a}, ${matrix.b}, ${matrix.c}, ${matrix.d}, ${matrix.e}, ${matrix.f + delta})`, "active-ticker-frame");
         }
@@ -1477,7 +1496,7 @@
         const css = styleFor(element);
         if (css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0) continue;
         oldBoxes.push(...old.texts, ...(control(element) ? [old.box] : []));
-        currentBoxes.push(...directTextRects(element), ...(control(element) ? [rect(element.getBoundingClientRect())] : []));
+        currentBoxes.push(...directTextRects(element), ...(control(element) ? [rect(boxFor(element))] : []));
       }
       const before = bounds(oldBoxes), now = bounds(currentBoxes);
       if (!before || !now) return null;
