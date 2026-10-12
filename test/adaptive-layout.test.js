@@ -613,6 +613,59 @@ test("nested alert choices settle through rapid refreshes without replaying owne
   await page.evaluate(()=>layout.restore());const restored=await page.evaluate(()=>{const p=document.querySelector('.alert');return {style:p.getAttribute('style'),properties:getComputedStyle(p).transitionProperty,durations:getComputedStyle(p).transitionDuration,actions:document.querySelector('.actions').getAttribute('style')};});assert.equal(restored.style,null);assert.equal(restored.actions,null);assert.equal(restored.properties,'all, opacity');assert.equal(restored.durations,'0.334s, 0.7s');await page.close();
 });
 
+test("viewport shells preserve percentage-height logo spacing and bottom-aligned footers", async () => {
+  const page = await prepare(`<style>
+    html,body{height:100%;margin:0;font:14px Arial}
+    .shell{display:flex;flex-direction:column;height:100%}
+    header{height:60px;flex-shrink:0}
+    .logo{height:calc(100% - 560px);max-height:290px;min-height:92px;flex-shrink:0;display:flex;align-items:end;justify-content:center}
+    .logo svg{height:92px;width:272px}.search{padding:26px}.space{flex-grow:1}
+    footer{line-height:14px;padding:15px}p{margin:0}
+  </style><div class="shell"><header><a>About</a></header><div class="logo"><svg></svg></div>
+    <div class="search"><button>Google Search</button></div><div class="space"></div>
+    <footer><p>Germany</p><a>Privacy</a></footer></div>`, { width: 1200, height: 900 },
+  'a,p,button{font-size:15.4px!important;line-height:1.6!important;letter-spacing:.02em!important}');
+  const metrics = () => page.evaluate(() => ({
+    shell: document.querySelector('.shell').getBoundingClientRect().height,
+    logo: document.querySelector('.logo').getBoundingClientRect().height,
+    footer: document.querySelector('footer').getBoundingClientRect().bottom,
+    repair: document.querySelector('.shell').getAttribute('data-lexend-layout-repair')
+  }));
+  const first = await metrics();
+  assert.match(first.repair, /expand/);
+  assert.equal(first.shell, 900);
+  assert.equal(first.logo, 290);
+  assert.equal(first.footer, 900);
+  await page.evaluate(() => { for (let i = 0; i < 5; i++) { layout.capture(); layout.repair(); } });
+  assert.deepEqual(await metrics(), first);
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.evaluate(() => { layout.capture(); layout.repair(); });
+  const resized = await metrics();
+  assert.equal(resized.shell, 800);
+  assert.equal(resized.logo, 240);
+  assert.equal(resized.footer, 800);
+  assert.equal(await page.evaluate(() => { layout.restore(); return document.querySelector('.shell').getAttribute('style'); }), null);
+  await page.close();
+});
+
+test("viewport shells still grow when enlarged flow content exceeds the viewport", async () => {
+  const page = await prepare(`<style>
+    html,body{height:100%;margin:0;font:14px/20px Arial}
+    .shell{display:flex;flex-direction:column;height:100%}
+    header{height:60px;flex-shrink:0}main{height:500px;flex-shrink:0}footer{flex-shrink:0}p{margin:0}
+  </style><div class="shell"><header><a>About</a></header><main><p>Search</p></main>
+    <footer><p>Germany</p><p>Privacy</p></footer></div>`, { width: 1200, height: 600 });
+  const state = await page.evaluate(() => {
+    const shell = document.querySelector('.shell'), footer = document.querySelector('footer');
+    return { height: shell.getBoundingClientRect().height, bottom: footer.getBoundingClientRect().bottom,
+      scroll: shell.scrollHeight, client: shell.clientHeight };
+  });
+  assert.ok(state.height > 600);
+  assert.ok(state.bottom <= state.height + 1);
+  assert.ok(state.scroll <= state.client + 1);
+  await page.close();
+});
+
 test("full-cover empty overlays cannot reflow the columns owning a native viewport scroller", async () => {
   const page=await prepare(`<style>body{margin:0;overflow:hidden;font:16px/20px Arial}.shell{position:relative;display:flex;flex-direction:row;width:390px;height:600px;overflow:hidden}.rail{width:50px;flex-shrink:0}.main{width:340px;height:600px;overflow:hidden}.scroll{height:100%;overflow-y:auto}.copy{min-height:590px}.cover{position:absolute;inset:0;pointer-events:none}p{margin:0}a{display:block;width:100px}.last{margin-top:570px}</style><div class="shell"><aside class="rail"><p>Rail</p></aside><main class="main"><div class="scroll" tabindex="0"><section class="copy"><p>Browse readable categories</p><a class="last" href="#native">Music and DJs</a></section></div></main><div class="cover"><canvas width="390" height="600"></canvas></div></div>`,{width:390,height:600},'p,a{font-size:26.4px!important;line-height:1.6!important;letter-spacing:.02em!important}');
   const first=await page.evaluate(()=>{const e=document.querySelector('.scroll'),m=document.querySelector('main');return {main:m.getBoundingClientRect().toJSON(),client:e.clientHeight,scroll:e.scrollHeight,wrap:getComputedStyle(document.querySelector('.shell')).flexWrap,cover:getComputedStyle(document.querySelector('.cover')).position};});assert.equal(first.main.left,50);assert.equal(first.main.top,0);assert.equal(first.client,600);assert.ok(first.scroll>600);assert.equal(first.wrap,'nowrap');assert.equal(first.cover,'absolute');

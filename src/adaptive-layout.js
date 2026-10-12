@@ -232,14 +232,24 @@
       }
       values.get(name).applied = next;
     };
-    const restore = () => {
+    const restore = ({ preserveHidden = false } = {}) => {
       invalidateMeasurements();
+      // visibility:hidden still occupies layout space. Responsive navigation
+      // measures that space to decide which links belong in its overflow menu.
+      // Dropping repairs just because those links are unpainted changes the
+      // measurement and makes the site alternate between two layouts forever.
+      const retained = new Set();
+      if (preserveHidden) for (const element of edits.keys()) {
+        if (element.isConnected && getComputedStyle(element).visibility === "hidden"
+            && element.getClientRects().length) retained.add(element);
+      }
       for (const [element, offset] of maskedScrollOffsets) {
         const owned = edits.get(element)?.get("overflow-x");
         if (owned && element.style.getPropertyValue("overflow-x") === owned.applied) element.scrollLeft = offset;
       }
       maskedScrollOffsets.clear();
       for (const [element, properties] of edits) {
+        if (retained.has(element)) continue;
         const restoreProperty = (property, original) => {
           // The site may have changed its inline style since our last pass.
           if (element.style.getPropertyValue(property) !== original.applied || element.style.getPropertyPriority(property) !== original.appliedPriority) return;
@@ -256,21 +266,25 @@
         if (!element.getAttribute("style") && !originalStylePresence.get(element)) element.removeAttribute("style");
       }
       for (const [element, values] of attributes) {
+        if (retained.has(element)) continue;
         for (const [name, original] of values) {
           if (element.getAttribute(name) !== original.applied) continue;
           if (original.value === null) element.removeAttribute(name);
           else element.setAttribute(name, original.value);
         }
       }
-      edits.clear(); attributes.clear(); originalStylePresence.clear();
+      for (const element of edits.keys()) if (!retained.has(element)) edits.delete(element);
+      for (const element of attributes.keys()) if (!retained.has(element)) attributes.delete(element);
+      for (const element of originalStylePresence.keys()) if (!retained.has(element)) originalStylePresence.delete(element);
       for (const [table, wrapper] of tableWrappers) {
+        if (retained.has(wrapper)) continue;
         if (table.parentNode === wrapper && wrapper.parentNode) wrapper.parentNode.insertBefore(table, wrapper);
         if (!wrapper.childNodes.length) wrapper.remove();
+        tableWrappers.delete(table);
       }
-      tableWrappers.clear();
     };
-    const captureBaseline = (roots = [document.documentElement]) => {
-      restore();
+    const captureBaseline = (roots = [document.documentElement], options) => {
+      restore(options);
       baseline = new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
       return withStylesDisabled(() => {
         panelReservations = new Map();
@@ -810,14 +824,36 @@
     const expandContainer = (element, now, additional, category) => {
       const css = styleFor(element);
       const definite = Number.parseFloat(css.height);
+      const before = baseline.get(element);
       // Percentage-height image layers need a definite containing-block height.
       // 'auto' can erase photographs or collapse background layers to zero.
       if (needsDefiniteHeight(element, now) && Number.isFinite(definite)) {
         write(element, "height", `${Math.ceil(definite + Math.max(0, additional))}px`, category);
+        write(element, "max-height", "none", category);
       } else {
+        // Removing a height can erase flex/grid space or invalidate children's
+        // percentage heights, even below a header, inside a narrow column, or
+        // after scrolling. Measure that effect instead of matching a viewport.
+        const children = [...element.children].filter((child) =>
+          !["absolute", "fixed"].includes(styleFor(child).position))
+          .map((child) => ({ child, height: child.getBoundingClientRect().height }));
         write(element, "height", "auto", category);
+        write(element, "max-height", "none", category);
+        const expanded = element.getBoundingClientRect();
+        const lostSpace = expanded.height < now.box.height - 0.5
+          || children.some(({ child, height }) => child.getBoundingClientRect().height < height - EPSILON);
+        if (lostSpace && Number.isFinite(definite)) {
+          // Glyphs may exceed a tight line box without overflowing its page.
+          // Only new scrollable overflow warrants more height; counting glyph
+          // bounds here repeatedly grows bottom-aligned layouts on each pass.
+          const oldOverflow = before ? Math.max(0, before.scrollHeight - before.clientHeight) : 0;
+          const growth = Math.max(0, now.scrollHeight - now.clientHeight - oldOverflow);
+          // Retain fractional CSS pixels. Rounding a viewport height upward
+          // can create a scrollbar and narrow the entire page at browser zoom.
+          const height = Math.max(definite + growth, parseFloat(styleFor(element).height) || 0);
+          write(element, "height", `${height}px`, category);
+        }
       }
-      write(element, "max-height", "none", category);
     };
     const repairExpandedFades = () => {
       for (const [element, before] of baseline) {
@@ -1489,7 +1525,7 @@
       if (requiredHeight > limit) return null;
       return { baselineHeight: frameQualification.baselineHeight, requiredHeight, viewportHeight };
     };
-    const capture = (roots) => withMeasurements(() => captureBaseline(roots));
+    const capture = (roots, options) => withMeasurements(() => captureBaseline(roots, options));
     const repair = () => withMeasurements(repairLayout);
     return Object.freeze({ capture, repair, restore, getFrameRequirement, refresh: (roots) => { capture(roots); repair(); } });
   };
