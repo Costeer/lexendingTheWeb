@@ -16,6 +16,19 @@ These adjustments use the page's measured layout, with no rules for specific
 websites. Text added later, window resizing, and newly loaded fonts trigger
 another check. Focus and scroll positions are preserved.
 
+Height repairs follow the same rules at every window size:
+
+- Expanding text must not shrink its container or erase space allocated to
+  children. A repair measures the effect of `height: auto` before keeping it.
+- Keep a definite height when automatic sizing would collapse flex or grid
+  space, or a child's percentage height. This also applies to narrow columns,
+  containers below a header, and pages that have already been scrolled.
+- Grow preserved heights only for new overflow. Glyphs extending beyond a
+  tight line box must not add page height on every refresh. Preserve fractional
+  heights so browser zoom does not introduce an extra scrollbar.
+- Recalculate from the site's styles after a resize, and restore those styles
+  when Lexend is paused. Existing scrolling regions keep their own bounds.
+
 With **Default** line height and letter spacing, enlarging or shrinking text
 scales the site's spacing with it. An explicit spacing setting takes priority;
 font-dependent `normal` line height still follows the font's natural metrics.
@@ -27,8 +40,9 @@ fallback fonts.
 Pausing restores the styles the extension changed while keeping later updates
 made by the site. If a page still looks wrong, use **Pause here** in the popup.
 
-Layout measurements are reused within each synchronous pass and invalidated
-after a repair changes the page. Protected code and editor subtrees inherit
+Layout measurements, element boxes, and generated-text styles are reused within
+each synchronous pass and invalidated after a repair changes the page.
+Protected code and editor subtrees inherit
 their original typography from the boundary without styling every token.
 Paused pages skip refreshes; theme changes and rules for other sites also
 avoid remeasuring the page.

@@ -29,6 +29,15 @@ const prepare = async (context, saved = { enabled: true, scope: "all", textScale
     };
     const create = LexendLayout.create;
     globalThis.fontReadyAtCapture = [];
+    globalThis.preloadedReadingWeights = new Set();
+    const load = document.fonts.load.bind(document.fonts);
+    document.fonts.load = async (font, ...args) => {
+      const faces = await load(font, ...args);
+      if (faces.some(face => face.family.replace(/["']/g, "") === "Lexend for the Web" && face.status === "loaded")) {
+        preloadedReadingWeights.add(parseInt(font, 10));
+      }
+      return faces;
+    };
     globalThis.fontFrameBeforeRepair = false;
     globalThis.repairFrames = [];
     LexendLayout = { create: (options) => {
@@ -37,8 +46,10 @@ const prepare = async (context, saved = { enabled: true, scope: "all", textScale
         requestAnimationFrame(() => {
           fontFrameBeforeRepair = getComputedStyle(document.querySelector("#text")).fontFamily.includes("Lexend") && state().pending;
         });
-        fontReadyAtCapture.push(document.fonts.check('400 20px "Lexend for the Web"', "Read")
-          && document.fonts.check('700 20px "Lexend for the Web"', "Bold"));
+        // Native capture temporarily disables conversion CSS. Chromium can
+        // recreate unloaded FontFace wrappers for already decoded sources at
+        // that boundary; record the real preload's completion instead.
+        fontReadyAtCapture.push(preloadedReadingWeights.has(400) && preloadedReadingWeights.has(700));
         return layout.capture(...args);
       }, repair: (...args) => {
         repairFrames.push(fontFrameBeforeRepair);
@@ -169,5 +180,61 @@ test("rapid settings changes cancel older deferred repairs and preserve interven
     await page.waitForTimeout(150);
     assert.equal(await page.evaluate(() => state().pending), false);
     assert.equal(await page.locator("#text").getAttribute("style"), null, "an obsolete scheduled repair cannot restore paused overrides");
+  } finally { await context.close(); }
+});
+
+test("temporary author styles finish a suspended repair without repeating conversion", async () => {
+  const context = await createContext(browser);
+  try {
+    const page = await prepare(context);
+    await page.waitForFunction(() => !state().pending);
+    const before = await page.evaluate(async () => {
+      // Keep the rendering callbacks parked so the author changes arrive
+      // between conversion and repair, regardless of host scheduling speed.
+      let id = 0;
+      const frames = new Map();
+      globalThis.requestAnimationFrame = callback => { frames.set(++id, callback); return id; };
+      globalThis.cancelAnimationFrame = id => frames.delete(id);
+      const before = { captures: fontReadyAtCapture.length, repairs: repairFrames.length };
+      update({ textScale: 140 });
+      const label = document.querySelector("#text");
+      label.style.setProperty("--temporary-theme", "#ddd");
+      await Promise.resolve();
+      label.style.removeProperty("--temporary-theme");
+      await Promise.resolve();
+      return { ...before, revision: state().refreshRevision, pending: state().pending };
+    });
+    assert.equal(before.pending, true);
+    await page.waitForFunction(() => !state().pending);
+    assert.equal(await page.evaluate(() => fontReadyAtCapture.length), before.captures + 1,
+      "reverted author styles keep the existing native baseline");
+    assert.equal(await page.evaluate(() => repairFrames.length), before.repairs + 1,
+      "suspending the animation frames cannot lose the pending repair");
+    assert.equal(await page.evaluate(() => state().refreshRevision), before.revision);
+    assert.equal(await page.locator("#text").evaluate(element => getComputedStyle(element).fontSize), "28px");
+    assert.equal(await page.evaluate(() => state().healthy), true);
+  } finally { await context.close(); }
+});
+
+test("incoming content invalidates a deferred baseline and receives a complete repair", async () => {
+  const context = await createContext(browser);
+  try {
+    const page = await prepare(context);
+    await page.waitForFunction(() => !state().pending);
+    const before = await page.evaluate(async () => {
+      const before = { captures: fontReadyAtCapture.length, repairs: repairFrames.length };
+      update({ textScale: 140 });
+      document.body.insertAdjacentHTML("beforeend", '<p id="incoming">New reading text</p>');
+      await Promise.resolve();
+      return { ...before, family: getComputedStyle(document.querySelector("#incoming")).fontFamily };
+    });
+    assert.match(before.family, /Lexend/, "new text receives its font before recapture");
+    await page.waitForFunction(() => !state().pending);
+    assert.equal(await page.evaluate(() => fontReadyAtCapture.length), before.captures + 2,
+      "changed content gets a fresh baseline after invalidating the old one");
+    assert.equal(await page.evaluate(() => repairFrames.length), before.repairs + 1,
+      "only the current content's baseline is repaired");
+    assert.equal(await page.locator("#incoming").evaluate(element => getComputedStyle(element).fontSize), "28px");
+    assert.equal(await page.evaluate(() => state().healthy), true);
   } finally { await context.close(); }
 });

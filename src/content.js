@@ -25,9 +25,13 @@
   const codeFont = /monospace|mono\b|menlo|monaco|consolas|courier|iosevka|fira[\s-]*code|source[\s-]*code/i;
   const TEXT_ATTRIBUTE = "data-lexend-text";
   const PROTECTED_ATTRIBUTE = "data-lexend-protected";
+  const FONT_ATTRIBUTE = "data-lexend-font";
   const managedElements = new Map();
+  const authorFontFamilies = new Map();
   const eligibleTextRoots = new Map();
   const transitionRules = new Map();
+  const retainedStyleRules = new Map();
+  let retainedStyleId = 0;
   const transitionAttributes = ["data-lexend-transition", "data-lexend-before-transition", "data-lexend-after-transition"];
   const settledFontFaces = new WeakSet();
   const settledBundledFaces = new Set();
@@ -37,7 +41,12 @@
   let refreshRevision = 0;
   let refreshing = false;
   let repairFrame = null;
+  let pendingRepair = null;
   let repairSynchronously = false;
+  let nextRefreshTime = 0;
+  let refreshRequired = false;
+  const pendingAriaChanges = new Map();
+  const pendingStyleChanges = new Map();
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
@@ -277,6 +286,9 @@
       letter-spacing: var(--lexend-${prefix}spacing) !important;
     `;
     return `
+      [${FONT_ATTRIBUTE}] { font-family: var(--lexend-family) !important; }
+      [data-lexend-before='font']::before { font-family: var(--lexend-before-family) !important; }
+      [data-lexend-after='font']::after { font-family: var(--lexend-after-family) !important; }
       [${TEXT_ATTRIBUTE}] { ${converted()} }
       [${PROTECTED_ATTRIBUTE}] { ${preserved()} }
       [data-lexend-before='text']::before { ${converted("before-")} }
@@ -289,6 +301,9 @@
       /* Slotted light-DOM text belongs to an inner shadow cascade. Important
          author ::slotted declarations outrank outer inline-important styles. */
       @layer lexend-slotted-typography {
+        ::slotted([${FONT_ATTRIBUTE}]) { font-family: var(--lexend-family) !important; }
+        ::slotted([data-lexend-before='font'])::before { font-family: var(--lexend-before-family) !important; }
+        ::slotted([data-lexend-after='font'])::after { font-family: var(--lexend-after-family) !important; }
         ::slotted([${TEXT_ATTRIBUTE}]), ::slotted([${PROTECTED_ATTRIBUTE}]) { ${converted()} }
         ::slotted([data-lexend-before='text'])::before, ::slotted([data-lexend-before='protected'])::before { ${converted("before-")} }
         ::slotted([data-lexend-after='text'])::after, ::slotted([data-lexend-after='protected'])::after { ${converted("after-")} }
@@ -320,7 +335,7 @@
     return false;
   };
   const primaryFont = (family) => family.split(",")[0].replace(/["']/g, "").trim();
-  const protectedFont = (style) => iconFont.test(primaryFont(style.fontFamily)) || codeFont.test(style.fontFamily);
+  const protectedFont = (family) => iconFont.test(primaryFont(family)) || codeFont.test(family);
   const privateGlyphs = /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/gu;
   const containsPrivateGlyph = (text) => /[\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u.test(text);
   const onlyPrivateGlyphs = (text) => containsPrivateGlyph(text) && !text.replace(privateGlyphs, "").replace(/[\s"']/g, "");
@@ -431,10 +446,73 @@
     property.appliedValue = element.style.getPropertyValue(name);
     property.appliedPriority = element.style.getPropertyPriority(name);
   };
+  // Compare author declarations, not the temporary typography overrides a
+  // framework may remove when it reapplies its style prop. Restoring an
+  // unchanged author style must not restart a full-page baseline/repair cycle.
+  const authorStyle = document.createElement("span").style;
+  const authorStyleSignature = (element, cssText) => {
+    authorStyle.cssText = cssText ?? "";
+    for (const [name, property] of managedElements.get(element)?.properties ?? []) {
+      if (authorStyle.getPropertyValue(name) !== property.appliedValue
+          || authorStyle.getPropertyPriority(name) !== property.appliedPriority) continue;
+      if (property.value) authorStyle.setProperty(name, property.value, property.priority);
+      else authorStyle.removeProperty(name);
+    }
+    // Declaration order is immaterial after CSSOM has resolved shorthands.
+    return JSON.stringify([...authorStyle].sort().map(name =>
+      [name, authorStyle.getPropertyValue(name), authorStyle.getPropertyPriority(name)]));
+  };
+  const retainTypographyInStylesheet = (element, state) => {
+    // This notification may contain a newer author declaration than the
+    // inline write it answered. Keep it for future edits, cloning and pause.
+    for (const [name, property] of state.properties) {
+      const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+      if (value === property.appliedValue && priority === property.appliedPriority) continue;
+      property.value = value;
+      property.priority = priority;
+    }
+    setAttribute(element, "data-lexend-original-typography", JSON.stringify({
+      hadStyle: state.hadStyle,
+      properties: [...state.properties].map(([name, { value, priority }]) => [name, value, priority])
+    }));
+    if (state.retainedStyle) return;
+    // A style-prop observer can immediately remove our inline declarations
+    // again. Keep this element's values in our existing reversible stylesheet
+    // instead of repeatedly fighting that observer or refreshing the page.
+    const root = element.getRootNode();
+    const sheet = (root instanceof ShadowRoot ? root : document.documentElement)
+      .querySelector(`#${STYLE_ID}`)?.sheet;
+    if (!sheet) return;
+    const id = String(++retainedStyleId);
+    const index = sheet.insertRule(`[data-lexend-retained='${id}'] {}`, sheet.cssRules.length);
+    const style = sheet.cssRules[index].style;
+    for (const [name, property] of state.properties) {
+      style.setProperty(name, property.appliedValue, property.appliedPriority);
+    }
+    if (!retainedStyleRules.has(sheet)) retainedStyleRules.set(sheet, []);
+    retainedStyleRules.get(sheet).push(index);
+    state.retainedStyle = true;
+    setAttribute(element, "data-lexend-retained", id);
+  };
   const retainOverwrittenTypography = (element) => {
     const state = managedElements.get(element);
-    if (!state || !element.isConnected || retainedTypography.has(element)
-        || (retentionWrites.get(element) ?? 0) >= 32 || !isActive()) return;
+    if (!state || !element.isConnected || !isActive()) return;
+    // The stylesheet handles repeated copies of the same author baseline.
+    // A later, genuinely different declaration still gets immediate retention
+    // while the scheduled pass measures its new typography.
+    if (state.retainedStyle && ![...state.properties].some(([name, property]) => {
+      const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+      return (value !== property.appliedValue || priority !== property.appliedPriority)
+        && (value !== property.value || priority !== property.priority);
+    })) return;
+    if (retainedTypography.has(element) || (retentionWrites.get(element) ?? 0) >= 32) {
+      if ([...state.properties].some(([name, property]) =>
+        element.style.getPropertyValue(name) !== property.appliedValue
+        || element.style.getPropertyPriority(name) !== property.appliedPriority)) {
+        retainTypographyInStylesheet(element, state);
+      }
+      return;
+    }
     let overwritten = false;
     state.properties.forEach((property, name) => {
       const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
@@ -472,11 +550,14 @@
     // cloneNode copies inline overrides but not WeakMap/Map ownership. Carry a
     // small author-state record so cloned cards start from the page's baseline.
     const clones = [];
-    roots.forEach((root) => root.querySelectorAll("[data-lexend-original-typography]").forEach((element) => {
+    roots.forEach((root) => [
+      ...(root.matches?.("[data-lexend-original-typography]") ? [root] : []),
+      ...root.querySelectorAll("[data-lexend-original-typography]")
+    ].forEach((element) => {
       if (managedElements.has(element)) return;
       try {
         const original = JSON.parse(element.getAttribute("data-lexend-original-typography"));
-        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, "data-lexend-before", "data-lexend-after"]) element.removeAttribute(attribute);
+        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", "data-lexend-retained"]) element.removeAttribute(attribute);
         original.properties.filter(([name]) => name !== "transition-property").forEach(([name, value, priority]) => {
           if (value) element.style.setProperty(name, value, priority);
           else element.style.removeProperty(name);
@@ -487,22 +568,43 @@
     // Inherited font changes can animate in nontext wrappers between a cloned
     // control and its label. Restore the whole branch before releasing guards.
     for (const { element, original } of clones) {
+      if (original.properties.some(([name]) => name === "transition-property")) getComputedStyle(element).fontSize;
+      for (const pseudo of ["before", "after"]) {
+        if (element.hasAttribute(`data-lexend-${pseudo}-transition`)) getComputedStyle(element, `::${pseudo}`).fontSize;
+      }
+    }
+    for (const { element, original } of clones) {
       try {
         const transition = original.properties.find(([name]) => name === "transition-property");
         if (transition) {
-          getComputedStyle(element).fontSize;
           if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
           else element.style.removeProperty(transition[0]);
         }
-        for (const pseudo of ["before", "after"]) {
-          if (element.hasAttribute(`data-lexend-${pseudo}-transition`)) getComputedStyle(element, `::${pseudo}`).fontSize;
-        }
-        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
+        for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
         if (!original.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
       } catch { /* Do not trust unrelated malformed page attributes. */ }
     }
   };
   const clearTypography = () => {
+    // Preserve font-transition guards while removing a contested element's
+    // stylesheet fallback. Otherwise releasing that rule can animate toward
+    // the native font and make the next capture measure an intermediate size.
+    if (retainedStyleRules.size) for (const [element, state] of managedElements) {
+      if (!state.retainedStyle) continue;
+      for (const [name, property] of state.properties) {
+        if (!name.startsWith("transition-")) continue;
+        const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
+        if (value !== property.appliedValue || priority !== property.appliedPriority) {
+          property.value = value;
+          property.priority = priority;
+        }
+        element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+      }
+    }
+    for (const [sheet, indices] of retainedStyleRules) {
+      for (const index of indices.reverse()) sheet.deleteRule(index);
+    }
+    retainedStyleRules.clear();
     const restorations = [];
     managedElements.forEach((state, element) => {
       const restoreAttribute = (value, name) => {
@@ -533,27 +635,31 @@
     // guard, including guards on wrappers that never receive Lexend themselves.
     // A microsecond transition still retains its previous computed font during
     // this synchronous measurement and would otherwise scale a child twice.
-    for (const { state, element, restoreProperty, restoreAttribute } of restorations) {
+    for (const { state, element } of restorations) {
       // Font transitions outrank even inline !important. Restore the authored
       // typography and flush it while font transitions are still suppressed;
       // otherwise a transient animated size becomes the next scaled baseline.
       const transition = state.properties.get("transition-property");
-      if (transition) {
-        getComputedStyle(element).fontSize;
-        restoreProperty(transition, "transition-property");
-      }
+      if (transition) getComputedStyle(element).fontSize;
       // Generated content owns its own transitions; a host flush alone does
       // not settle the tooltip's delayed font values. Keep the guards until
       // authored pseudo typography has also been computed.
       for (const pseudo of ["before", "after"]) {
         if (state.attributes.has(`data-lexend-${pseudo}-transition`)) getComputedStyle(element, `::${pseudo}`).fontSize;
       }
+    }
+    // Resolve all guarded fonts in one read phase. Releasing a guard between
+    // reads forces a new style calculation for every animated label.
+    for (const { state, element, restoreProperty, restoreAttribute } of restorations) {
+      const transition = state.properties.get("transition-property");
+      if (transition) restoreProperty(transition, "transition-property");
       for (const name of transitionAttributes) {
         if (state.attributes.has(name)) restoreAttribute(state.attributes.get(name), name);
       }
       if (!state.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
     }
     managedElements.clear();
+    authorFontFamilies.clear();
     eligibleTextRoots.clear();
     transitionRules.clear();
   };
@@ -610,12 +716,12 @@
       duration: list("duration"), delay: list("delay"), timing: list("timing") }
       : { property: "none", duration: "0s", delay: "0s", timing: "ease" };
   };
-  const readTypography = (style) => ({
-    family: style.fontFamily, size: style.fontSize,
+  const readTypography = (style, family = style.fontFamily) => ({
+    family, size: style.fontSize,
     line: style.lineHeight, spacing: style.letterSpacing,
     transition: withoutTypographyTransitions(style)
   });
-  const measureTypography = (roots) => {
+  const measureTypography = (roots, newOnly = false) => {
     const effective = getEffectiveSettings();
     const measurements = [];
     const styles = new WeakMap();
@@ -624,13 +730,15 @@
       return styles.get(element);
     };
     for (const root of roots) for (const element of allElements(root)) {
+      if (newOnly && managedElements.has(element)) continue;
       const style = styleFor(element);
+      const family = newOnly ? authorFontFamilies.get(style.fontFamily) ?? style.fontFamily : style.fontFamily;
       const semanticProtection = hasProtectedAncestor(element);
       const inScope = effective.scope === "all" || !isHeading(element);
       const text = ownTextContent(element);
       const mixedGlyphProse = containsPrivateGlyph(text) && !onlyPrivateGlyphs(text);
-      const protectedText = semanticProtection || codeFont.test(style.fontFamily)
-        || (!mixedGlyphProse && protectedFont(style)) || onlyPrivateGlyphs(text)
+      const protectedText = semanticProtection || codeFont.test(family)
+        || (!mixedGlyphProse && protectedFont(family)) || onlyPrivateGlyphs(text)
         || isImageReplacementText(element, style, styleFor) || hasEmptyPaintClip(element, style, styleFor) || !inScope;
       const target = !protectedText && inScope && (Boolean(text.trim()) || isTextControl(element));
       const pseudos = [];
@@ -641,11 +749,12 @@
         if (["none", "normal", '""', "''"].includes(pseudoStyle.content)) continue;
         const paintedContent = paintedGeneratedContent(pseudoStyle.content);
         const mixedPseudo = containsPrivateGlyph(paintedContent) && !onlyPrivateGlyphs(paintedContent);
-        pseudos.push({ pseudo, noTracking: /\p{Script=Arabic}/u.test(paintedContent), protected: protectedText || codeFont.test(pseudoStyle.fontFamily)
-          || (!mixedPseudo && protectedFont(pseudoStyle)) || onlyPrivateGlyphs(paintedContent),
-          inScope, typography: { ...readTypography(pseudoStyle), symbols: !semanticProtection && !codeFont.test(pseudoStyle.fontFamily) && containsPrivateGlyph(paintedContent) } });
+        const pseudoFamily = newOnly ? authorFontFamilies.get(pseudoStyle.fontFamily) ?? pseudoStyle.fontFamily : pseudoStyle.fontFamily;
+        pseudos.push({ pseudo, noTracking: /\p{Script=Arabic}/u.test(paintedContent), protected: protectedText || codeFont.test(pseudoFamily)
+          || (!mixedPseudo && protectedFont(pseudoFamily)) || onlyPrivateGlyphs(paintedContent),
+          inScope, typography: { ...readTypography(pseudoStyle, pseudoFamily), symbols: !semanticProtection && !codeFont.test(pseudoFamily) && containsPrivateGlyph(paintedContent) } });
       }
-      const typography = { ...readTypography(style), symbols: !semanticProtection && !codeFont.test(style.fontFamily) && containsPrivateGlyph(text) };
+      const typography = { ...readTypography(style, family), symbols: !semanticProtection && !codeFont.test(family) && containsPrivateGlyph(text) };
       if (protectedText || target || pseudos.length || typography.transition !== null) measurements.push({
         element, protected: protectedText, target, noTracking: /\p{Script=Arabic}/u.test(text), typography, pseudos
       });
@@ -656,7 +765,7 @@
     }
     return measurements;
   };
-  const applyTypography = (measurements) => {
+  const applyTypography = (measurements, fontOnly = false) => {
     measurements.forEach(({ typography, pseudos }) => {
       for (const values of [typography, ...pseudos.map(({ typography }) => typography)]) {
         if (values.transition !== null && !transitionRules.has(values.transition.property)) {
@@ -728,7 +837,12 @@
       const fallback = `, "${SYMBOLS_FAMILY}"`;
       const family = protectedText ? values.family + (values.symbols ? fallback : "")
         : `"Lexend for the Web", ${values.family}${fallback}`;
+      authorFontFamilies.set(family, values.family);
       setProperty(element, `--lexend-${prefix}family`, family);
+      if (fontOnly) {
+        if (!prefix) setProperty(element, "font-family", family, "important");
+        return;
+      }
       setProperty(element, `--lexend-${prefix}size`, `${parseFloat(values.size) * scale}px`);
       setProperty(element, `--lexend-${prefix}line`, line);
       setProperty(element, `--lexend-${prefix}spacing`, spacing);
@@ -743,12 +857,12 @@
     };
     measurements.forEach(({ element, protected: protectedText, target, noTracking, typography, pseudos }) => {
       if (protectedText || target) {
-        setAttribute(element, protectedText ? PROTECTED_ATTRIBUTE : TEXT_ATTRIBUTE, "");
+        setAttribute(element, fontOnly ? FONT_ATTRIBUTE : protectedText ? PROTECTED_ATTRIBUTE : TEXT_ATTRIBUTE, "");
         applyValues(element, typography, protectedText, "", noTracking);
       }
       pseudos.forEach(({ pseudo, protected: protectedPseudo, noTracking: pseudoNoTracking, inScope, typography: values }) => {
         if (!protectedPseudo && !inScope) return;
-        setAttribute(element, `data-lexend-${pseudo}`, protectedPseudo ? "protected" : "text");
+        setAttribute(element, `data-lexend-${pseudo}`, fontOnly ? "font" : protectedPseudo ? "protected" : "text");
         applyValues(element, values, protectedPseudo, `${pseudo}-`, pseudoNoTracking);
       });
       const state = managedElements.get(element);
@@ -787,10 +901,10 @@
   };
   const observeRoots = () => {
     observer.observe(document, { childList: true, subtree: true, characterData: true, characterDataOldValue: true,
-      attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+      attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
     styledRoots.forEach((root) => {
       if (root instanceof ShadowRoot) observer.observe(root, { childList: true, subtree: true,
-        characterData: true, characterDataOldValue: true, attributes: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+        characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
     });
   };
   const visitShadowRoots = (root) => {
@@ -801,11 +915,39 @@
       }
     });
   };
+  const applyIncomingFonts = (branches, fontOnly = true) => {
+    if (!isActive() || !document.documentElement || !branches.size) return;
+    observer.disconnect();
+    try {
+      applyToRoot(document.documentElement);
+      const roots = new Set(branches);
+      for (const branch of branches) {
+        if (branch.shadowRoot) { applyToRoot(branch.shadowRoot); roots.add(branch.shadowRoot); }
+        const previousRoots = new Set(styledRoots);
+        visitShadowRoots(branch);
+        if (branch.shadowRoot) visitShadowRoots(branch.shadowRoot);
+        for (const root of styledRoots) if (!previousRoots.has(root)) roots.add(root);
+        // A mutation can originate inside an already discovered shadow tree.
+        const tree = branch.getRootNode();
+        if (tree instanceof ShadowRoot) applyToRoot(tree);
+      }
+      recoverClonedTypography(roots);
+      // Resolve inherited families through the exact stacks we applied. New
+      // code and icons keep the author's family without temporarily stripping
+      // typography from the rest of the page or rerunning geometry repairs.
+      const measurements = measureTypography(roots, true);
+      applyTypography(measurements, fontOnly);
+    } catch (error) {
+      lastRefreshError = error instanceof Error ? error.message : String(error);
+      console.warn("Lexend for the Web could not apply incoming fonts.", error);
+    } finally { observeRoots(); }
+  };
   const cancelPendingRepair = () => {
-    if (repairFrame === null) return false;
-    cancelAnimationFrame(repairFrame);
+    const pending = pendingRepair !== null;
+    if (repairFrame !== null) cancelAnimationFrame(repairFrame);
     repairFrame = null;
-    return true;
+    pendingRepair = null;
+    return pending;
   };
   const withViewportPreserved = (callback) => {
     refreshing = true;
@@ -818,7 +960,6 @@
     const scrollPosition = { x: scrollX, y: scrollY };
     const rootStyle = document.documentElement.style;
     const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: document.documentElement.hasAttribute("style") };
-    rootStyle.setProperty("overflow-anchor", "none", "important");
     const body = document.body;
     const primaryBodyScroller = body && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
       && body.clientHeight >= innerHeight * 0.8 && body.clientHeight <= innerHeight + 64
@@ -826,7 +967,6 @@
     const bodyScroll = primaryBodyScroller ? { x: body.scrollLeft, y: body.scrollTop,
       value: body.style.getPropertyValue("overflow-anchor"), priority: body.style.getPropertyPriority("overflow-anchor"),
       hadStyle: body.hasAttribute("style") } : null;
-    if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
     const nestedScrollers = new Map();
     for (const root of new Set([document.documentElement, ...styledRoots])) {
       root.querySelectorAll("*").forEach((element) => {
@@ -835,9 +975,13 @@
         nestedScrollers.set(element, { x: element.scrollLeft, y: element.scrollTop,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
           hadStyle: element.hasAttribute("style"), table: ownedTableChild(element) });
-        element.style.setProperty("overflow-anchor", "none", "important");
       });
     }
+    // Read every scroll offset before changing styles; interleaving these
+    // writes with geometry reads forces layout repeatedly on dashboard pages.
+    rootStyle.setProperty("overflow-anchor", "none", "important");
+    if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
+    for (const element of nestedScrollers.keys()) element.style.setProperty("overflow-anchor", "none", "important");
     let refreshError = null;
     try {
       callback();
@@ -885,7 +1029,13 @@
     }
     return refreshError;
   };
-  const completeRefresh = (refreshError, completedConversion = true) => {
+  const budgetRefresh = (duration) => {
+    // Count synchronous work in both phases, excluding time spent waiting for
+    // a rendering frame or coalescing author changes.
+    const finished = performance.now();
+    nextRefreshTime = finished + (duration > 50 ? duration * 4 : 0);
+  };
+  const completeRefresh = (refreshError, completedConversion = true, duration = 0) => {
     if (refreshError) {
       lastRefreshError = refreshError instanceof Error ? refreshError.message : String(refreshError);
       if (warnedRefreshError !== lastRefreshError) {
@@ -910,11 +1060,19 @@
       }
       notifyFrameRequirement();
     }
+    // Large pages can spend hundreds of milliseconds in a full repair. Give
+    // the site four times that duration to handle input and paint before the
+    // next automatic pass. Incoming text receives its font independently.
+    budgetRefresh(duration);
   };
-  const refresh = () => {
+  const refresh = (preserveHidden = false) => {
     refreshTimer = null;
     refreshUrgent = false;
+    refreshRequired = false;
+    pendingAriaChanges.clear();
+    pendingStyleChanges.clear();
     if (refreshing || !document.documentElement) return;
+    const started = performance.now();
     cancelPendingRepair();
     const focused = document.activeElement && !document.activeElement.matches("body,html");
     if (retentionTimer !== null) clearTimeout(retentionTimer);
@@ -934,7 +1092,7 @@
         // close-state mutations, even when typography remains enabled.
         if (hidden) restoreFrame(frame);
       }
-      layout?.restore();
+      layout?.restore({ preserveHidden });
       if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
@@ -946,7 +1104,7 @@
         let measurements;
         withExtensionStylesDisabled(() => {
           measurements = measureTypography(roots);
-          layout?.capture(roots);
+          layout?.capture(roots, { preserveHidden });
         });
         applyTypography(measurements);
         // Focused repaired controls must retain their wrapper and scroll range
@@ -955,39 +1113,83 @@
         else deferred = true;
       }
     });
+    const duration = performance.now() - started;
     repairSynchronously = false;
-    if (error || !deferred) { completeRefresh(error); return; }
+    if (error || !deferred) { completeRefresh(error, true, duration); return; }
     refreshRevision++;
+    budgetRefresh(duration);
+    pendingRepair = () => {
+      pendingRepair = null;
+      repairFrame = null;
+      const started = performance.now();
+      const error = withViewportPreserved(() => layout?.repair(settings));
+      completeRefresh(error, false, duration + performance.now() - started);
+    };
     // Let converted text paint before the expensive geometry repair. A second
     // frame keeps that repair out of the first font paint's rendering task.
     // The saved native baseline belongs to this conversion only; new settings
     // or author mutations cancel it before another capture can replace it.
     repairFrame = requestAnimationFrame(() => {
-      repairFrame = requestAnimationFrame(() => {
-        repairFrame = null;
-        completeRefresh(withViewportPreserved(() => layout?.repair(settings)), false);
-      });
+      repairFrame = requestAnimationFrame(() => pendingRepair?.());
     });
   };
-  const queueRefresh = (urgent = false) => {
+  const runQueuedRefresh = () => {
+    // Responsive navigation can temporarily hide and reveal the same links
+    // across separate observer deliveries while measuring them. Restoring
+    // typography restarts that measurement, so refreshing an unchanged final
+    // state would create a feedback loop even with a refresh cooldown. Theme
+    // observers can likewise add/remove inline variables in separate tasks.
+    const changed = !refreshRequired && ([...pendingAriaChanges].some(([element, value]) =>
+      element.isConnected && element.getAttribute("aria-hidden") !== value)
+      || [...pendingStyleChanges].some(([element, value]) => element.isConnected
+        && authorStyleSignature(element, element.getAttribute("style")) !== value));
+    if (refreshRequired || changed) { refresh(true); return; }
+    refreshTimer = null;
+    refreshUrgent = false;
+    pendingAriaChanges.clear();
+    pendingStyleChanges.clear();
+    // A reverted temporary style/accessibility change leaves the saved native
+    // baseline valid. Finish its suspended repair without another conversion.
+    repairSynchronously = false;
+    pendingRepair?.();
+  };
+  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null) => {
     urgent = urgent === true;
     if (refreshing || !settingsLoaded || !isActive()) return;
-    // Busy pages retain an atomic capture/repair on the next refresh instead
-    // of starving repairs or applying a baseline invalidated between frames.
-    if (cancelPendingRepair()) repairSynchronously = true;
+    if (pendingRepair !== null) {
+      if (repairFrame !== null) cancelAnimationFrame(repairFrame);
+      repairFrame = null;
+      repairSynchronously = true;
+      // Content/geometry changes invalidate the baseline outright. Temporary
+      // author styles can settle back before the queued deadline instead.
+      if (!ariaChanges && !styleChanges) pendingRepair = null;
+    }
+    if (ariaChanges) {
+      for (const mutation of ariaChanges) {
+        if (!pendingAriaChanges.has(mutation.target)) pendingAriaChanges.set(mutation.target, mutation.oldValue);
+      }
+    }
+    if (styleChanges) {
+      for (const [element, value] of styleChanges) {
+        if (!pendingStyleChanges.has(element)) pendingStyleChanges.set(element, value);
+      }
+    }
+    if (!ariaChanges && !styleChanges) refreshRequired = true;
+    // Parser mutations still receive their fonts immediately, but cannot
+    // start native capture before the startup preload has settled or timed out.
+    if (initializing) return;
     if (refreshTimer !== null) {
       if (!urgent || refreshUrgent) return;
       clearTimeout(refreshTimer);
     }
-    // Newly inserted/replaced prose must convert in the next task, without
-    // waiting behind a continuously animated style-only mutation batch. Keep
-    // style/geometry changes coalesced and measure descendants atomically.
+    // Fonts have already been applied to incoming text. Keep layout repairs
+    // on a fixed deadline so a continuous feed cannot starve or flood them.
     refreshUrgent = urgent;
-    refreshTimer = setTimeout(refresh, urgent ? 0 : 100);
+    refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
   };
-  const invalidateAutoContent = (urgent = false) => {
+  const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null) => {
     revealedAutoContent = new WeakSet();
-    queueRefresh(urgent === true);
+    queueRefresh(urgent === true, ariaChanges, styleChanges);
   };
 
   const notifyState = () => {
@@ -999,7 +1201,7 @@
     }).catch(() => {});
   };
 
-  const applySettings = (nextSettings) => {
+  const applySettings = (nextSettings, deferLayout = false) => {
     settingsLoaded = true;
     const previous = getEffectiveSettings();
     const previousTypography = settings;
@@ -1011,7 +1213,11 @@
     revealedAutoContent = new WeakSet();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = null;
-    refresh();
+    if (deferLayout && effective.active) {
+      applyIncomingFonts(new Set(document.documentElement ? [document.documentElement] : []), false);
+      observeRoots();
+      queueRefresh();
+    } else refresh();
     notifyState();
   };
   const fittingCounterMutation = (mutation) => {
@@ -1062,9 +1268,56 @@
   };
   const observer = new MutationObserver((mutations) => {
     if (!isActive()) return;
-    const authored = mutations.filter((mutation) => !ownStyleIds.includes(mutation.target.id)
-      && !ownStyleIds.includes(mutation.target.parentElement?.id) && !fittingCounterMutation(mutation));
+    // Frameworks frequently assign the same class/style again or change it
+    // and restore it within one task. Compare the first old value with the
+    // final value, rather than rebuilding the page for each notification.
+    const attributes = new Map();
+    const authored = mutations.filter((mutation) => {
+      if (!mutation.target.isConnected || ownStyleIds.includes(mutation.target.id)
+          || ownStyleIds.includes(mutation.target.parentElement?.id)) return false;
+      if (mutation.type === "attributes") {
+        let names = attributes.get(mutation.target);
+        if (!names) attributes.set(mutation.target, names = new Set());
+        if (names.has(mutation.attributeName)) return false;
+        names.add(mutation.attributeName);
+        if (mutation.oldValue === mutation.target.getAttribute(mutation.attributeName)) return false;
+      }
+      return !fittingCounterMutation(mutation);
+    });
     if (!authored.length) return;
+    const incoming = new Set();
+    const incomingText = (node) => {
+      // Existing text already owns its font. A character edit adds no element
+      // or shadow root to discover; walking its entire parent subtree on each
+      // token bypasses the full-refresh budget without applying any new font.
+      const parent = node.parentElement;
+      if (parent && !managedElements.has(parent)) incoming.add(parent);
+    };
+    for (const mutation of authored) {
+      if (mutation.type === "characterData") incomingText(mutation.target);
+      if (mutation.type === "childList") for (const node of mutation.addedNodes) {
+        if (node instanceof Element) incoming.add(node);
+        else if (node.nodeType === Node.TEXT_NODE) incomingText(node);
+      }
+    }
+    // Parser and framework batches can mention both a branch and its children.
+    // Classify each new element once, before the next paint, without waiting
+    // for the full-page repair cooldown.
+    for (const element of incoming) {
+      if (!element?.isConnected || ownStyleIds.includes(element.id)
+          || element.matches("script,style,template,noscript")) { incoming.delete(element); continue; }
+      for (let parent = composedParent(element); parent; parent = composedParent(parent)) {
+        if (incoming.has(parent)) { incoming.delete(element); break; }
+      }
+    }
+    const styleChanges = new Map();
+    const needsRefresh = authored.filter((mutation) => {
+      if (mutation.type !== "attributes" || mutation.attributeName !== "style") return true;
+      const before = authorStyleSignature(mutation.target, mutation.oldValue);
+      if (before === authorStyleSignature(mutation.target, mutation.target.getAttribute("style"))) return false;
+      styleChanges.set(mutation.target, before);
+      return true;
+    });
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
     if (changedStyles.size) {
@@ -1072,7 +1325,13 @@
       try { changedStyles.forEach(retainOverwrittenTypography); }
       finally { observeRoots(); }
     }
-    invalidateAutoContent(authored.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"));
+    applyIncomingFonts(incoming);
+    if (!needsRefresh.length) return;
+    const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes"
+      && ["aria-hidden", "style"].includes(mutation.attributeName));
+    invalidateAutoContent(needsRefresh.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
+      coalescible ? needsRefresh.filter(mutation => mutation.attributeName === "aria-hidden") : null,
+      coalescible ? styleChanges : null);
   });
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
@@ -1153,7 +1412,7 @@
       // A pending repair will measure the converted layout with the newly
       // decoded bundled glyphs. Its native baseline is still valid. Author
       // fonts change that baseline too and require a fresh capture.
-      if (newMetrics && (authorMetrics || repairFrame === null)) invalidateAutoContent(true);
+      if (newMetrics && (authorMetrics || !initializing && pendingRepair === null)) invalidateAutoContent(true);
     });
     let initialSettings;
     const revision = settingsRevision;
@@ -1164,12 +1423,14 @@
     }
     if (revision !== settingsRevision) return;
     const confirmed = settingsApi.normalizeSettings(initialSettings);
+    // Apply fonts and startup sizing before any full-page layout work. The
+    // first capture waits for the bounded preload and a scheduled task.
+    applySettings(confirmed, true);
     if (document.documentElement && document.fonts?.load
         && settingsApi.resolveSite(confirmed, getEffectiveHostname()).active) {
-      // Start fetching/decoding the small reading font before walking the
-      // page. Otherwise the first repair blocks its request and a second full
-      // refresh is needed when fallback metrics swap to Lexend. Bound the
-      // wait so a failed/slow font still gets ordinary fallback conversion.
+      // Request both reading weights before the first native layout capture.
+      // Incoming typography is already visible; bound the wait so failed or
+      // slow fonts cannot hold the first repair indefinitely.
       installFontStyle(document.documentElement);
       const sample = "A" + (document.body?.textContent ?? "").slice(0, 4000);
       let timer;
@@ -1181,7 +1442,6 @@
       } catch { /* Font errors retain the page's original fallback families. */ }
       finally { clearTimeout(timer); }
     }
-    if (revision === settingsRevision) applySettings(confirmed);
   };
 
   extension.storage.onChanged.addListener((changes, areaName) => {
@@ -1205,7 +1465,7 @@
     if (message?.type !== "LEXEND_GET_STATE") return undefined;
     sendResponse({
       ready: true,
-      pending: initializing || refreshing || refreshTimer !== null || repairFrame !== null,
+      pending: initializing || refreshing || refreshTimer !== null || pendingRepair !== null,
       refreshRevision,
       healthy: lastRefreshError === null,
       error: lastRefreshError,
@@ -1216,5 +1476,8 @@
     return undefined;
   });
 
-  start().finally(() => { initializing = false; });
+  start().finally(() => {
+    initializing = false;
+    if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size) queueRefresh(true);
+  });
 })();
