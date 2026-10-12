@@ -270,9 +270,11 @@ test("typography preserves protected content and refreshes atomic inherited base
     assert.equal(await page.evaluate(() => document.body.style.overflowAnchor),"auto","body scroll anchoring restores its authored value");
     assert.equal(await page.evaluate(() => __state().healthy),true);
     await page.evaluate(() => {globalThis.__failLayout=true;__update({textScale:125});});
+    await page.waitForFunction(() => !__state().pending);
     assert.deepEqual(await page.evaluate(() => ({healthy:__state().healthy,error:__state().error})),{healthy:false,error:"Injected layout failure"},"runtime state reports actual failed refresh");
     assert.match((await page.evaluate(() => __metrics("wrapper"))).family,/Lexend/,"applied typography remains available while repair failure is retried");
     await page.evaluate(() => __update({textScale:125}));
+    await page.waitForFunction(() => !__state().pending);
     assert.equal(refreshWarnings.length,1,"repeated same repair error warns once");
     await page.evaluate(() => {globalThis.__failLayout=false;document.querySelector("#wrapper").textContent="Recovered observer refresh";});
     await page.waitForFunction(() => __state().healthy);

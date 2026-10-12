@@ -11,6 +11,8 @@
   const styledRoots = new Set();
   let settings = settingsApi.normalizeSettings();
   let settingsRevision = 0;
+  let initializing = true;
+  let settingsLoaded = false;
 
   // Names such as `with-icon` are often ordinary prose wrappers. Protect actual
   // semantics and computed symbol/code fonts rather than substring class names.
@@ -29,10 +31,13 @@
   const transitionAttributes = ["data-lexend-transition", "data-lexend-before-transition", "data-lexend-after-transition"];
   const settledFontFaces = new WeakSet();
   const settledBundledFaces = new Set();
+  const bundledFaceKey = (face) => [face.family.replace(/["']/g, ""), face.style, face.weight, face.stretch, face.unicodeRange].join(";");
   let refreshTimer = null;
   let refreshUrgent = false;
   let refreshRevision = 0;
   let refreshing = false;
+  let repairFrame = null;
+  let repairSynchronously = false;
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
@@ -753,7 +758,7 @@
       }));
     });
   };
-  const applyToRoot = (root) => {
+  const installFontStyle = (root) => {
     // Font declarations stay enabled while measuring author typography.
     // Disabling/re-enabling @font-face repeatedly emits loadingdone events
     // even with cached files, which would perpetually schedule new baselines.
@@ -764,6 +769,9 @@
       fontStyle.textContent = getFontFaceCss();
       root.append(fontStyle);
     }
+  };
+  const applyToRoot = (root) => {
+    installFontStyle(root);
     let style = root.querySelector(`#${STYLE_ID}`);
     if (!style) {
       style = document.createElement("style");
@@ -793,15 +801,14 @@
       }
     });
   };
-  const refresh = () => {
-    refreshTimer = null;
-    refreshUrgent = false;
-    if (refreshing || !document.documentElement) return;
+  const cancelPendingRepair = () => {
+    if (repairFrame === null) return false;
+    cancelAnimationFrame(repairFrame);
+    repairFrame = null;
+    return true;
+  };
+  const withViewportPreserved = (callback) => {
     refreshing = true;
-    if (retentionTimer !== null) clearTimeout(retentionTimer);
-    retentionTimer = null;
-    retainedTypography = new WeakSet();
-    retentionWrites = new WeakMap();
     observer.disconnect();
     let focusedElement = document.activeElement;
     while (focusedElement?.shadowRoot?.activeElement) focusedElement = focusedElement.shadowRoot.activeElement;
@@ -833,34 +840,7 @@
     }
     let refreshError = null;
     try {
-      for (const frame of resizedFrames.keys()) {
-        let hidden = !frame.isConnected || !frame.getClientRects().length;
-        for (let current = frame; !hidden && current; current = current.parentElement) {
-          const css = getComputedStyle(current);
-          hidden = css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0;
-        }
-        // An embed may be removed before its child can relay a null request.
-        // Restore its surrounding footprint while preserving the site's own
-        // close-state mutations, even when typography remains enabled.
-        if (hidden) restoreFrame(frame);
-      }
-      layout?.restore();
-      if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
-      recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
-      clearTypography();
-      [...styledRoots].forEach((root) => { if (!root.isConnected) styledRoots.delete(root); });
-      applyToRoot(document.documentElement);
-      visitShadowRoots(document.documentElement);
-      if (isActive()) {
-        const roots = [...styledRoots];
-        let measurements;
-        withExtensionStylesDisabled(() => {
-          measurements = measureTypography(roots);
-          layout?.capture(roots);
-        });
-        applyTypography(measurements);
-        layout?.repair(settings);
-      }
+      callback();
     } catch (error) {
       refreshError = error;
     } finally {
@@ -903,6 +883,9 @@
         catch (error) { refreshError ??= error; }
       }
     }
+    return refreshError;
+  };
+  const completeRefresh = (refreshError, completedConversion = true) => {
     if (refreshError) {
       lastRefreshError = refreshError instanceof Error ? refreshError.message : String(refreshError);
       if (warnedRefreshError !== lastRefreshError) {
@@ -912,7 +895,7 @@
     } else {
       lastRefreshError = null;
       warnedRefreshError = null;
-      refreshRevision++;
+      if (completedConversion) refreshRevision++;
       // A global repair restores earlier overrides, including those belonging
       // to a subtree that has since been skipped. Only painted subtrees have
       // a valid baseline from this refresh; returning to an omitted subtree
@@ -928,9 +911,70 @@
       notifyFrameRequirement();
     }
   };
+  const refresh = () => {
+    refreshTimer = null;
+    refreshUrgent = false;
+    if (refreshing || !document.documentElement) return;
+    cancelPendingRepair();
+    const focused = document.activeElement && !document.activeElement.matches("body,html");
+    if (retentionTimer !== null) clearTimeout(retentionTimer);
+    retentionTimer = null;
+    retainedTypography = new WeakSet();
+    retentionWrites = new WeakMap();
+    let deferred = false;
+    const error = withViewportPreserved(() => {
+      for (const frame of resizedFrames.keys()) {
+        let hidden = !frame.isConnected || !frame.getClientRects().length;
+        for (let current = frame; !hidden && current; current = current.parentElement) {
+          const css = getComputedStyle(current);
+          hidden = css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0;
+        }
+        // An embed may be removed before its child can relay a null request.
+        // Restore its surrounding footprint while preserving the site's own
+        // close-state mutations, even when typography remains enabled.
+        if (hidden) restoreFrame(frame);
+      }
+      layout?.restore();
+      if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
+      recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
+      clearTypography();
+      [...styledRoots].forEach((root) => { if (!root.isConnected) styledRoots.delete(root); });
+      applyToRoot(document.documentElement);
+      visitShadowRoots(document.documentElement);
+      if (isActive()) {
+        const roots = [...styledRoots];
+        let measurements;
+        withExtensionStylesDisabled(() => {
+          measurements = measureTypography(roots);
+          layout?.capture(roots);
+        });
+        applyTypography(measurements);
+        // Focused repaired controls must retain their wrapper and scroll range
+        // within the same task. Hidden tabs cannot depend on animation frames.
+        if (repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
+        else deferred = true;
+      }
+    });
+    repairSynchronously = false;
+    if (error || !deferred) { completeRefresh(error); return; }
+    refreshRevision++;
+    // Let converted text paint before the expensive geometry repair. A second
+    // frame keeps that repair out of the first font paint's rendering task.
+    // The saved native baseline belongs to this conversion only; new settings
+    // or author mutations cancel it before another capture can replace it.
+    repairFrame = requestAnimationFrame(() => {
+      repairFrame = requestAnimationFrame(() => {
+        repairFrame = null;
+        completeRefresh(withViewportPreserved(() => layout?.repair(settings)), false);
+      });
+    });
+  };
   const queueRefresh = (urgent = false) => {
     urgent = urgent === true;
-    if (refreshing || !isActive()) return;
+    if (refreshing || !settingsLoaded || !isActive()) return;
+    // Busy pages retain an atomic capture/repair on the next refresh instead
+    // of starving repairs or applying a baseline invalidated between frames.
+    if (cancelPendingRepair()) repairSynchronously = true;
     if (refreshTimer !== null) {
       if (!urgent || refreshUrgent) return;
       clearTimeout(refreshTimer);
@@ -956,6 +1000,7 @@
   };
 
   const applySettings = (nextSettings) => {
+    settingsLoaded = true;
     const previous = getEffectiveSettings();
     const previousTypography = settings;
     settings = settingsApi.normalizeSettings(nextSettings);
@@ -1031,14 +1076,6 @@
   });
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
-    let initialSettings;
-    const revision = settingsRevision;
-    try { initialSettings = await extension.storage.sync.get(null); }
-    catch (error) {
-      console.warn("Lexend for the Web could not load settings; using defaults.", error);
-      initialSettings = settingsApi.defaults;
-    }
-    if (revision === settingsRevision) applySettings(initialSettings);
     window.addEventListener("pageshow", async (event) => {
       if (!event.persisted) return;
       // Cached documents may miss storage events while frozen. Read current
@@ -1096,23 +1133,55 @@
       // typography stops using it and conversion requests it again. Its glyph
       // metrics did not change; refreshing that face repeatedly creates a loop.
       let newMetrics = false;
+      let authorMetrics = false;
       for (const face of event.fontfaces) {
         const family = face.family.replace(/["']/g, "");
         if (family === "Lexend for the Web" || family === SYMBOLS_FAMILY) {
           // CSS cascade updates can recreate FontFace wrapper identities for
           // the same immutable bundled source. Its subset and weight identify
           // those cached metrics across stylesheet activation changes.
-          const key = [family, face.style, face.weight, face.stretch, face.unicodeRange].join(";");
+          const key = bundledFaceKey(face);
           if (settledBundledFaces.has(key)) continue;
           settledBundledFaces.add(key);
         } else {
           if (settledFontFaces.has(face)) continue;
           settledFontFaces.add(face);
+          authorMetrics = true;
         }
         newMetrics = true;
       }
-      if (newMetrics) invalidateAutoContent();
+      // A pending repair will measure the converted layout with the newly
+      // decoded bundled glyphs. Its native baseline is still valid. Author
+      // fonts change that baseline too and require a fresh capture.
+      if (newMetrics && (authorMetrics || repairFrame === null)) invalidateAutoContent(true);
     });
+    let initialSettings;
+    const revision = settingsRevision;
+    try { initialSettings = await extension.storage.sync.get(null); }
+    catch (error) {
+      console.warn("Lexend for the Web could not load settings; using defaults.", error);
+      initialSettings = settingsApi.defaults;
+    }
+    if (revision !== settingsRevision) return;
+    const confirmed = settingsApi.normalizeSettings(initialSettings);
+    if (document.documentElement && document.fonts?.load
+        && settingsApi.resolveSite(confirmed, getEffectiveHostname()).active) {
+      // Start fetching/decoding the small reading font before walking the
+      // page. Otherwise the first repair blocks its request and a second full
+      // refresh is needed when fallback metrics swap to Lexend. Bound the
+      // wait so a failed/slow font still gets ordinary fallback conversion.
+      installFontStyle(document.documentElement);
+      const sample = "A" + (document.body?.textContent ?? "").slice(0, 4000);
+      let timer;
+      const loaded = Promise.all([400, 700].map((weight) =>
+        document.fonts.load(`${weight} 16px "Lexend for the Web"`, sample)));
+      try {
+        const faces = await Promise.race([loaded, new Promise((resolve) => { timer = setTimeout(resolve, 50); })]);
+        faces?.flat().forEach((face) => settledBundledFaces.add(bundledFaceKey(face)));
+      } catch { /* Font errors retain the page's original fallback families. */ }
+      finally { clearTimeout(timer); }
+    }
+    if (revision === settingsRevision) applySettings(confirmed);
   };
 
   extension.storage.onChanged.addListener((changes, areaName) => {
@@ -1136,7 +1205,7 @@
     if (message?.type !== "LEXEND_GET_STATE") return undefined;
     sendResponse({
       ready: true,
-      pending: refreshing || refreshTimer !== null,
+      pending: initializing || refreshing || refreshTimer !== null || repairFrame !== null,
       refreshRevision,
       healthy: lastRefreshError === null,
       error: lastRefreshError,
@@ -1147,5 +1216,5 @@
     return undefined;
   });
 
-  start();
+  start().finally(() => { initializing = false; });
 })();
