@@ -3,7 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const dist = join(root, "dist");
+// Interface checks must not delete release ZIPs or installed-browser artifacts.
+const dist = process.argv.includes("--ui-tests")
+  ? join(root, "dist/ui-tests/build")
+  : join(root, "dist");
 const targets = ["chrome", "firefox"];
 const sharedFiles = [
   "shared.css",

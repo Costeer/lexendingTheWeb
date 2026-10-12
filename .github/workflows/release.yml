@@ -8,7 +8,31 @@ permissions:
   contents: write
 
 jobs:
+  interfaces:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ui
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: release-interface-regressions
+          path: |
+            dist/ui-tests/results/
+            dist/ui-tests/report/
+          if-no-files-found: error
+
   release:
+    needs: interfaces
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -25,6 +49,7 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run package
+      - run: npm run test:packages
       - run: npm run lint:firefox
       - name: Test installed Chrome and Firefox extensions
         env:
@@ -33,6 +58,11 @@ jobs:
         run: |
           xvfb-run -a npm run test:browser -- chrome
           xvfb-run -a npm run test:browser -- firefox
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: release-browser-regressions
+          path: dist/browser-tests/
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

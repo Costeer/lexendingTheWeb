@@ -10,6 +10,7 @@
   const ownStyleIds = [STYLE_ID, FONT_STYLE_ID, TRANSITION_STYLE_ID];
   const styledRoots = new Set();
   let settings = settingsApi.normalizeSettings();
+  let settingsRevision = 0;
 
   // Names such as `with-icon` are often ordinary prose wrappers. Protect actual
   // semantics and computed symbol/code fonts rather than substring class names.
@@ -1031,12 +1032,27 @@
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
     let initialSettings;
+    const revision = settingsRevision;
     try { initialSettings = await extension.storage.sync.get(null); }
     catch (error) {
       console.warn("Lexend for the Web could not load settings; using defaults.", error);
       initialSettings = settingsApi.defaults;
     }
-    applySettings(initialSettings);
+    if (revision === settingsRevision) applySettings(initialSettings);
+    window.addEventListener("pageshow", async (event) => {
+      if (!event.persisted) return;
+      // Cached documents may miss storage events while frozen. Read current
+      // preferences before reusing their typography, without letting a stale
+      // read replace a newer storage event or overlapping restoration.
+      const revision = ++settingsRevision;
+      try {
+        const saved = await extension.storage.sync.get(null);
+        if (revision === settingsRevision) applySettings(saved);
+      } catch (error) {
+        console.warn("Lexend for the Web could not reload settings after navigation.", error);
+      }
+      notifyState();
+    });
     window.addEventListener("resize", invalidateAutoContent, { passive: true });
     window.addEventListener("message", receiveFrameRequirement);
     document.addEventListener("focusin", (event) => {
@@ -1101,6 +1117,7 @@
 
   extension.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") return;
+    settingsRevision++;
 
     const nextSettings = { ...settings };
     Object.entries(changes).forEach(([key, change]) => {
