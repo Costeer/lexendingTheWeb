@@ -57,7 +57,7 @@ export const instrumentContent = (source) => {
     observer.disconnect();
     try {
       applyToRoot(document.documentElement);`);
-  return source.replace('  start();', `
+  return source.replace('  start()', `
     globalThis.__probe = {calls:{}, mutations:{}, targets:{}, deliveries:0, incomingNodes:0};
     ${wrappers}
     globalThis.__collections = () => ({
@@ -72,5 +72,5 @@ export const instrumentContent = (source) => {
       frames: resizedFrames.size,
       authorFamilies: authorFontFamilies.size
     });
-    start();`);
+    start()`);
 };

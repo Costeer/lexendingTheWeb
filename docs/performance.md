@@ -1,5 +1,60 @@
 # Typography performance
 
+Font conversion now runs separately from layout repair on settled, visible
+pages. Native typography and layout are captured together, then Lexend is
+applied immediately. The browser receives a rendering frame before the
+geometry repair runs. Each phase preserves the current focus and scroll
+positions, including scrolling performed between the two phases.
+
+New preferences cancel the previous pending repair. Content and geometry mutations
+invalidate its baseline and make the next refresh complete capture and repair
+together, so animated pages cannot starve repairs. Temporary author style and
+accessibility changes suspend a pending repair while they coalesce; reverting
+them resumes that repair without another conversion. Focused controls, embedded frames, and
+hidden documents also complete both phases in the same task. Offscreen frames
+cannot rely on animation frames to relay their measured height. The runtime
+`pending` flag includes the deferred repair; `refreshRevision` counts successful
+conversions.
+
+Startup applies fonts and sizing immediately, then requests the bundled regular
+and bold reading fonts before capturing native layout, with a 50 ms limit before
+the initial scheduled capture proceeds using fallback metrics. Confirmed
+pause/site preferences are respected, and a newer storage event wins over an
+initial read or font preload. A bundled font completing while a repair is
+pending uses that repair rather than starting another full conversion. Late
+author fonts still require a new native baseline.
+
+Local Chromium measurements at 1280 × 800 compared the previous implementation
+with this one on 80- and 400-card pages, each with 500 protected code tokens.
+Results are medians of three fresh contexts; each settings sample alternated
+110% and 120% scale six times, waiting for repairs to settle between updates.
+
+| Work on the 400-card page | Previous | Current |
+| --- | ---: | ---: |
+| First rendering frame with loaded Lexend | 610 ms | 240 ms |
+| Applying a new font-size preference | 716 ms | 192 ms |
+| Rendering newly inserted text in Lexend | 704 ms | 178 ms |
+| Preference change through completed layout repair | 730 ms | 644 ms |
+
+These results measure local fixtures, not every website. Moving repair work
+after the font's first frame improves visible response more than total repair
+time. Measurement caches also freeze ancestor paint properties, bounding boxes,
+and pseudo styles for each synchronous pass; every repair write invalidates
+them. Sibling collision detection measures each branch once, and already fitting
+single-fragment headings avoid measuring every word separately.
+
+The 80-card work-budget fixture dropped from 16,029 bounding-box reads to 2,009
+for a complete preference refresh. Its CI budget is 3,500, including both the
+font and deferred repair phases. Startup tests cover rendering before repair,
+bounded fallback, font failures, preference races, cancellation, and intervening
+scrolling:
+
+```sh
+node --test test/typography-startup.test.mjs test/typography-performance.test.mjs
+```
+
+## Earlier measurement optimizations
+
 The optimization work compared complete, synchronous preference refreshes on
 a local Chromium page with 80 reading cards, 500 code tokens, and 1,019 elements.
 Fonts were loaded before six alternating changes between 110% and 120% text
@@ -59,8 +114,8 @@ events, preference changes, or viewport changes.
 
 An additional experiment skipped repeated container-repair passes when no
 intervening writes occurred. It showed no consistent timing improvement and
-was removed. The regression budget now requires fewer than 7,000 style reads
-and 4,000 bounding-box reads for its large-page fixture.
+was removed. The combined regression budget requires fewer than 7,000 style reads
+and 3,500 bounding-box reads across both phases for its large-page fixture.
 
 ## Continuous updates and responsive navigation
 

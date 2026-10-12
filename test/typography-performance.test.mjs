@@ -401,16 +401,17 @@ test("large pages reuse measurements, preserve protected branches, and rest whil
     assert.equal(rhythm[1].line, "19.2px");
     assert.equal(rhythm[1].spacing, "2.4px");
     assert.equal(await page.locator("#native-line").evaluate((element) => getComputedStyle(element).lineHeight), "normal");
-    const measured = await page.evaluate(() => {
+    await page.evaluate(() => {
       __styleReads = 0;
       __boxReads = 0;
       __update({ textScale: 110 });
-      return { reads: __styleReads, boxes: __boxReads, state: __state() };
     });
+    await page.waitForFunction(() => !__state().pending);
+    const measured = await page.evaluate(() => ({ reads: __styleReads, boxes: __boxReads, state: __state() }));
     // A work budget rather than a wall-clock assertion: the old implementation
     // performs over 100,000 reads for this page, regardless of machine speed.
     assert.ok(measured.reads < 7000, `a complete refresh used ${measured.reads} computed-style reads`);
-    assert.ok(measured.boxes < 4000, `a complete refresh used ${measured.boxes} bounding-box reads`);
+    assert.ok(measured.boxes < 3500, `a complete refresh used ${measured.boxes} bounding-box reads`);
     assert.equal(measured.state.healthy, true);
     await page.evaluate(() => __update({ textScale: 120 }));
     assert.deepEqual(await page.evaluate(() => __protected()), original, "cached measurements never compound text scaling across refreshes");

@@ -76,10 +76,10 @@
     }
     return result;
   };
-  const measureSnapshot = (element, allowViewportEscape, styleFor, textRects, boxFor, hasBox) => {
+  const measureSnapshot = (element, allowViewportEscape, styleFor, textRects, paintStyleFor, boxFor, hasBox) => {
     const style = styleFor(element);
-    if (!visible(element, style, allowViewportEscape, styleFor, boxFor, hasBox)) return null;
-    const box = rect(boxFor(element));
+    if (!visible(element, paintStyleFor(element), allowViewportEscape, paintStyleFor, boxFor, hasBox)) return null;
+    const box = boxFor(element);
     const texts = textRects(element);
     return {
       box, texts, text: bounds(texts), scrollWidth: element.scrollWidth, scrollHeight: element.scrollHeight,
@@ -135,7 +135,8 @@
     // after any write: a child can change its siblings or a :has() ancestor.
     let measurements = null;
     const freshMeasurements = () => ({
-      styles: new WeakMap(), pseudoStyles: new WeakMap(), snapshots: [new WeakMap(), new WeakMap()],
+      styles: new WeakMap(), pseudoStyles: new WeakMap(), paintStyles: new WeakMap(),
+      snapshots: [new WeakMap(), new WeakMap()],
       textRects: new WeakMap(), containedRects: new WeakMap(),
       boxes: new WeakMap(), hasBox: new WeakMap()
     });
@@ -149,18 +150,13 @@
     const styleFor = (element, pseudo = null) => {
       if (!measurements) return getComputedStyle(element, pseudo);
       if (pseudo) {
-        if (!measurements.pseudoStyles.has(element)) measurements.pseudoStyles.set(element, new Map());
-        const styles = measurements.pseudoStyles.get(element);
+        let styles = measurements.pseudoStyles.get(element);
+        if (!styles) measurements.pseudoStyles.set(element, styles = new Map());
         if (!styles.has(pseudo)) styles.set(pseudo, getComputedStyle(element, pseudo));
         return styles.get(pseudo);
       }
       if (!measurements.styles.has(element)) measurements.styles.set(element, getComputedStyle(element));
       return measurements.styles.get(element);
-    };
-    const boxFor = (element) => {
-      if (!measurements) return readBox(element);
-      if (!measurements.boxes.has(element)) measurements.boxes.set(element, readBox(element));
-      return measurements.boxes.get(element);
     };
     const hasBox = (element) => {
       if (!measurements) return readHasBox(element);
@@ -172,10 +168,29 @@
       if (!measurements.textRects.has(element)) measurements.textRects.set(element, measureTextRects(element));
       return measurements.textRects.get(element);
     };
+    const boxFor = (element) => {
+      if (!measurements) return rect(readBox(element));
+      if (!measurements.boxes.has(element)) measurements.boxes.set(element, rect(readBox(element)));
+      return measurements.boxes.get(element);
+    };
+    const paintStyleFor = (element) => {
+      if (!measurements) return styleFor(element);
+      if (!measurements.paintStyles.has(element)) {
+        const css = styleFor(element);
+        // ComputedStyle is a live object: even cached objects repeatedly ask
+        // the browser for each ancestor property. Freeze these shared paint
+        // checks for this pass; every repair write discards the entire cache.
+        measurements.paintStyles.set(element, Object.fromEntries([
+          "display", "visibility", "opacity", "clip", "clipPath", "textIndent", "position", "left",
+          "transform", "perspective", "filter", "backdropFilter", "contain", "willChange", "overflowX", "overflowY"
+        ].map((name) => [name, css[name]])));
+      }
+      return measurements.paintStyles.get(element);
+    };
     const snapshot = (element, allowViewportEscape = false) => {
-      if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, boxFor, hasBox);
+      if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox);
       const cache = measurements.snapshots[Number(allowViewportEscape)];
-      if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, boxFor, hasBox));
+      if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox));
       return cache.get(element);
     };
     const write = (element, property, value, category) => {
@@ -469,6 +484,11 @@
         parentState ? parentState.box.width - parentState.paddingLeft - parentState.paddingRight : innerWidth,
         innerWidth - Math.max(0, containerState.box.left)
       );
+      // A single painted text fragment that fits also proves that every word
+      // fits. Avoid creating and measuring a Range for each word in ordinary
+      // headings and links, including the final action-label recheck.
+      if (now.texts.length === 1 && now.text
+          && now.text.right - now.text.left <= available - Math.max(4, now.letterSpacing * 2)) return;
       let longest = 0;
       let brokenWord = false;
       // Canvas cannot reproduce author variable-font axes or every font feature.
@@ -954,19 +974,22 @@
       for (const [parent, before] of baseline) {
         if (parent.children.length < 2 || parent.children.length > 16) continue;
         const children = [...parent.children].filter((child) => baseline.has(child)
-          && baseline.get(child).position !== "fixed" && visible(child, styleFor(child), false, styleFor, boxFor, hasBox)
+          && baseline.get(child).position !== "fixed" && visible(child, paintStyleFor(child), false, paintStyleFor, boxFor, hasBox)
           // Full-cover empty artwork is an overlay, not a flow column. Its
           // intentional overlap cannot wrap a viewport's sidebar/content row.
           && !(baseline.get(child).position === "absolute" && !containedText(child).length
             && baseline.get(child).box.width >= before.box.width * 0.8
             && baseline.get(child).box.height >= before.box.height * 0.65));
         if (children.length < 2) continue;
+        // No writes occur during collision detection. Measure each branch once
+        // rather than repeating geometry reads for every sibling pair.
+        const boxes = children.map((child) => branchBounds(child));
         let collision = false;
         for (let i = 0; i < children.length && !collision; i++) {
           for (let j = i + 1; j < children.length; j++) {
             const a = children[i], b = children[j];
             const previous = intersection(baseline.get(a).contentBounds ?? baseline.get(a).box, baseline.get(b).contentBounds ?? baseline.get(b).box);
-            const current = intersection(branchBounds(a), branchBounds(b));
+            const current = intersection(boxes[i], boxes[j]);
             if (current > previous + 8) { collision = true; break; }
           }
         }
