@@ -12,6 +12,9 @@
   });
   const MAX_SITE_RULE_BYTES = 8192;
   const ruleStoragePrefix = "@1\n";
+  const preferenceKeys = ["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing"];
+  const ruleKey = (rule) => `${rule.hostname}\n${rule.includeSubdomains}`;
+  const sameRule = (left, right) => left.enabled === right.enabled && left.scope === right.scope;
   const legacySpacingValues = Object.freeze({
     default: 0,
     wide: 0.04,
@@ -230,6 +233,69 @@
     return settings;
   };
 
+  // Rule order does not affect resolution. Compare normalized values by rule
+  // identity so a harmless reordering cannot invalidate a replacement preview.
+  const settingsEqual = (left, right) => {
+    const before = normalizeSettings(left);
+    const after = normalizeSettings(right);
+    if (preferenceKeys.some((key) => before[key] !== after[key])
+        || before.siteRules.length !== after.siteRules.length) return false;
+    const rules = new Map(after.siteRules.map((rule) => [ruleKey(rule), rule]));
+    return before.siteRules.every((rule) => {
+      const other = rules.get(ruleKey(rule));
+      return other && sameRule(rule, other);
+    });
+  };
+
+  const previewImport = (current, imported) => {
+    const before = normalizeSettings(current);
+    const after = normalizeSettings(imported);
+    const beforeRules = new Map(before.siteRules.map((rule) => [ruleKey(rule), rule]));
+    const afterRules = new Map(after.siteRules.map((rule) => [ruleKey(rule), rule]));
+    return {
+      before,
+      after,
+      changes: preferenceKeys.filter((key) => before[key] !== after[key])
+        .map((key) => ({ key, before: before[key], after: after[key] })),
+      rules: {
+        added: after.siteRules.filter((rule) => !beforeRules.has(ruleKey(rule))),
+        removed: before.siteRules.filter((rule) => !afterRules.has(ruleKey(rule))),
+        changed: after.siteRules.filter((rule) => {
+          const previous = beforeRules.get(ruleKey(rule));
+          return previous && !sameRule(previous, rule);
+        }).map((rule) => ({ before: beforeRules.get(ruleKey(rule)), after: rule }))
+      }
+    };
+  };
+
+  const restoreImport = (current, original, imported) => {
+    const settings = normalizeSettings(current);
+    const { before, after, rules } = previewImport(original, imported);
+    for (const key of preferenceKeys) {
+      if (before[key] !== after[key] && settings[key] === after[key]) settings[key] = before[key];
+    }
+    const currentRules = new Map(settings.siteRules.map((rule) => [ruleKey(rule), rule]));
+    // Whole-rule additions/removals are deliberately conservative. A later
+    // edit owns that identity; undo must not remove or overwrite its fields.
+    for (const rule of rules.added) {
+      const currentRule = currentRules.get(ruleKey(rule));
+      if (currentRule && sameRule(currentRule, rule)) currentRules.delete(ruleKey(rule));
+    }
+    for (const rule of rules.removed) {
+      if (!currentRules.has(ruleKey(rule))) currentRules.set(ruleKey(rule), rule);
+    }
+    for (const change of rules.changed) {
+      const currentRule = currentRules.get(ruleKey(change.after));
+      if (!currentRule) continue;
+      for (const key of ["enabled", "scope"]) {
+        if (change.before[key] !== change.after[key] && currentRule[key] === change.after[key]) {
+          currentRule[key] = change.before[key];
+        }
+      }
+    }
+    return normalizeSettings({ ...settings, siteRules: [...currentRules.values()] });
+  };
+
   const ruleMatches = (rule, hostname) => (
     hostname === rule.hostname
     || (rule.includeSubdomains && hostname.endsWith(`.${rule.hostname}`))
@@ -308,6 +374,33 @@
     });
   };
 
+  const updateSiteRule = (value, hostname, includeSubdomains = false, changes) => {
+    const settings = normalizeSettings(value);
+    const normalizedHostname = normalizeHostname(hostname);
+    if (!validHostname(normalizedHostname) || typeof includeSubdomains !== "boolean"
+        || !changes || typeof changes !== "object" || Array.isArray(changes)
+        || Object.keys(changes).some((key) => !["includeSubdomains", "enabled", "scope"].includes(key))
+        || (Object.hasOwn(changes, "includeSubdomains") && typeof changes.includeSubdomains !== "boolean")
+        || (Object.hasOwn(changes, "enabled") && changes.enabled !== null && typeof changes.enabled !== "boolean")
+        || (Object.hasOwn(changes, "scope") && changes.scope !== null && !["body", "all"].includes(changes.scope))) {
+      throw settingsError("INVALID_RULE", "Choose valid settings for this site rule.");
+    }
+    const index = settings.siteRules.findIndex((rule) => (
+      rule.hostname === normalizedHostname && rule.includeSubdomains === includeSubdomains
+    ));
+    if (index < 0) throw settingsError("RULE_NOT_FOUND", "This rule was removed. Refresh the rule list before editing it.");
+    const updated = { ...settings.siteRules[index], ...changes };
+    if (settings.siteRules.some((rule, position) => position !== index && ruleKey(rule) === ruleKey(updated))) {
+      throw settingsError("DUPLICATE_RULE", "A rule with that domain and matching mode already exists.");
+    }
+    if (updated.enabled === null && updated.scope === null) {
+      settings.siteRules.splice(index, 1);
+      return settings;
+    }
+    settings.siteRules[index] = updated;
+    return validateCapacity(settings);
+  };
+
   const toggleSite = (value, hostname) => {
     const settings = normalizeSettings(value);
     const effective = resolveSite(settings, hostname);
@@ -326,10 +419,14 @@
     encodeSettings,
     getDirectRule,
     normalizeSettings,
+    previewImport,
     removeSiteRule,
     resolveSite,
+    restoreImport,
     setSiteRule,
+    settingsEqual,
     toggleSite,
+    updateSiteRule,
     settingsError,
     settingsEqual,
     ruleStorageBytes,

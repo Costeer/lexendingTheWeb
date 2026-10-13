@@ -96,6 +96,28 @@ test("failed writes roll back optimistic values and do not poison later writes",
   assert.equal(f.saved().theme, "dark");
 });
 
+test("change listeners distinguish optimistic intent from confirmed storage and ignore older replies", async () => {
+  const f = fixture({ textScale: 100 });
+  const seen = [];
+  const client = preferences.createClient(f.extension, {
+    onChange: (current, loaded, confirmed) => seen.push(structuredClone({ current, loaded, confirmed }))
+  });
+  await client.load();
+  let reply;
+  f.extension.runtime.sendMessage = () => new Promise((resolve) => { reply = resolve; });
+  const mutation = client.mutate({ type: "patch", changes: { textScale: 110 } });
+  assert.equal(seen.at(-1).loaded, true);
+  assert.equal(seen.at(-1).current.textScale, 110);
+  assert.equal(seen.at(-1).confirmed.textScale, 100, "pending intent cannot prove an import committed");
+  await f.storage.set({ textScale: 127 });
+  assert.equal(seen.at(-1).current.textScale, 110, "pending local intent remains visible");
+  assert.equal(seen.at(-1).confirmed.textScale, 127, "the real storage event is exposed separately");
+  reply({ ok: true, settings: api.normalizeSettings({ textScale: 110 }) });
+  await mutation;
+  assert.equal(seen.at(-1).current.textScale, 127);
+  assert.equal(seen.at(-1).confirmed.textScale, 127, "an older response cannot replace the observed commit");
+});
+
 test("an over-capacity pause and import fail without changing any saved settings", async () => {
   const oversized = Array.from({ length: 250 }, (_, index) => ({ hostname: `site${index}.example.com`, enabled: false }));
   const f = fixture({ siteRules: oversized });
