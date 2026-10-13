@@ -49,15 +49,17 @@ driver's small in-page probes, not wall time or whole-browser CPU. Heap is
 post-GC V8 heap, not process RSS. Browser layout/style recalculation counts and
 refresh counts are also recorded as diagnostics.
 
-The gate checks per-workload medians. An increase must exceed **both** the
-relative tolerance and the absolute noise floor:
+The existing aggregate timing/work gate checks per-workload medians. An
+increase must exceed **both** the relative tolerance and the absolute noise
+floor:
 
 - First font frame: 30% and 30 ms; complete settling: 30% and 50 ms.
 - Main-thread task time: 30% and 25 ms.
 - Computed-style reads: 15% and 100 reads; bounding-box reads: 15% and 50 reads.
 - Post-GC heap: 20% and 1 MB; live DOM: 5% and 20 nodes.
 
-P95 is reported for diagnosis, not gated with only five samples. Every measured
+P95 is reported for diagnosis, not gated with only five samples. The separate
+responsiveness criterion below checks the worst observed task. Every measured
 candidate run must have zero typography reads/refreshes while idle or paused,
 at most 1 MB heap growth and at most 20 extra DOM nodes between replacements
 2 and 6. These absolute checks apply even when the baseline is already bad.
@@ -83,6 +85,89 @@ For models making changes:
 
 For deeper diagnosis, use the conversation profiler described below. It writes
 CPU profiles and traces; those expensive probes are excluded from this gate.
+
+## Direct responsiveness under contention
+
+Aggregate `taskMs` is the sum of main-thread work during an operation. Averaging
+six preference changes and comparing sample medians cannot establish the longest
+individual stall. The additional responsiveness phase observes native Chromium
+Long Tasks during timed text updates and author-observer feedback. It runs after
+the original conversation phases, keeping their workloads and budgets intact.
+
+The new criterion compares the largest individual task in any measured candidate
+run with the largest baseline task, allowing an increase of 30% or 50 ms,
+whichever is larger. These allowances were selected before calibration. The
+30% allowance follows the existing timing policy; the 50 ms floor matches the
+Long Tasks observation boundary. Individual candidate outliers cannot disappear
+in an average or median. A slow baseline outlier can widen this regression bound;
+a pass is not a claim that tasks are shorter than 50 ms or that input is always
+responsive. This direct task criterion covers the added conversation phase; it
+does not yet bound the six preference changes or the 400-card settings path.
+
+The extra conversation phase runs after replacements and resume, with 120 open
+shadow hosts and 130% scale. It schedules 100 text edits at 25 ms intervals and
+changes an author-owned label whose existing observer restores its style.
+Reports retain scheduled and delivered edit timestamps, actual observer writes,
+raw long-task entries, and a separate 70 ms positive-control task proving that
+the detector works. The positive control is outside the measured window.
+Unsupported or inactive detectors fail the command. The window includes the
+final queued refresh and deferred repair.
+
+To demonstrate the real browser failure path while retaining all default
+workloads and samples:
+
+```sh
+npm run test:performance -- --base <pre-change-commit> \
+  --inject-block-ms 1000 --output /tmp/lexend-injected-block.json
+```
+
+The flag adds a synchronous block only to the last measured candidate timed
+stream. A report records the injected task and checks that a native task entry
+covers it. Inspect `responsiveness.maxLongTaskMs`: its comparison uses `max`,
+while the original aggregate gates still use their previous statistics. The
+failure demonstration requires a block larger than the baseline-derived bound;
+it is not valid proof to fail only from an unrelated error. Preserve both the
+ordinary report and this deliberately failed report.
+
+Long Tasks report browser main-thread task duration, including work by the page,
+the extension, and the small harness. They do not directly measure trusted input
+queueing, event-to-frame latency, or compositor presentation. The existing first
+font frame and typing correctness checks must not be described as those metrics.
+The timed fixture is synthetic and is not a capture of an authenticated site.
+
+## Separate phase and refresh-reason profiling
+
+```sh
+node scripts/profile-responsiveness.mjs --source-ref <pre-change-commit> \
+  --output /tmp/lexend-phases.json
+node scripts/profile-responsiveness.mjs --source-ref <pre-change-commit> \
+  --workload reading-400 --output /tmp/lexend-reading-phases.json
+```
+
+Omit `--source-ref` to profile working-tree runtime bytes. This diagnostic pass
+uses exact-once source probes and fails if a probe no longer matches. It records
+source, transformed-source, and harness hashes, browser identity, refresh
+scheduling reasons, and per-scenario phase durations. It measures capture,
+typography, repair stages, and collection of nested scroll positions separately.
+The default profiles the original 120-reply conversation at 120% scale with
+sequential 20 ms timers, including protected-code growth. It differs from the
+gate's post-replacement shadow fixture at 130%; do not compare their durations
+as if they were the same workload. `--workload reading-400` reuses the gate's
+400-card HTML and its six settled preference changes without a timed stream.
+
+Inclusive phase durations overlap and must not be summed. Self time subtracts
+nested instrumented phases only; it still includes uninstrumented work and probe
+overhead. Reasons describe accepted scheduling requests and coalesced refreshes,
+not exclusive causal attribution. A mixed mutation batch may contribute several
+reasons, and a request can revert before a refresh occurs. These measurements
+help choose an optimization target; they do not replace the unmodified-source
+gate or prove a latency improvement.
+
+Any region or scroll-owner cache must retain global fallback when selector,
+geometry, font, or lifecycle dependencies are uncertain. CSS containment alone
+does not rule out ancestor selectors or a protected subtree moving neighboring
+content. A production optimization depends on complete lifecycle invalidation
+and disposal; this measurement change does not narrow runtime invalidation.
 
 ## Runtime design and previous measurements
 

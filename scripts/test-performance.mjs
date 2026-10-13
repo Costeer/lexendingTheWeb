@@ -14,6 +14,7 @@ const { values } = parseArgs({ options: {
   base: { type: 'string', default: 'HEAD' },
   samples: { type: 'string', default: '5' },
   output: { type: 'string', default: 'dist/performance/report.json' },
+  'inject-block-ms': { type: 'string' },
   help: { type: 'boolean', default: false }
 } });
 if (values.help) {
@@ -21,6 +22,8 @@ if (values.help) {
 Compare a Git revision with the working tree, serially in pinned Chromium.
 Use --base origin/main for committed changes. No Git files or baselines are modified.
 Samples must be an integer from 3 to 15; one extra warm-up per version is discarded.
+--inject-block-ms 1000 deliberately blocks one measured candidate contention phase.
+Use a block above the max-task limit to verify failure; injection evidence is reported.
 Exit 0: passed. Exit 1: regression, broken workload, or invalid measurement.
 See docs/performance.md for metrics, noise tolerances, and model workflow.`);
 } else {
@@ -34,6 +37,14 @@ async function main() {
   try {
     const samples = Number(values.samples);
     if (!Number.isInteger(samples) || samples < 3 || samples > 15) throw new Error('--samples must be an integer from 3 to 15');
+    const injectedBlockMs = values['inject-block-ms'] === undefined ? 0 : Number(values['inject-block-ms']);
+    if (values['inject-block-ms'] !== undefined && (!Number.isInteger(injectedBlockMs) || injectedBlockMs < 50 || injectedBlockMs > 5000)) {
+      throw new Error('--inject-block-ms must be an integer from 50 to 5000');
+    }
+    report.negativeControl = injectedBlockMs ? {
+      kind: 'synchronous-block', durationMs: injectedBlockMs, version: 'candidate',
+      workload: 'conversation-120', phase: 'responsiveness', sample: samples
+    } : null;
     const baseCommit = commitFor(root, values.base);
     // Freeze both sets of source and font bytes before sampling, including any
     // uncommitted candidate edits. Never run git checkout or rewrite a baseline.
@@ -54,19 +65,25 @@ async function main() {
     console.log('Run on an otherwise idle machine; do not run other tests alongside this benchmark.');
     for (const workload of workloads) {
       const runs = report.workloads[workload.name] = { baseline: [], candidate: [], order: [] };
+      if (workload.conversation) runs.rawResponsiveness = { baseline: [], candidate: [] };
       for (let round = 0; round <= samples; round++) {
         const order = round % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'];
         runs.order.push({ warmup: round === 0, versions: order });
         for (const label of order) {
           console.log(`${workload.name}: ${round ? `sample ${round}/${samples}` : 'warm-up'} ${label}`);
-          const metrics = await runWorkload(browser, label === 'baseline' ? baseline : candidate, workload);
-          if (round) runs[label].push(metrics);
+          const measurement = await runWorkload(browser, label === 'baseline' ? baseline : candidate, workload, {
+            injectedBlockMs: label === 'candidate' && round === samples ? injectedBlockMs : 0
+          });
+          if (round) {
+            runs[label].push(measurement.metrics);
+            if (workload.conversation) runs.rawResponsiveness[label].push(measurement.responsiveness);
+          }
         }
       }
       runs.comparison = compareSamples(runs.baseline, runs.candidate);
       for (const row of runs.comparison) {
-        if (row.regression || /^(startup.firstFontFrameMs|settings.taskMs|memory.heapBytes)$/.test(row.metric)) {
-          console.log(`${row.regression ? 'FAIL' : 'PASS'} ${workload.name}/${row.metric}: ${row.baseline.median.toFixed(2)} -> ${row.candidate.median.toFixed(2)} (limit ${row.limit?.toFixed(2) ?? 'diagnostic'})`);
+        if (row.regression || /^(startup.firstFontFrameMs|settings.taskMs|memory.heapBytes|responsiveness.maxLongTaskMs)$/.test(row.metric)) {
+          console.log(`${row.regression ? 'FAIL' : 'PASS'} ${workload.name}/${row.metric}: ${row.baseline[row.statistic].toFixed(2)} -> ${row.candidate[row.statistic].toFixed(2)} (${row.statistic}; limit ${row.limit?.toFixed(2) ?? 'diagnostic'})`);
         }
       }
     }

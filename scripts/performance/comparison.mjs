@@ -12,6 +12,11 @@ export const policy = {
   refreshes: null,
   layouts: null,
   styleRecalculations: null,
+  // A single task must not disappear inside settings averages or run medians.
+  // Fixed before calibration; 50 ms is the Long Tasks reporting boundary.
+  maxLongTaskMs: { relative: 0.30, absolute: 50, statistic: 'max' },
+  longTaskCount: null,
+  totalBlockingMs: null,
   heapGrowthBytes: { maximum: 1_000_000 },
   nodeGrowth: { maximum: 20 }
 };
@@ -46,18 +51,20 @@ export function compareSamples(baseline, candidate) {
     const before = summarize(baseline.map(sample => sample[metric]));
     const after = summarize(candidate.map(sample => sample[metric]));
     const rule = policy[name];
+    const statistic = rule?.statistic ?? 'median';
     let limit = rule && 'relative' in rule
-      ? before.median + Math.max(before.median * rule.relative, rule.absolute)
+      ? before[statistic] + Math.max(before[statistic] * rule.relative, rule.absolute)
       : rule?.maximum ?? null;
     // Idle and paused pages must do no typography work, on every run. A median
     // must never hide an occasional feedback loop or work performed while paused.
     if (/^(idle|paused)\.(refreshes|styleReads|boxReads)$/.test(metric)) limit = 0;
     const absolute = limit !== null && (!rule || !('relative' in rule) || limit === 0);
+    const comparedStatistic = absolute ? 'max' : statistic;
     return {
-      metric, baseline: before, candidate: after, limit,
-      delta: after.median - before.median,
-      percent: before.median ? (after.median / before.median - 1) * 100 : null,
-      regression: limit !== null && (absolute ? after.max : after.median) > limit
+      metric, baseline: before, candidate: after, limit, statistic: comparedStatistic,
+      delta: after[comparedStatistic] - before[comparedStatistic],
+      percent: before[comparedStatistic] ? (after[comparedStatistic] / before[comparedStatistic] - 1) * 100 : null,
+      regression: limit !== null && after[comparedStatistic] > limit
     };
   });
 }

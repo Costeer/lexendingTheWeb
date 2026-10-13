@@ -33,7 +33,8 @@ export async function runtimeSnapshot(root, revision) {
 }
 
 export const harnessFiles = ['scripts/test-performance.mjs', 'scripts/performance/sources.mjs',
-  'scripts/performance/workloads.mjs', 'scripts/performance/comparison.mjs', 'test/helpers/conversation.mjs'];
+  'scripts/performance/workloads.mjs', 'scripts/performance/comparison.mjs',
+  'scripts/performance/responsiveness.mjs', 'test/helpers/conversation.mjs'];
 export async function harnessHashes(root, revision) {
   return Object.fromEntries(await Promise.all(harnessFiles.map(async path => [path,
     sha256(revision ? git(root, 'show', `${revision}:${path}`) : await readFile(resolve(root, path)))])));

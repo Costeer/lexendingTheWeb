@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { conversationHtml } from '../../test/helpers/conversation.mjs';
+import { measureResponsiveness, responsivenessProtocol } from './responsiveness.mjs';
 
 export const protocol = {
-  version: 1,
+  version: 2,
   viewport: { width: 1280, height: 800 },
   settingsChanges: 6,
   idleMs: 4000,
   streamEdits: 100,
   replacements: 6,
-  sampleTimeoutMs: 45000
+  sampleTimeoutMs: 45000,
+  responsiveness: responsivenessProtocol
 };
 
 const cards = count => `<!doctype html><style>
@@ -114,12 +116,12 @@ async function browserMetrics(client) {
   return metrics;
 }
 
-export async function runWorkload(browser, version, workload) {
+export async function runWorkload(browser, version, workload, { injectedBlockMs = 0 } = {}) {
   const context = await browser.newContext({ viewport: protocol.viewport, locale: 'en-US', timezoneId: 'UTC', serviceWorkers: 'block' });
   let timeout;
   try {
     return await Promise.race([
-      measure(context, version, workload),
+      measure(context, version, workload, injectedBlockMs),
       new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error(`${workload.name} exceeded ${protocol.sampleTimeoutMs} ms`)), protocol.sampleTimeoutMs); })
     ]);
   } finally {
@@ -128,7 +130,7 @@ export async function runWorkload(browser, version, workload) {
   }
 }
 
-async function measure(context, version, workload) {
+async function measure(context, version, workload, injectedBlockMs) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -146,6 +148,7 @@ async function measure(context, version, workload) {
   const client = await context.newCDPSession(page);
   await client.send('Performance.enable');
   const result = {};
+  let responsiveness;
   const snapshot = async () => ({ ...await browserMetrics(client), ...await page.evaluate(() => __bench.counters()) });
   const delta = (before, after) => ({
     taskMs: (after.TaskDuration - before.TaskDuration) * 1000,
@@ -238,7 +241,13 @@ async function measure(context, version, workload) {
     assert.equal(paused.state.pending, false);
     assert.equal(paused.size, '16px');
     record('resume', await measureChange(() => page.evaluate(() => { __bench.begin(); __bench.update({ enabled: true }); })));
+
+    // Appended after every existing phase so probe allocations cannot influence
+    // the old work/timing/retention gate. This is timed streaming, not the earlier
+    // intentionally unchanged microtask burst.
+    responsiveness = await measureResponsiveness(page, injectedBlockMs);
+    record('responsiveness', responsiveness.metrics);
   }
   assert.deepEqual(errors, [], 'Browser errors invalidate the measurement');
-  return result;
+  return { metrics: result, responsiveness: responsiveness?.raw };
 }
