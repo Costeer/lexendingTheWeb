@@ -10,6 +10,7 @@
     "check": "node scripts/check.mjs",
     "lint:firefox": "addons-linter dist/firefox --warnings-as-errors",
     "test": "node scripts/test.mjs",
+    "test:performance": "node scripts/test-performance.mjs",
     "test:browser": "node scripts/browser-tests.mjs",
     "test:ui": "npm run build:ui-tests && playwright test",
     "test:ui:update": "npm run build:ui-tests && playwright test --update-snapshots",
