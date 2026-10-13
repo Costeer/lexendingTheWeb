@@ -22,6 +22,7 @@ const { values } = parseArgs({ options: {
 const output = resolve(root, values.output);
 const report = { schemaVersion: 1, status: 'error', diagnosticOnly: true, startedAt: new Date().toISOString(),
   interpretation: 'Inclusive times overlap; never sum them. Self time subtracts only nested instrumented phases, includes uninstrumented work and probe overhead. These instrumented timings are not comparable to the unmodified-source gate. Scheduling reasons describe accepted queue requests; mixed mutation batches can have multiple reasons and requests can coalesce or revert before a refresh.',
+  containerEvidence: 'Each bounded record describes an actual repairContainers invocation, ordered within its repairLayout call. Numeric cache generations identify cache objects through a WeakMap; reports retain no cache or DOM objects. Before/after cumulative counters and per-invocation deltas distinguish centralized style and marker invalidations from other invalidation calls. Invocation ordinals are not fixed source checkpoint labels if a future implementation skips a checkpoint. Overflow fails this diagnostic.',
   protocol: { viewport: { width: 1280, height: 800 }, turns: 120, settingsChanges: 6,
     streamEdits: 100, streamIntervalMs: 20, protectedCodeEditEvery: 5, feedback: true }, samples: [] };
 let browser;
@@ -129,6 +130,11 @@ try {
   for (const phase of ['content.refresh', 'content.measureTypography', 'content.collectNestedScrollers', 'layout.captureBaseline', 'layout.repairLayout']) {
     assert(final.phases[phase]?.count > 0 && final.phases[phase].inclusiveMs > 0, `Inactive phase probe ${phase}`);
   }
+  assert.equal(final.containerPasses.dropped, 0, 'Container diagnostic overflowed its bounded record buffer');
+  assert.equal(final.containerPasses.records.length, final.phases['layout.repairContainers']?.count,
+    'Container invocation evidence differs from the exact phase counter');
+  assert(final.containerPasses.records.length > 0 && final.containerPasses.records.every(record =>
+    record.completed && record.repairId !== null && record.invocationInRepair > 0), 'Missing complete container repair evidence');
   if (conversation) {
     assert(final.schedulingReasons['mutation:characterData'] > 0, 'Missing stream reason probe');
     assert(report.samples.at(-1).authorWritesDelta > 0, 'Author observer did not contend during timed streaming');
