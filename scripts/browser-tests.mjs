@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { Builder, By, Key, Select } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import firefox from "selenium-webdriver/firefox.js";
+import { Command } from "selenium-webdriver/lib/command.js";
 import { unzipSync } from "fflate";
 import { assertBrowserVersion, isPersistedRestoration, parseBrowserArguments } from "./browser-evidence.mjs";
 
@@ -173,7 +174,13 @@ try {
   });
   await driver.manage().setTimeouts({ script: 20000 });
   if (browserName === "firefox") {
-    await driver.installAddon(archive, true);
+    // Selenium's installAddon sends base64. With geckodriver 0.37+, older
+    // Firefox releases delete that temporary backing XPI before content scripts
+    // load (Mozilla bug 2045054). The local driver's path endpoint keeps the
+    // exact retained archive available for the whole browser session.
+    const addonId = await driver.execute(new Command("install addon")
+      .setParameter("path", retainedArchive).setParameter("temporary", true));
+    report.installation = { method: "geckodriver-path", temporary: true, addonId, path: retainedArchive };
   }
   await driver.manage().window().setRect({ width: 1280, height: 900 });
   await driver.get(fixtureUrl);

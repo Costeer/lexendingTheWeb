@@ -54,6 +54,13 @@ statistics are disabled. The runner asserts that a requested numeric version
 matches the actual browser's version prefix. An unavailable download or driver is
 a verification failure, not a minimum-version pass.
 
+Firefox installs the retained ZIP through geckodriver's local-path endpoint and
+records that method in the report. Selenium's base64 installation route can
+delete the temporary add-on's backing file on older Firefox releases with newer
+geckodriver, leaving content scripts unavailable ([Mozilla bug 2045054](https://bugzilla.mozilla.org/show_bug.cgi?id=2045054)).
+The path route uses the same packaged bytes and permissions and keeps the archive
+available for the complete session.
+
 Each output directory contains `results.json` and applicable screenshots. The
 report records requested and actual browser versions, driver version, platform,
 the release ZIP path and SHA-256, manifest, and individual check outcomes. It also
