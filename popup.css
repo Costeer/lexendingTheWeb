@@ -753,6 +753,9 @@ fieldset:disabled {
 }
 
 :root .site-strip-copy { min-width: 0; }
+/* A standalone retry stretches across the mobile flex panel. The shared
+   link highlight's negative margins would make it wider than the viewport. */
+:root .panel > .text-link { margin-inline: 0; }
 :root .site-strip .site-message {
   display: block;
   margin-top: 5px;

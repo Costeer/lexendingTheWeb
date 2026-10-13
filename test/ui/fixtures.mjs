@@ -88,3 +88,40 @@ export async function scanAccessibility(page, testInfo) {
   await testInfo.attach("accessibility", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
   expect(results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map(({ target }) => target) }))).toEqual([]);
 }
+
+export async function assertViewportLayout(page, testInfo) {
+  const viewport = page.viewportSize();
+  const actual = await page.evaluate(() => ({
+    innerWidth, innerHeight,
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    coarsePointer: matchMedia("(pointer: coarse)").matches,
+    hover: matchMedia("(hover: hover)").matches,
+    touch: navigator.maxTouchPoints > 0
+  }));
+  expect(actual, "The page must retain its intended viewport and input capabilities").toMatchObject({
+    innerWidth: viewport.width, innerHeight: viewport.height, clientWidth: viewport.width,
+    coarsePointer: Boolean(testInfo.project.use.isMobile),
+    hover: !testInfo.project.use.isMobile,
+    touch: Boolean(testInfo.project.use.hasTouch)
+  });
+  expect(actual.scrollWidth, "The interface must not overflow horizontally").toBeLessThanOrEqual(viewport.width);
+}
+
+export async function containFullPageScreenshot(page, testInfo) {
+  await assertViewportLayout(page, testInfo);
+  // Chromium's captureBeyondViewport can clear mobile touch emulation. Give
+  // the capture the whole document at the same width so it stays in-viewport.
+  // Resize once, then fail if content does not fit; never conceal overflow.
+  const viewport = page.viewportSize();
+  const documentHeight = await page.evaluate(() => Math.ceil(Math.max(
+    document.documentElement.scrollHeight, document.body.scrollHeight,
+    document.body.getBoundingClientRect().bottom + scrollY
+  )));
+  if (documentHeight > viewport.height) {
+    await page.setViewportSize({ width: viewport.width, height: documentHeight });
+  }
+  await assertViewportLayout(page, testInfo);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight),
+    "The full document must fit inside the screenshot viewport").toBeLessThanOrEqual(page.viewportSize().height);
+}

@@ -1,4 +1,4 @@
-import { test, expect, openInterface, scanAccessibility } from "./fixtures.mjs";
+import { test, expect, openInterface, scanAccessibility, assertViewportLayout, containFullPageScreenshot } from "./fixtures.mjs";
 import { readFile } from "node:fs/promises";
 
 for (const section of ["readability", "rules", "appearance", "tools"]) {
@@ -90,5 +90,7 @@ test("popup remains accessible and visually stable", async ({ page }, testInfo) 
   await openInterface(page, "popup.html");
   await expect(page.locator("#site-strip")).toBeVisible();
   await scanAccessibility(page, testInfo);
+  if (testInfo.project.use.isMobile) await containFullPageScreenshot(page, testInfo);
   await expect(page).toHaveScreenshot("popup.png", { fullPage: true });
+  await assertViewportLayout(page, testInfo);
 });

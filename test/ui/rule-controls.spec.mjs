@@ -1,4 +1,4 @@
-import { test, expect, openInterface, scanAccessibility } from "./fixtures.mjs";
+import { test, expect, openInterface, scanAccessibility, assertViewportLayout } from "./fixtures.mjs";
 
 const saved = (page) => page.evaluate(async () => LexendSettings.normalizeSettings(await browser.storage.sync.get(null)));
 const setSettings = (page, settings) => page.evaluate(async (next) => {
@@ -147,8 +147,11 @@ test("popup identifies the independent winning rules beside global controls", as
   await expect(page.locator("#spacing-custom")).toBeChecked();
   await expect(page.locator("#spacing-custom")).toHaveAccessibleName(/Custom.*0\.057\s?em/i);
   await expect(page.locator("#spacing-custom + span")).toHaveCSS("background-color", "rgb(217, 0, 0)");
+  await expect(page.locator("#retry-page")).toBeVisible();
+  await assertViewportLayout(page, testInfo);
   await scanAccessibility(page, testInfo);
   await expect(page.locator("#spacing-fieldset")).toHaveScreenshot("custom-popup-spacing.png");
+  await assertViewportLayout(page, testInfo);
   await page.emulateMedia({ forcedColors: "active" });
   const customPaint = await page.locator("#spacing-custom + span").evaluate((element) => {
     const style = getComputedStyle(element);
