@@ -21,7 +21,7 @@
     "version": "node scripts/sync-version.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": "^22.13.0 || >=24.0.0"
   },
   "license": "MIT",
   "devDependencies": {

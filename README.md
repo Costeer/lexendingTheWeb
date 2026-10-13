@@ -61,8 +61,9 @@ available in [HTML](docs/privacy.html) for hosting as a standalone page.
 
 ## Build and test
 
-You'll need Node.js 22 or newer. Install the dependencies and Chromium for the
-browser tests, then run the tests and repository checks:
+You'll need Node.js 22.13 or newer within the 22.x line, or Node.js 24 or newer,
+matching the locked development dependencies. Install the dependencies and
+Chromium for the browser tests, then run the tests and repository checks:
 
 ```sh
 npm ci
@@ -83,6 +84,8 @@ worktree, use the folders printed by that worktree's build. Another checkout's
 npm run package
 npm run test:browser -- chrome
 npm run test:browser -- firefox
+# Exercise the Firefox desktop minimum declared in its manifest:
+npm run test:browser -- firefox --browser-version 140.0 --output /tmp/lexend-firefox-140
 ```
 
 These tests install the built extension into an isolated browser profile and
@@ -91,14 +94,19 @@ content scripts, typography, exclusions, shadow-root recovery, related frames,
 keyboard deletion, imports, and responsive settings and popup layouts. Chrome
 also checks forced colors and reduced motion. Selenium Manager downloads matching
 browser/driver binaries as needed; its usage statistics are disabled by the test
-runner. Results and screenshots are written to `dist/browser-tests/`.
+runner. Reports include actual browser and driver versions and artifact hashes;
+results and screenshots default to `dist/browser-tests/`. Use an absolute
+`--output` directory outside `dist` to preserve evidence across builds.
 The tests open desktop browser windows. On a Linux server without a desktop,
 prefix each browser command with `xvfb-run -a`; CI does this automatically so
 pointer/hover media queries match the desktop interface.
 
-CI runs both browsers on pull requests and checks dependency advisories. The
-narrow-window tests cover responsive layout, not Firefox Android's browser chrome;
-the Android add-on still needs device testing before release.
+CI runs stable Chrome and Firefox plus Firefox's manifest-declared desktop minimum
+on pull requests, and checks dependency advisories. Chrome currently has no declared
+minimum version, so its stable result does not establish a Chrome version floor.
+The narrow-window tests cover responsive layout, not Firefox Android's browser
+chrome. See [platform validation](docs/platform-validation.md) for the matrix,
+evidence requirements, and Android and manual accessibility checks before release.
 
 ### Additional regression checks
 
@@ -115,8 +123,9 @@ Run it after builds and separately from other tests. See the
 [performance guide](docs/performance.md#empirical-regression-gate) for metrics,
 tolerances, limitations, and the workflow for models making changes.
 
-`npm test` also runs reproducible generated settings/rule cases, cached-page
-restoration checks, and a 12-cycle dynamic feed stress test. CI repeats the full
+`npm test` also runs reproducible generated settings/rule cases, synthetic
+cached-page event handling checks, and a 12-cycle dynamic feed stress test. These
+events do not prove that a browser restored a cached document. CI repeats the full
 suite nightly at 03:17 UTC, with 100 stress cycles. To run the longer test locally:
 
 ```sh
@@ -127,7 +136,9 @@ After packaging, `npm run test:packages` checks both ZIPs against their build
 folders and validates runtime references, linked assets, and font licenses.
 The installed Chrome suite loads the extracted release ZIP and also restarts
 the browser with the same profile to check saved preferences and site pauses.
-Both installed browsers test back/forward navigation after preferences change.
+The installed suites separately record back/forward restoration after preferences
+change. Only a retained document with a real `pageshow.persisted` event counts as
+BFCache coverage; unavailable restoration is reported explicitly.
 
 The interface suite runs axe accessibility scans, keyboard deletion checks,
 asset/error checks, and screenshot comparisons in light and dark themes at
@@ -187,9 +198,10 @@ This builds both extensions and creates their ZIP files in `dist/releases`.
 Before submitting a release, run `npm run verify:chrome`,
 `npm run verify:firefox` (including Mozilla's `addons-linter`), and both
 installed-browser regression suites from the exact commit being submitted.
-Check navigation and rule deletion with a keyboard and screen reader. Also
-smoke-test the popup and settings on a real Firefox Android device; desktop
-narrow-window tests do not cover Android's extension surface.
+Complete the [platform release record](docs/platform-validation.md#release-record),
+including keyboard and screen-reader checks and installed Firefox Android popup
+and settings flows. Desktop narrow-window and axe results do not establish those
+manual/device checks.
 
 ## For website authors
 

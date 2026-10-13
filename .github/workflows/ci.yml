@@ -68,26 +68,4 @@ jobs:
           if-no-files-found: error
 
   browsers:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chrome, firefox]
-    env:
-      SE_AVOID_STATS: "true"
-      SE_FORCE_BROWSER_DOWNLOAD: "true"
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run package
-      - run: xvfb-run -a npm run test:browser -- ${{ matrix.browser }}
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: browser-tests-${{ matrix.browser }}
-          path: dist/browser-tests/
+    uses: ./.github/workflows/installed-browsers.yml
