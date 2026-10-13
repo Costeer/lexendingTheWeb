@@ -8,6 +8,11 @@ permissions:
   contents: write
 
 jobs:
+  installed-browsers:
+    uses: ./.github/workflows/installed-browsers.yml
+    with:
+      artifact-prefix: release-browser-${{ github.sha }}
+
   performance:
     uses: ./.github/workflows/performance.yml
     with:
@@ -38,7 +43,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [interfaces, performance]
+    needs: [interfaces, performance, installed-browsers]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -60,18 +65,6 @@ jobs:
       - run: npm run package
       - run: npm run test:packages
       - run: npm run lint:firefox
-      - name: Test installed Chrome and Firefox extensions
-        env:
-          SE_AVOID_STATS: "true"
-          SE_FORCE_BROWSER_DOWNLOAD: "true"
-        run: |
-          xvfb-run -a npm run test:browser -- chrome
-          xvfb-run -a npm run test:browser -- firefox
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: release-browser-regressions
-          path: dist/browser-tests/
       - uses: actions/download-artifact@v6
         with:
           name: release-performance-${{ github.sha }}

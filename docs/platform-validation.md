@@ -9,7 +9,8 @@ passing desktop run does not establish Android or assistive technology coverage.
 The reusable `.github/workflows/installed-browsers.yml` workflow reads desktop
 minimums from the manifests and runs the packaged extension in each declared
 minimum and in stable Chrome and Firefox. CI calls this workflow on pull requests,
-main pushes, manual dispatches, and its nightly schedule. It also runs correctness,
+main pushes, manual dispatches, and its nightly schedule. Release publication
+also depends on this entire workflow. It runs correctness,
 package, and Firefox lint checks on Node 22.13.0; the existing CI jobs use Node 24.
 The package engine range excludes Node 23, which the locked tooling does not
 support.
@@ -26,8 +27,8 @@ minimum requires examining that version's results; do not substitute current
 stable when the requested older engine cannot launch or install the artifact.
 
 The matrix verifies built files against the release ZIPs with `npm run
-test:packages` immediately after packaging. After the workflow03 delayed-root
-runner is integrated, every matrix entry must also run that installed-browser
+test:packages` immediately after packaging. Every matrix entry also runs the
+installed shadow-discovery and runtime-lifecycle
 runner with `--browser-version "$TEST_BROWSER_VERSION"` set to its requested
 numeric minimum or `stable`, plus `--checks scripts/runtime-lifecycle-checks.mjs`
 and without `--checks-only`. The default shadow checks alone do not establish
@@ -35,8 +36,8 @@ the full lifecycle contract, and any runner failure must block publication.
 It must exercise the actual MAIN and ISOLATED execution worlds
 using the original manifest entries and production script bytes that match the
 verified ZIP. Injected-source `npm test` fixtures do not establish this coverage.
-The runner invocation is pending integration; this branch does not invoke an
-unavailable script.
+Both suites run against the exact checkout selected by `github.sha`. Their
+reports, retained archives and command logs are uploaded even after a failure.
 
 From a packaged checkout, use:
 
@@ -46,6 +47,8 @@ npm run package
 npm run test:browser -- chrome --browser-version stable --output /tmp/lexend-chrome-stable
 npm run test:browser -- firefox --browser-version stable --output /tmp/lexend-firefox-stable
 npm run test:browser -- firefox --browser-version 140.0 --output /tmp/lexend-firefox-140
+node scripts/shadow-browser-tests.mjs firefox --browser-version 140.0 \
+  --checks scripts/runtime-lifecycle-checks.mjs --output /tmp/lexend-firefox-140-shadow
 ```
 
 On Linux without a desktop, prefix each browser command with `xvfb-run -a`.
@@ -60,6 +63,9 @@ delete the temporary add-on's backing file on older Firefox releases with newer
 geckodriver, leaving content scripts unavailable ([Mozilla bug 2045054](https://bugzilla.mozilla.org/show_bug.cgi?id=2045054)).
 The path route uses the same packaged bytes and permissions and keeps the archive
 available for the complete session.
+Both installed suites share this installation helper. The shadow suite retains
+its instrumented archive separately, with original manifest, production resource
+and test-probe hashes; the test probe is not part of the release package.
 
 Each output directory contains `results.json` and applicable screenshots. The
 report records requested and actual browser versions, driver version, platform,

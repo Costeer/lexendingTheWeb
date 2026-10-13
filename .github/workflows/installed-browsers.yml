@@ -17,6 +17,8 @@ jobs:
       browsers: ${{ steps.matrix.outputs.browsers }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -59,6 +61,8 @@ jobs:
       SE_FORCE_BROWSER_DOWNLOAD: "true"
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -81,6 +85,17 @@ jobs:
             --browser-version "$TEST_BROWSER_VERSION" \
             --output "$RUNNER_TEMP/lexend-browser-tests" \
             2>&1 | tee "$RUNNER_TEMP/lexend-browser-tests/command.log"
+      - name: Verify installed shadow discovery and runtime lifecycle
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
+          TEST_BROWSER_VERSION: ${{ matrix.version }}
+        shell: bash
+        run: |
+          xvfb-run -a node scripts/shadow-browser-tests.mjs "$TEST_BROWSER" \
+            --browser-version "$TEST_BROWSER_VERSION" \
+            --checks scripts/runtime-lifecycle-checks.mjs \
+            --output "$RUNNER_TEMP/lexend-browser-tests/shadow" \
+            2>&1 | tee "$RUNNER_TEMP/lexend-browser-tests/shadow-command.log"
       - name: Expose the actual engine and incomplete coverage
         if: always()
         shell: bash
@@ -117,6 +132,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 22.13.0

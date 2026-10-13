@@ -3,14 +3,14 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Builder } from "selenium-webdriver";
-import { Command } from "selenium-webdriver/lib/command.js";
 import chrome from "selenium-webdriver/chrome.js";
 import firefox from "selenium-webdriver/firefox.js";
 import { zipSync } from "fflate";
 import { assertBrowserVersion, parseBrowserProofOptions } from "./browser-proof-options.mjs";
+import { installTemporaryFirefoxAddon } from "./firefox-installation.mjs";
 
 // Installed-extension lifecycle proof. Unlike addScriptTag tests, the fixture
 // creates its roots in the page world and the runtime runs in ISOLATED.
@@ -94,6 +94,11 @@ await new Promise((done) => server.listen(0, "127.0.0.1", done));
 const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
 
 try {
+  const harnessPaths = ["scripts/shadow-browser-tests.mjs", "scripts/browser-proof-options.mjs", "scripts/firefox-installation.mjs"];
+  if (options.checks) harnessPaths.push(relative(root, resolve(options.checks)));
+  artifactEvidence.harnessHashes = Object.fromEntries(await Promise.all(harnessPaths.map(async (path) =>
+    [path, createHash("sha256").update(await readFile(resolve(root, path))).digest("hex")])));
+  artifactEvidence.customChecks = options.checks ? relative(root, resolve(options.checks)) : null;
   await cp(join(root, "dist", browserName), extensionDirectory, { recursive: true });
   const builtManifest = await readFile(join(extensionDirectory, "manifest.json"), "utf8");
   const manifest = JSON.parse(builtManifest);
@@ -175,8 +180,8 @@ try {
       method: "geckodriver-path", temporary: true, path: archive,
       archiveSha256: artifactEvidence.testInstrumentedArchive.sha256, addonId: null
     };
-    artifactEvidence.installation.addonId = await driver.execute(new Command("install addon")
-      .setParameter("path", archive).setParameter("temporary", true));
+    artifactEvidence.installation = { ...artifactEvidence.installation,
+      ...await installTemporaryFirefoxAddon(driver, archive) };
   }
   await driver.get(fixtureUrl);
   await wait("getComputedStyle(document.querySelector('#prose')).fontFamily.includes('Lexend')", "Installed extension applies initial typography");

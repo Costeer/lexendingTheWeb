@@ -539,6 +539,16 @@ pre-roadmap revision `9ba8c632ba900c39c0b102daa163ae3f0409488e`. A checkout
 missing that anchor or the previous release's resources fails rather than
 choosing another baseline. Fetch the full history and tags when reproducing.
 
+The historical `v0.5.0` runtime (`f2670e24aa210b80f6baedfcf09d22a5dd91e640`)
+predates the author-style feedback fix. An unchanged conversation fixture run
+against those bytes fails startup because typography does not settle within
+15 seconds. Consequently, a next release selecting that baseline remains
+blocked even if the candidate passes against the pre-roadmap revision. Preserve
+the baseline failure; it is not candidate regression evidence or a successful
+comparison. Resolving this historical compatibility boundary requires an
+explicitly reviewed release-baseline policy. Do not silently substitute a newer
+revision or relax the fixture to publish.
+
 ```sh
 node scripts/release-performance.mjs baseline --tag v0.6.0
 npm run test:performance -- --base <printed-baseline-commit>

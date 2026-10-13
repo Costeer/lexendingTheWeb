@@ -10,9 +10,9 @@ import { promisify } from "node:util";
 import { Builder, By, Key, Select } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import firefox from "selenium-webdriver/firefox.js";
-import { Command } from "selenium-webdriver/lib/command.js";
 import { unzipSync } from "fflate";
 import { assertBrowserVersion, isPersistedRestoration, parseBrowserArguments } from "./browser-evidence.mjs";
+import { installTemporaryFirefoxAddon } from "./firefox-installation.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { browserName, browserVersion, output } = parseBrowserArguments(process.argv.slice(2));
@@ -145,7 +145,7 @@ try {
     path: archive, retainedPath: retainedArchive, sha256: createHash("sha256").update(archiveBytes).digest("hex"), manifest,
     buildIdentity: files["build-identity.json"] ? JSON.parse(Buffer.from(files["build-identity.json"]).toString("utf8")) : null
   };
-  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html"].map(async (path) =>
+  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/firefox-installation.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html"].map(async (path) =>
     [path, createHash("sha256").update(await readFile(join(root, path))).digest("hex")])));
   report.environment.selenium = JSON.parse(await readFile(join(root, "node_modules/selenium-webdriver/package.json"), "utf8")).version;
   if (browserName === "chrome") {
@@ -178,9 +178,7 @@ try {
     // Firefox releases delete that temporary backing XPI before content scripts
     // load (Mozilla bug 2045054). The local driver's path endpoint keeps the
     // exact retained archive available for the whole browser session.
-    const addonId = await driver.execute(new Command("install addon")
-      .setParameter("path", retainedArchive).setParameter("temporary", true));
-    report.installation = { method: "geckodriver-path", temporary: true, addonId, path: retainedArchive };
+    report.installation = await installTemporaryFirefoxAddon(driver, retainedArchive);
   }
   await driver.manage().window().setRect({ width: 1280, height: 900 });
   await driver.get(fixtureUrl);
