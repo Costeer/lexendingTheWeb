@@ -1,0 +1,86 @@
+/* Shared by the extension's interfaces, never injected into websites. */
+:root fieldset.layout-picker {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 1;
+}
+:root .layout-picker > legend {
+  padding: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.layout-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+:root .layout-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 12px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+:root .layout-choice:has(:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-tint);
+}
+.layout-choice:has(:focus-visible) {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+:root .layout-choice input {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+:root .layout-choice input:focus-visible { outline: none; }
+.layout-choice-copy { min-width: 0; }
+.layout-choice-copy strong,
+.layout-choice-copy > span { display: block; }
+.layout-choice-copy strong { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.layout-choice-copy > span { margin-top: 4px; font-size: 12px; line-height: 1.4; }
+:root .layout-inherit {
+  grid-column: 1 / -1;
+  align-items: center;
+  padding-block: 8px;
+}
+.layout-inherit .layout-choice-copy { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.layout-inherit .layout-choice-copy > span { margin: 0; }
+:root .layout-explanation,
+:root .layout-note,
+:root .layout-save-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.layout-explanation { min-height: 3em; }
+:root .layout-note { font-size: 12px; }
+.layout-picker:disabled .layout-choice { opacity: .6; cursor: default; }
+@media (hover: hover) {
+  .layout-picker:not(:disabled) .layout-choice:hover { border-color: var(--ink); }
+}
+@media (max-width: 380px) {
+  :root .layout-choice { flex-direction: column; gap: 6px; padding: 10px 8px; }
+  :root .layout-inherit { flex-direction: row; align-items: center; }
+}
+@media (forced-colors: active) {
+  :root .layout-choice:has(:checked) { border: 2px solid Highlight; padding: 11px 9px; }
+  .layout-choice:has(:focus-visible) { outline-color: Highlight; }
+}

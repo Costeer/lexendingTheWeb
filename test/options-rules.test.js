@@ -5,6 +5,7 @@ import test from "node:test";
 import "../src/settings.js";
 import "../src/preferences.js";
 
+const layoutSource = await readFile(new URL("../src/ui-layout.js", import.meta.url), "utf8");
 const source = await readFile(new URL("../options.js", import.meta.url), "utf8");
 const themeSource = await readFile(new URL("../src/ui-theme.js", import.meta.url), "utf8");
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -121,6 +122,7 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
     console: { error(...args) { errors.push(args); } }
   };
   runInNewContext(themeSource, context);
+  runInNewContext(layoutSource, context);
   runInNewContext(source, context);
   await tick();
   if (!allowErrors) assert.deepEqual(errors, []);
@@ -424,7 +426,7 @@ test("readability and appearance changes preserve the existing site-rule rows", 
 });
 
 const ruleControl = (row, field) => row.children.find(child => child.className === "rule-settings")
-  .children.flatMap(label => label.children).find(child => child.dataset.field === field);
+  .children.flatMap(control => [control, ...control.children]).find(child => child.dataset.field === field);
 
 test("creation saves a layout-only subdomain rule without pausing Lexend", async () => {
   const page = await openSettings({ count: 0 });

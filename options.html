@@ -7,6 +7,7 @@
         <script src="src/ui-theme.js"></script>
         <link rel="preload" href="assets/fonts/lexend-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
         <link rel="stylesheet" href="shared.css" />
+        <link rel="stylesheet" href="src/ui-layout.css" />
         <link rel="stylesheet" href="options.css" />
         <link rel="stylesheet" href="options-desktop.css" />
     </head>
@@ -291,14 +292,8 @@
                 </div>
 
                 <div class="layout-control">
-                    <label for="layout-mode">Default layout mode</label>
-                    <select id="layout-mode" aria-describedby="layout-mode-description layout-mode-help" disabled>
-                        <option value="off">Off — leave layout alone</option>
-                        <option value="gentle">Gentle repair — grow simple text boxes</option>
-                        <option value="fit">Fit text — adapt type to the space</option>
-                    </select>
-                    <p id="layout-mode-description" class="helper"></p>
-                    <p id="layout-mode-help" class="helper">Applies to sites without a layout choice. Use the toolbar popup to compare modes and remember a choice for each site. Changes apply to open pages; no refresh needed. The sample below previews typography only.</p>
+                    <fieldset id="layout-mode" disabled></fieldset>
+                    <p id="layout-mode-help" class="helper">Used on sites without their own layout choice. To try a mode on just one site, use the toolbar popup. The sample below previews typography only.</p>
                 </div>
 
                 <div class="readability-preview">
@@ -334,7 +329,7 @@
                 <div class="section-heading">
                     <h2 id="rules-title">Site rules</h2>
                     <p class="helper">
-                        Exact-host rules take priority over subdomain rules.
+                        Choose how Lexend behaves on each site. Changes save automatically. More specific rules take priority.
                     </p>
                 </div>
 
@@ -357,42 +352,30 @@
                             role="alert"
                         ></p>
                     </div>
-                    <label class="check-label">
-                        <input id="new-subdomains" type="checkbox" />
-                        <span>
-                            <strong>Include subdomains</strong>
-                            <small id="subdomain-preview">*.example.com</small>
-                        </span>
-                    </label>
                     <div class="new-rule-settings">
-                        <label class="rule-control" for="new-rule-enabled">
-                            <span>Lexend</span>
-                            <select id="new-rule-enabled" disabled>
-                                <option value="default">Use default</option>
-                                <option value="on">On</option>
-                                <option value="paused">Paused</option>
-                            </select>
-                        </label>
-                        <label class="rule-control" for="new-rule-layout">
-                            <span>Layout</span>
-                            <select id="new-rule-layout" disabled>
-                                <option value="default">Use default</option>
-                                <option value="off">Off</option>
-                                <option value="gentle">Gentle repair</option>
-                                <option value="fit">Fit text</option>
-                            </select>
-                        </label>
+                        <fieldset id="new-rule-layout" disabled></fieldset>
+                        <div class="new-rule-options">
+                            <label class="rule-control" for="new-rule-enabled">
+                                <span>Lexend</span>
+                                <select id="new-rule-enabled" disabled>
+                                    <option value="default">Use default</option>
+                                    <option value="on">On</option>
+                                    <option value="paused">Paused</option>
+                                </select>
+                            </label>
+                            <label class="check-label">
+                                <input id="new-subdomains" type="checkbox" />
+                                <span>
+                                    <strong>Include subdomains</strong>
+                                    <small id="subdomain-preview">*.example.com</small>
+                                </span>
+                            </label>
+                        </div>
                     </div>
-                    <p id="new-rule-help" class="helper rule-form-help">Choose a layout mode or set Lexend to On or Paused. Use default follows matching parent rules, then your global settings. Layout choices apply while Lexend is on.</p>
-                    <button
-                        id="add-rule-button"
-                        class="primary-button"
-                        type="submit"
-                        aria-describedby="new-rule-help"
-                        disabled
-                    >
-                        Add rule
-                    </button>
+                    <div class="rule-form-actions">
+                        <button id="add-rule-button" class="primary-button" type="submit" aria-describedby="new-rule-help" disabled>Add rule</button>
+                        <p id="new-rule-help" class="helper rule-form-help">Choose a layout mode or change Lexend’s on/off setting to create a rule.</p>
+                    </div>
                 </form>
 
                 <div id="rule-toolbar" class="rule-toolbar" hidden>
@@ -559,6 +542,7 @@
 
         <script src="src/settings.js"></script>
         <script src="src/preferences.js"></script>
+        <script src="src/ui-layout.js"></script>
         <script src="src/quotes.js"></script>
         <script src="options.js"></script>
     </body>

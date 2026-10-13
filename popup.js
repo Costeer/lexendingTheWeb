@@ -4,6 +4,7 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const quotesApi = globalThis.LexendQuotes;
+  const layoutUi = globalThis.LexendLayoutUI;
   const tabs = extension?.tabs;
   const protectedHosts = new Set([
     "chrome.google.com",
@@ -36,12 +37,12 @@
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
   const retryLoad = document.querySelector("#retry-load");
-  const siteLayoutMode = document.querySelector("#site-layout-mode");
-  const siteLayoutDescription = document.querySelector("#site-layout-description");
+  const siteLayoutMode = layoutUi.create(document.querySelector("#site-layout-mode"), { label: "Layout on this site", inherit: true, announce: true });
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
   let feedbackTimer;
+  let pendingLayout;
   const quote = quotesApi.random();
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
@@ -92,16 +93,13 @@
     const supported = Boolean(site?.supported);
     siteLayoutMode.disabled = !preferences.loaded || !supported;
     const directLayout = supported ? settingsApi.getDirectRule(settings, site.hostname)?.layoutMode : null;
-    const effectiveLayout = supported ? settingsApi.resolveSite(settings, site.hostname).layoutMode : settings.layoutMode;
-    const inheritedLayout = supported
-      ? settingsApi.resolveSite({ ...settings, siteRules: settings.siteRules.map((rule) =>
-        rule.hostname === site.hostname && !rule.includeSubdomains ? { ...rule, layoutMode: null } : rule) }, site.hostname).layoutMode
-      : settings.layoutMode;
-    siteLayoutMode.querySelector('option[value="default"]').textContent = `Use default (${settingsApi.layoutModes[inheritedLayout].label})`;
-    siteLayoutMode.value = directLayout ?? "default";
-    siteLayoutDescription.textContent = supported
-      ? `${settingsApi.layoutModes[effectiveLayout].description} ${directLayout ? "Saved for this site." : "Using the default."}${settingsApi.resolveSite(settings, site.hostname).active ? "" : " Applies when Lexend resumes."}`
-      : "Open a website to compare layout modes. Change the default in Settings → Readability.";
+    siteLayoutMode.value = pendingLayout?.value ?? directLayout ?? "default";
+    layoutUi.update(siteLayoutMode, {
+      ...(supported ? layoutUi.inheritance(settings, site.hostname) : { inheritedMode: settings.layoutMode, source: "your global default" }),
+      notice: pendingLayout ? "Saving layout choice…" : !supported ? "Open a website to try layout modes."
+        : !settingsApi.resolveSite(settings, site.hostname).active ? "Lexend is paused here. This choice applies when it resumes."
+        : directLayout ? "Saved for this site." : ""
+    });
     siteStrip.hidden = !supported;
     restrictedNote.hidden = !site?.restricted;
     if (!supported) return;
@@ -224,10 +222,17 @@
     mutate({ type: "toggleSite", hostname: site.hostname });
   });
 
-  siteLayoutMode.addEventListener("change", () => {
+  siteLayoutMode.addEventListener("change", async () => {
     if (!site?.supported) return;
-    mutate({ type: "setSiteLayout", hostname: site.hostname,
-      layoutMode: siteLayoutMode.value === "default" ? null : siteLayoutMode.value });
+    const change = { value: siteLayoutMode.value };
+    pendingLayout = change;
+    const saved = await mutate({ type: "setSiteLayout", hostname: site.hostname,
+      layoutMode: change.value === "default" ? null : change.value });
+    if (pendingLayout === change) {
+      pendingLayout = null;
+      if (saved) showFeedback("", false, 0);
+    }
+    renderSite();
   });
 
   const start = async () => {

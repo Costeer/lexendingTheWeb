@@ -756,30 +756,3 @@ fieldset:disabled {
   padding-top: 14px;
   padding-bottom: 8px;
 }
-.layout-section > label {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--ink);
-  font-size: 13px;
-  letter-spacing: .06em;
-}
-.layout-section select {
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  font: inherit;
-  color: var(--text-body);
-  background: var(--surface);
-}
-.layout-description {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--secondary-text);
-}
-.layout-section select:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 3px;
-}

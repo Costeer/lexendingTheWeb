@@ -5,7 +5,8 @@ settings that predate layout modes. Lexend, text size, and spacing still apply.
 Off is a useful baseline: font changes can naturally reflow a page, but the
 extension does not rewrite its layout to compensate.
 
-Choose **Layout on this site** in the toolbar popup:
+Choose **Layout on this site** in the toolbar popup. All three choices stay
+visible, with a short explanation of the selected mode:
 
 - **Off** keeps your typography settings and leaves layout constraints alone.
 - **Gentle repair** grows a simple text box only when text that originally fit
@@ -15,6 +16,11 @@ Choose **Layout on this site** in the toolbar popup:
   between your requested size and the site's original size. If that cannot fit,
   it tries the site's original typography for that text alone. Ordinary reading
   text keeps Lexend. This mode can locally reduce your chosen size and spacing.
+
+The **Use default** choice shows the inherited mode and names the parent rule
+or global default it follows. Paused sites explain that changes apply when
+Lexend resumes. You can use Tab to reach a picker and arrow keys to change its
+selection.
 
 **Use default** removes that site's layout override without removing its pause
 or heading preference. Change the global choice in **Settings → Readability →

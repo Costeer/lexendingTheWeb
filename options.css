@@ -1689,44 +1689,25 @@ input::placeholder {
   border-top: 1px solid var(--ui-border);
   min-width: 0;
 }
-.layout-control > label {
-  font-weight: 500;
-  color: var(--text-title);
-}
-.layout-control select {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  min-height: 44px;
-  padding: 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  font: inherit;
-  color: var(--text-body);
-  background: var(--surface);
-}
 .layout-control .helper { margin: 0; }
-.layout-control select:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 3px;
-}
 
 .new-rule-settings,
 .rule-settings {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   grid-column: 1 / -1;
   min-width: 0;
 }
 .rule-control {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
   font-size: 13px;
 }
 .rule-control select {
-  width: 100%;
+  width: auto;
   min-width: 0;
   min-height: 44px;
   padding: 8px;
@@ -1745,4 +1726,33 @@ input::placeholder {
 :root .add-rule { grid-template-columns: minmax(0, 1fr); }
 @media (forced-colors: active) {
   .rule-control select:focus-visible { outline-color: Highlight; }
+}
+
+:root #add-rule-button { justify-self: start; }
+
+.new-rule-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 28px;
+}
+.new-rule-settings .layout-explanation { min-height: 0; }
+.rule-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  grid-column: 1 / -1;
+}
+:root .rule-form-actions #new-rule-help { margin: 0; font-size: 13px; }
+.rule-settings { container-type: inline-size; align-self: start; }
+.rule-settings .layout-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+:root .rule-settings .layout-choice { flex-direction: row; padding: 10px 8px; align-items: flex-start; }
+.rule-settings .layout-inherit { grid-column: auto; }
+.rule-settings .layout-choice-copy > span { display: none; }
+.rule-settings .layout-inherit .layout-choice-copy { display: block; }
+.rule-settings .layout-inherit .layout-choice-copy > span { display: block; }
+.rule-settings .layout-explanation { min-height: 0; }
+@container (min-width: 380px) {
+  .rule-settings .layout-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

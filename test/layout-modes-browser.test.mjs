@@ -92,15 +92,15 @@ test("installed modes switch live, preserve site choices, and restore all owned 
     // Use the actual extension Settings page and background writer.
     const options = await context.newPage();
     await options.goto(worker.url().replace('/src/background.js','/options.html'));
-    await options.locator('#layout-mode').selectOption('off');
+    await options.locator('#layout-mode input[value="off"]').check();
     await assertEventually(async()=>await worker.evaluate(async()=> (await chrome.storage.sync.get('layoutMode')).layoutMode)==='off');
     await settled('fit'); // this site's explicit choice wins over the default
     await options.locator('[data-settings-panel="rules-panel"]').click();
     const siteLayout = options.locator('[data-hostname="127.0.0.1"] [data-field="layoutMode"]');
-    assert.equal(await siteLayout.inputValue(), 'fit');
-    await siteLayout.selectOption('gentle');await settled('gentle');
-    await siteLayout.selectOption('fit');await settled('fit');
-    await siteLayout.selectOption('default');await settled('off');
+    assert.equal(await siteLayout.locator('input:checked').inputValue(), 'fit');
+    await siteLayout.locator('input[value="gentle"]').check();await settled('gentle');
+    await siteLayout.locator('input[value="fit"]').check();await settled('fit');
+    await siteLayout.locator('input[value="default"]').click();await settled('off');
     assert.equal(await options.locator('[data-hostname="127.0.0.1"]').count(), 0);
   } finally {
     await context?.close();await new Promise(resolve=>server.close(resolve));await rm(temporary,{recursive:true,force:true});

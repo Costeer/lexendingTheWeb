@@ -32,6 +32,10 @@ adding a rule. Edits save automatically; **Use default** removes that override
 and follows matching parent rules, then global settings. A rule with no
 remaining overrides is removed.
 
+Layout choices stay visible, with an explanation of the selected mode.
+**Use default** shows the inherited mode and where it comes from. Pickers
+support arrow keys, and paused sites explain when the choice will take effect.
+
 Settings sync through your browser when browser sync is enabled. Use the
 import and export controls in Settings to save or restore a JSON backup.
 

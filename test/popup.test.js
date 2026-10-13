@@ -5,6 +5,7 @@ import test from "node:test";
 import "../src/settings.js";
 import "../src/preferences.js";
 
+const layoutSource = await readFile(new URL("../src/ui-layout.js", import.meta.url), "utf8");
 const source = await readFile(new URL("../popup.js", import.meta.url), "utf8");
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) {
@@ -13,6 +14,7 @@ async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) 
     classList = { toggle() {}, remove() {} };
     addEventListener(name, listener) { this.listeners[name] = listener; }
     setAttribute(name, value) { this.attributes[name] = value; }
+    append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
     querySelector(selector) { return get(selector); }
     emit(name) { return this.listeners[name]?.(); }
@@ -50,6 +52,7 @@ async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) 
     LexendTheme: { apply() {} }, LexendQuotes: { random: () => ({ text: "Preview", author: "Author" }) },
     setTimeout: () => 0, clearTimeout() {}, console: { error() {} }, URL
   };
+  runInNewContext(layoutSource, context);
   runInNewContext(source, context);
   await tick();
   return { get, writes, scope, spacing, stored: () => stored };

@@ -7,6 +7,7 @@
     <script src="src/ui-theme.js"></script>
     <link rel="preload" href="assets/fonts/lexend-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="shared.css" />
+    <link rel="stylesheet" href="src/ui-layout.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -55,6 +56,11 @@
         <button id="toggle-site" class="text-link" type="button">Pause here</button>
       </section>
 
+      <section class="popup-section layout-section" aria-label="Layout on this site">
+        <fieldset id="site-layout-mode" disabled></fieldset>
+        <p class="layout-save-hint">Choices save automatically. No reload needed.</p>
+      </section>
+
       <fieldset id="scope-fieldset" class="popup-section scope-section">
         <legend>Apply Lexend to</legend>
         <label class="choice-card">
@@ -72,17 +78,6 @@
           </span>
         </label>
       </fieldset>
-
-      <section class="popup-section layout-section" aria-labelledby="site-layout-label">
-        <label id="site-layout-label" for="site-layout-mode">Layout on this site</label>
-        <select id="site-layout-mode" aria-describedby="site-layout-description" disabled>
-          <option value="default">Use default (Off)</option>
-          <option value="off">Off</option>
-          <option value="gentle">Gentle repair</option>
-          <option value="fit">Fit text</option>
-        </select>
-        <p id="site-layout-description" class="layout-description">Keep Lexend and your text settings. Leave the site's layout alone.</p>
-      </section>
 
       <fieldset id="spacing-fieldset" class="popup-section spacing-section">
         <legend>Spacing</legend>
@@ -118,6 +113,7 @@
     </main>
     <script src="src/settings.js"></script>
     <script src="src/preferences.js"></script>
+    <script src="src/ui-layout.js"></script>
     <script src="src/quotes.js"></script>
     <script src="popup.js"></script>
   </body>

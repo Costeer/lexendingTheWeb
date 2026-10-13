@@ -451,7 +451,7 @@
   }
 
   :root .settings-layout .add-rule {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px 20px;
     padding: 0;
     border: 0;
@@ -463,8 +463,8 @@
   }
 
   :root .settings-layout #add-rule-button {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: 1;
+    grid-row: auto;
   }
 
   :root .settings-layout .check-label {
