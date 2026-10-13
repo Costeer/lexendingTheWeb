@@ -35,9 +35,12 @@ import and export controls in Settings to save or restore a JSON backup.
 
 ## On the page
 
-When text no longer fits, Lexend makes room by letting boxes grow, labels wrap,
-or panels scroll. Pause it on a site to return to that site's styles. There's a
-short guide to [layout adjustments](docs/adaptive-layout.md).
+Layout repair starts **Off**. Use **Layout on this site** in the toolbar popup
+to compare **Off**, **Gentle repair** (grow simple clipped text boxes), and
+**Fit text** (adapt constrained text, with local original-font exceptions).
+Choices apply immediately and are saved for that site. Set the default in
+**Settings → Readability**. Pause a site to restore its original typography too.
+Read the [layout modes and testing guide](docs/adaptive-layout.md).
 
 Code, math, SVG artwork, and common icon fonts keep their original fonts.
 Missing icons can use the included Nerd Fonts symbols. Browser settings and

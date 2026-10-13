@@ -56,168 +56,6 @@
   let warnedRefreshError = null;
   let revealedAutoContent = new WeakSet();
   const knownAutoContent = new Map();
-  let initialFrameHeight = window === window.top ? null : innerHeight;
-  let requestedFrameHeight = null;
-  const resizedFrames = new Map();
-  let lastFrameRequest = null;
-  const FRAME_MESSAGE = "lexend-measured-frame-height";
-  const FRAME_RUNTIME_REQUEST = "LEXEND_FRAME_REQUIREMENT";
-  const FRAME_RUNTIME_APPLY = "LEXEND_APPLY_FRAME_REQUIREMENT";
-  const writeFrameProperty = (state, element, name, value) => {
-    let properties = state.elements.get(element);
-    if (!properties) state.elements.set(element, properties = { hadStyle: element.hasAttribute("style"), values: new Map() });
-    let original = properties.values.get(name);
-    if (!original) {
-      original = { value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) };
-      properties.values.set(name, original);
-    } else if (element.style.getPropertyValue(name) !== original.applied) {
-      original.value = element.style.getPropertyValue(name);
-      original.priority = element.style.getPropertyPriority(name);
-    }
-    original.applied = value;
-    if (element.style.getPropertyValue(name) !== value || element.style.getPropertyPriority(name) !== "important") element.style.setProperty(name, value, "important");
-  };
-  const restoreFrame = (frame) => {
-    const state = resizedFrames.get(frame);
-    if (!state) return;
-    for (const [name, original] of state.properties) {
-      if (frame.style.getPropertyValue(name) !== original.applied
-          || frame.style.getPropertyPriority(name) !== "important") continue;
-      if (original.value) frame.style.setProperty(name, original.value, original.priority);
-      else frame.style.removeProperty(name);
-    }
-    if (!state.hadStyle && !frame.getAttribute("style")) frame.removeAttribute("style");
-    for (const [element, properties] of state.elements) {
-      for (const [name, original] of properties.values) {
-        if (element.style.getPropertyValue(name) !== original.applied || element.style.getPropertyPriority(name) !== "important") continue;
-        if (original.value) element.style.setProperty(name, original.value, original.priority);
-        else element.style.removeProperty(name);
-      }
-      if (!properties.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
-    }
-    resizedFrames.delete(frame);
-  };
-  const notifyFrameRequirement = () => {
-    if (initialFrameHeight === null) return;
-    // At document_start an embed can still have its default/placeholder size.
-    // Follow native viewport changes until our measured request is actually
-    // reflected in the child viewport, then retain the pre-repair baseline.
-    if (innerHeight > 0 && (requestedFrameHeight === null
-        || Math.abs(innerHeight - requestedFrameHeight) > 1)) initialFrameHeight = innerHeight;
-    const requirement = isActive() ? layout?.getFrameRequirement?.(initialFrameHeight) ?? null : null;
-    const serialized = JSON.stringify(requirement);
-    if (lastFrameRequest === serialized && (!requirement
-        || Math.abs(innerHeight - requirement.requiredHeight) <= 1)) return;
-    lastFrameRequest = serialized;
-    requestedFrameHeight = requirement?.requiredHeight ?? null;
-    // Chrome can redact MessageEvent.source between extension isolated worlds.
-    // Route measured requirements through authenticated extension messaging.
-    extension.runtime.sendMessage({ type: FRAME_RUNTIME_REQUEST, requirement }).catch(() => {});
-  };
-  const applyFrameRequirement = (frame, requirement) => {
-    if (!isActive() || requirement === null) {
-      observer.disconnect();
-      try { restoreFrame(frame); } finally { if (!refreshing) observeRoots(); }
-      return;
-    }
-    if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) return;
-    const { viewportHeight, requiredHeight, baselineHeight } = requirement;
-    if (![viewportHeight, requiredHeight, baselineHeight].every(Number.isFinite)
-        || viewportHeight <= 0 || viewportHeight > 160 || baselineHeight <= 0 || baselineHeight > 160
-        || baselineHeight > viewportHeight + 2
-        || requiredHeight <= viewportHeight || requiredHeight > Math.min(320, innerHeight * 0.5)) return;
-    const box = frame.getBoundingClientRect(), css = getComputedStyle(frame);
-    if (box.width < 80 || box.height <= 0
-        || css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0) return;
-    // A caption can report before its parent scrolls it into the viewport.
-    // Keep its measured flow footprint ready, but do not open a closed portal
-    // or a subtree whose author styles prevent any native frame surface.
-    let paintedLeft = box.left, paintedRight = box.right, paintedTop = box.top, paintedBottom = box.bottom;
-    for (let parent = frame.parentElement; parent; parent = parent.parentElement) {
-      const style = getComputedStyle(parent);
-      if (style.display === "none" || style.visibility === "hidden" || style.contentVisibility === "hidden"
-          || Number(style.opacity) === 0) return;
-      const parentBox = parent.getBoundingClientRect();
-      if (/hidden|clip/.test(style.overflowX)) {
-        paintedLeft = Math.max(paintedLeft, parentBox.left);
-        paintedRight = Math.min(paintedRight, parentBox.right);
-      }
-      if (/hidden|clip/.test(style.overflowY)) {
-        paintedTop = Math.max(paintedTop, parentBox.top);
-        paintedBottom = Math.min(paintedBottom, parentBox.bottom);
-      }
-      if (paintedRight <= paintedLeft || paintedBottom <= paintedTop) return;
-    }
-    let state = resizedFrames.get(frame);
-    if (!state && Math.abs(box.height - viewportHeight) > 4) return;
-    observer.disconnect();
-    try {
-      if (!state) {
-        state = { hadStyle: frame.hasAttribute("style"), properties: new Map(), elements: new Map() };
-        resizedFrames.set(frame, state);
-      }
-      const shortAncestors = [];
-      for (let parent = frame.parentElement; parent && parent !== document.body && shortAncestors.length < 4; parent = parent.parentElement) {
-        const style = getComputedStyle(parent), before = parent.getBoundingClientRect();
-        if (before.height > 160 || before.width + 2 < box.width) break;
-        shortAncestors.push({ element: parent, box: before, clips: /hidden|clip/.test(style.overflowY) });
-      }
-      const oldBottom = shortAncestors.at(-1)?.box.bottom ?? box.bottom;
-      const borderBoxExtra = css.boxSizing === "border-box"
-        ? [css.borderTopWidth, css.borderBottomWidth, css.paddingTop, css.paddingBottom].reduce((total, value) => total + (parseFloat(value) || 0), 0) : 0;
-      for (const [name, value] of [["height", `${Math.ceil(requiredHeight + borderBoxExtra)}px`], ["max-height", "none"]]) {
-        let original = state.properties.get(name);
-        if (!original) {
-          original = { value: frame.style.getPropertyValue(name), priority: frame.style.getPropertyPriority(name) };
-          state.properties.set(name, original);
-        } else if (frame.style.getPropertyValue(name) !== original.applied) {
-          original.value = frame.style.getPropertyValue(name);
-          original.priority = frame.style.getPropertyPriority(name);
-        }
-        original.applied = value;
-        if (frame.style.getPropertyValue(name) !== value || frame.style.getPropertyPriority(name) !== "important") frame.style.setProperty(name, value, "important");
-      }
-      for (const parent of shortAncestors) {
-        const frameBox = frame.getBoundingClientRect(), parentBox = parent.element.getBoundingClientRect();
-        if (!parent.clips || frameBox.bottom <= parentBox.bottom + 2) continue;
-        const height = Math.ceil(parentBox.height + frameBox.bottom - parentBox.bottom);
-        if (height > Math.min(320, innerHeight * 0.5)) continue;
-        writeFrameProperty(state, parent.element, "height", `${height}px`);
-        writeFrameProperty(state, parent.element, "max-height", "none");
-      }
-      const newBottom = shortAncestors.at(-1)?.element.getBoundingClientRect().bottom ?? frame.getBoundingClientRect().bottom;
-      if (newBottom > oldBottom + 2) {
-        for (const actionBar of document.querySelectorAll("header,nav,[role='navigation']")) {
-          if (actionBar.contains(frame) || shortAncestors.some((entry) => entry.element.contains(actionBar))) continue;
-          const style = getComputedStyle(actionBar), bar = actionBar.getBoundingClientRect();
-          if (style.position !== "fixed" || bar.height <= 0 || bar.height > 160 || bar.top < oldBottom - 2 || bar.top >= newBottom
-              || bar.right <= box.left || bar.left >= box.right || !Number.isFinite(parseFloat(style.top))) continue;
-          writeFrameProperty(state, actionBar, "top", `${parseFloat(style.top) + newBottom - bar.top}px`);
-        }
-      }
-    } finally { if (!refreshing) observeRoots(); }
-  };
-  const receiveFrameRequirement = (event) => {
-    if (event.data?.type !== FRAME_MESSAGE || !event.source) return;
-    const frame = [...document.querySelectorAll("iframe")].find((candidate) => candidate.contentWindow === event.source);
-    if (frame) applyFrameRequirement(frame, event.data.requirement);
-  };
-  const receiveRuntimeFrameRequirement = (message, sender) => {
-    if (sender?.id !== extension.runtime.id || !Number.isInteger(message.sourceFrameId) || message.sourceFrameId <= 0) return;
-    let sourceUrl, senderUrl;
-    try {
-      sourceUrl = new URL(message.frameUrl);
-      senderUrl = new URL(sender.url);
-      if (!["http:", "https:"].includes(sourceUrl.protocol) || senderUrl.protocol !== new URL(extension.runtime.getURL("")).protocol
-          || senderUrl.host !== new URL(extension.runtime.getURL("")).host) return;
-      sourceUrl.hash = "";
-    } catch { return; }
-    const matches = [...document.querySelectorAll("iframe")].filter((frame) => {
-      try { const url = new URL(frame.src); url.hash = ""; return url.href === sourceUrl.href; } catch { return false; }
-    });
-    if (matches.length === 1) applyFrameRequirement(matches[0], message.requirement);
-  };
-
   // Exact, disjoint cmap coverage of the bundled subsets. Overlapping faces
   // can leave an unused subset pending in document.fonts.check even though
   // every painted character is loaded from another subset. Unsupported scripts
@@ -296,8 +134,6 @@
       [data-lexend-before='protected']::before { ${preserved("before-")} }
       [data-lexend-after='protected']::after { ${preserved("after-")} }
       [data-lexend-hide-fade-before]::before, [data-lexend-hide-fade-after]::after { display: none !important; }
-      [data-lexend-fit-pseudo-before]::before { margin-left: var(--lexend-layout-before-margin-left) !important; }
-      [data-lexend-fit-pseudo-after]::after { margin-left: var(--lexend-layout-after-margin-left) !important; }
       /* Slotted light-DOM text belongs to an inner shadow cascade. Important
          author ::slotted declarations outrank outer inline-important styles. */
       @layer lexend-slotted-typography {
@@ -515,6 +351,7 @@
     }
     let overwritten = false;
     state.properties.forEach((property, name) => {
+      if (layout?.ownsProperty?.(element, name)) return;
       const value = element.style.getPropertyValue(name), priority = element.style.getPropertyPriority(name);
       if (value === property.appliedValue && priority === property.appliedPriority) return;
       // Hover rerenders can replace an entire style attribute. Keep the new
@@ -954,9 +791,6 @@
     observer.disconnect();
     let focusedElement = document.activeElement;
     while (focusedElement?.shadowRoot?.activeElement) focusedElement = focusedElement.shadowRoot.activeElement;
-    const ownedTableChild = (element) => element?.matches?.("[data-lexend-layout-repair~='scroll-table']")
-      ? [...element.children].find((child) => child.tagName === "TABLE") ?? null : null;
-    const focusedTable = ownedTableChild(focusedElement);
     const scrollPosition = { x: scrollX, y: scrollY };
     const rootStyle = document.documentElement.style;
     const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: document.documentElement.hasAttribute("style") };
@@ -974,7 +808,7 @@
             || (!element.scrollLeft && !element.scrollTop)) return;
         nestedScrollers.set(element, { x: element.scrollLeft, y: element.scrollTop,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
-          hadStyle: element.hasAttribute("style"), table: ownedTableChild(element) });
+          hadStyle: element.hasAttribute("style") });
       });
     }
     // Read every scroll offset before changing styles; interleaving these
@@ -993,14 +827,13 @@
       // finished page is shorter) before re-enabling native scroll anchoring.
       try {
         document.documentElement.getBoundingClientRect();
-        const focusTarget = focusedElement?.isConnected ? focusedElement : focusedTable?.parentElement;
-        if (focusTarget && focusTarget !== document.body && focusTarget !== document.documentElement
-            && (!focusedTable || focusTarget.matches("[data-lexend-layout-repair~='scroll-table']"))) {
+        const focusTarget = focusedElement?.isConnected ? focusedElement : null;
+        if (focusTarget && focusTarget !== document.body && focusTarget !== document.documentElement) {
           focusTarget.focus({ preventScroll: true });
         }
         nestedScrollers.forEach((position, originalElement) => {
-          const element = originalElement.isConnected ? originalElement : position.table?.parentElement;
-          if (!element?.isConnected || (position.table && !element.matches("[data-lexend-layout-repair~='scroll-table']"))) return;
+          const element = originalElement;
+          if (!element.isConnected) return;
           element.scrollTo({ left: position.x, top: position.y, behavior: "instant" });
           if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
           else element.style.removeProperty("overflow-anchor");
@@ -1016,10 +849,6 @@
         if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
         else rootStyle.removeProperty("overflow-anchor");
         if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) document.documentElement.removeAttribute("style");
-        // An already focused action does not emit focusin again when its pane
-        // grows. Recheck its repaired vertical viewport after restoring saved
-        // offsets; ordinary page/table scrollers remain under native control.
-        if (!refreshError && isActive() && focusTarget?.isConnected) globalThis.LexendControls?.revealFocused?.(focusTarget);
       } catch (error) { refreshError ??= error; }
       finally {
         refreshing = false;
@@ -1058,14 +887,13 @@
           ? child.checkVisibility({ contentVisibilityAuto: true }) : !skipped;
         if (painted) revealedAutoContent.add(target);
       }
-      notifyFrameRequirement();
     }
     // Large pages can spend hundreds of milliseconds in a full repair. Give
     // the site four times that duration to handle input and paint before the
     // next automatic pass. Incoming text receives its font independently.
     budgetRefresh(duration);
   };
-  const refresh = (preserveHidden = false) => {
+  const refresh = () => {
     refreshTimer = null;
     refreshUrgent = false;
     refreshRequired = false;
@@ -1081,19 +909,7 @@
     retentionWrites = new WeakMap();
     let deferred = false;
     const error = withViewportPreserved(() => {
-      for (const frame of resizedFrames.keys()) {
-        let hidden = !frame.isConnected || !frame.getClientRects().length;
-        for (let current = frame; !hidden && current; current = current.parentElement) {
-          const css = getComputedStyle(current);
-          hidden = css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0;
-        }
-        // An embed may be removed before its child can relay a null request.
-        // Restore its surrounding footprint while preserving the site's own
-        // close-state mutations, even when typography remains enabled.
-        if (hidden) restoreFrame(frame);
-      }
-      layout?.restore({ preserveHidden });
-      if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
+      layout?.restore();
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
       [...styledRoots].forEach((root) => { if (!root.isConnected) styledRoots.delete(root); });
@@ -1104,13 +920,15 @@
         let measurements;
         withExtensionStylesDisabled(() => {
           measurements = measureTypography(roots);
-          layout?.capture(roots, { preserveHidden });
+          if (getEffectiveSettings().layoutMode !== "off") layout?.capture(roots);
         });
         applyTypography(measurements);
-        // Focused repaired controls must retain their wrapper and scroll range
-        // within the same task. Hidden tabs cannot depend on animation frames.
-        if (repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
-        else deferred = true;
+        // Focused controls and embedded/hidden documents complete the change
+        // in this task; they cannot rely on a future visible rendering frame.
+        if (getEffectiveSettings().layoutMode !== "off") {
+          if (repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
+          else deferred = true;
+        }
       }
     });
     const duration = performance.now() - started;
@@ -1143,7 +961,7 @@
       element.isConnected && element.getAttribute("aria-hidden") !== value)
       || [...pendingStyleChanges].some(([element, value]) => element.isConnected
         && authorStyleSignature(element, element.getAttribute("style")) !== value));
-    if (refreshRequired || changed) { refresh(true); return; }
+    if (refreshRequired || changed) { refresh(); return; }
     refreshTimer = null;
     refreshUrgent = false;
     pendingAriaChanges.clear();
@@ -1208,7 +1026,7 @@
     settings = settingsApi.normalizeSettings(nextSettings);
     const effective = getEffectiveSettings();
     if (refreshRevision > 0 && lastRefreshError === null && previous.active === effective.active
-        && (!effective.active || previous.scope === effective.scope
+        && (!effective.active || previous.scope === effective.scope && previous.layoutMode === effective.layoutMode
           && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) return;
     revealedAutoContent = new WeakSet();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
@@ -1334,7 +1152,7 @@
       coalescible ? styleChanges : null);
   });
   const start = async () => {
-    layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
+    layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements, getMode: () => getEffectiveSettings().layoutMode }) ?? null;
     window.addEventListener("pageshow", async (event) => {
       if (!event.persisted) return;
       // Cached documents may miss storage events while frozen. Read current
@@ -1350,13 +1168,7 @@
       notifyState();
     });
     window.addEventListener("resize", invalidateAutoContent, { passive: true });
-    window.addEventListener("message", receiveFrameRequirement);
-    document.addEventListener("focusin", (event) => {
-      queueRefresh();
-      requestAnimationFrame(() => {
-        if (isActive()) globalThis.LexendControls?.revealFocused?.(event.target);
-      });
-    }, true);
+    document.addEventListener("focusin", queueRefresh, true);
     document.addEventListener("focusout", queueRefresh, true);
     const remeasureRevealedLabels = (event) => {
       if (event.type === "transitionend"
@@ -1457,11 +1269,6 @@
   });
 
   extension.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === FRAME_RUNTIME_APPLY) {
-      receiveRuntimeFrameRequirement(message, _sender);
-      sendResponse({ received: true });
-      return undefined;
-    }
     if (message?.type !== "LEXEND_GET_STATE") return undefined;
     sendResponse({
       ready: true,
@@ -1471,6 +1278,8 @@
       error: lastRefreshError,
       active: isActive(),
       hostname: getEffectiveHostname(),
+      layoutMode: getEffectiveSettings().layoutMode,
+      layout: layout?.getDiagnostics?.() ?? null,
       scope: getEffectiveSettings().scope
     });
     return undefined;

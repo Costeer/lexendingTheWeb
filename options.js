@@ -19,6 +19,8 @@
   const textScaleSlider = document.querySelector("#text-scale");
   const lineHeightSlider = document.querySelector("#line-height");
   const letterSpacingSlider = document.querySelector("#letter-spacing");
+  const layoutModeInput = document.querySelector("#layout-mode");
+  const layoutModeDescription = document.querySelector("#layout-mode-description");
   const textScaleOutput = document.querySelector("#text-scale-output");
   const lineHeightOutput = document.querySelector("#line-height-output");
   const letterSpacingOutput = document.querySelector("#letter-spacing-output");
@@ -114,7 +116,7 @@
   const ruleRowData = new WeakMap();
   const quote = quotesApi.random();
   const mutationControls = [darkThemeInput, advancedModeInput, textScaleSlider,
-    lineHeightSlider, letterSpacingSlider, resetReadabilityButton, hostnameInput,
+    lineHeightSlider, letterSpacingSlider, layoutModeInput, resetReadabilityButton, hostnameInput,
     subdomainsInput, exportButton, importButton, importFile,
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
   const preferences = globalThis.LexendPreferences.createClient(extension, {
@@ -286,6 +288,8 @@
   };
 
   const renderReadability = () => {
+    layoutModeInput.value = settings.layoutMode;
+    layoutModeDescription.textContent = settingsApi.layoutModes[settings.layoutMode].description;
     setRadioValue(basicTextScaleInputs, settings.textScale);
     setRadioValue(basicLineHeightInputs, settings.lineHeight);
     setRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
@@ -422,6 +426,12 @@
       hostname.title = `Open ${rule.hostname}`;
       hostname.textContent = rule.hostname;
       domain.append(hostname);
+      if (rule.layoutMode) {
+        const layoutTag = document.createElement("span");
+        layoutTag.className = "rule-tag";
+        layoutTag.textContent = `Layout: ${settingsApi.layoutModes[rule.layoutMode].label}`;
+        domain.append(layoutTag);
+      }
       if (rule.includeSubdomains) {
         const tag = document.createElement("span");
         tag.className = "rule-tag";
@@ -520,6 +530,8 @@
       showToast("The advanced view preference could not be saved");
     }
   });
+
+  layoutModeInput.addEventListener("change", () => save({ layoutMode: layoutModeInput.value }));
 
   darkThemeInput.addEventListener("change", () => {
     save({

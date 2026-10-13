@@ -1,48 +1,72 @@
-# Layout adjustments
+# Layout modes
 
-Lexend can take up more space than a site's original font. The extension
-measures the page before and after changing the text, then makes room where
-that change causes clipping or overlap.
+The extension starts with layout repair **Off**, including when upgrading from
+settings that predate layout modes. Lexend, text size, and spacing still apply.
+Off is a useful baseline: font changes can naturally reflow a page, but the
+extension does not rewrite its layout to compensate.
 
-It can:
+Choose **Layout on this site** in the toolbar popup:
 
-- Let text boxes grow and short labels wrap without splitting words.
-- Keep buttons and dialog actions reachable, adding scrolling where needed.
-- Give wide tables a scrolling area you can focus with the keyboard.
-- Keep photos from shrinking when their captions grow.
-- Move tooltips back onscreen and keep fixed controls clear of page content.
+- **Off** keeps your typography settings and leaves layout constraints alone.
+- **Gentle repair** grows a simple text box only when text that originally fit
+  becomes clipped. It preserves the requested type size. It does not restructure
+  navigation, flex or grid layouts, positioned panels, scrolling regions, or media.
+- **Fit text** keeps layout CSS intact and finds the largest fitting font size
+  between your requested size and the site's original size. If that cannot fit,
+  it tries the site's original typography for that text alone. Ordinary reading
+  text keeps Lexend. This mode can locally reduce your chosen size and spacing.
 
-These adjustments use the page's measured layout, with no rules for specific
-websites. Text added later, window resizing, and newly loaded fonts trigger
-another check. Focus and scroll positions are preserved.
+**Use default** removes that site's layout override without removing its pause
+or heading preference. Change the global choice in **Settings → Readability →
+Default layout mode**. Site choices sync with your other preferences and are
+included in settings backups. An exact hostname choice wins over an inherited
+subdomain rule. Site rules lists show saved layout choices; deleting a rule
+also removes its pause and scope settings.
 
-Height repairs follow the same rules at every window size:
+## Comparing on a real site
 
-- Expanding text must not shrink its container or erase space allocated to
-  children. A repair measures the effect of `height: auto` before keeping it.
-- Keep a definite height when automatic sizing would collapse flex or grid
-  space, or a child's percentage height. This also applies to narrow columns,
-  containers below a header, and pages that have already been scrolled.
-- Grow preserved heights only for new overflow. Glyphs extending beyond a
-  tight line box must not add page height on every refresh. Preserve fractional
-  heights so browser zoom does not introduce an extra scrollbar.
-- Recalculate from the site's styles after a resize, and restore those styles
-  when Lexend is paused. Existing scrolling regions keep their own bounds.
+1. Reload the rebuilt extension in your browser and refresh already-open site
+   tabs once so they receive the new content script.
+2. Keep font size, scope, and spacing fixed. Start with **Off** in the popup.
+3. Switch to **Gentle repair**, then **Fit text**, and compare the same area.
+   Switching takes effect on open pages without another refresh. Each change
+   first restores the preceding mode's edits.
+4. Check menus, dialogs, narrow windows, and content loaded after scrolling.
+   Leave the best mode selected for that hostname, or choose **Use default**.
+5. **Pause here** restores the site's typography too; Off only disables repairs.
 
-With **Default** line height and letter spacing, enlarging or shrinking text
-scales the site's spacing with it. An explicit spacing setting takes priority;
-font-dependent `normal` line height still follows the font's natural metrics.
+A page that already accommodates the changed text may look identical in all
+three modes. That's intentional: a mode needs evidence of new overflow before
+it can change anything.
 
-Code, math, SVG artwork, icon fonts, and elements marked `data-lexend-ignore`
-keep their original typography. Characters Lexend doesn't cover use the site's
-fallback fonts.
+## Boundaries and rollback
 
-Pausing restores the styles the extension changed while keeping later updates
-made by the site. If a page still looks wrong, use **Pause here** in the popup.
+Both active modes compare native and converted text geometry. They leave
+existing clipping, ellipses, line clamps, transformed/animated regions, hidden
+labels, code, editors, SVG, and explicit opt-outs alone. Measurements follow
+open shadow roots and slot ancestry. Only simple direct text with an unambiguous
+box qualifies; complex mixed markup and generated text can remain clipped.
 
-Layout measurements, element boxes, and generated-text styles are reused within
-each synchronous pass and invalidated after a repair changes the page.
-Protected code and editor subtrees inherit
-their original typography from the boundary without styling every token.
-Paused pages skip refreshes; theme changes and rules for other sites also
-avoid remeasuring the page.
+A trial must eliminate the measured new overflow without adding horizontal
+page overflow, ancestor clipping, changed neighboring widths, or overlap with
+nearby siblings. Failed trials restore their changes. Gentle growth is limited
+to the smaller of 96 pixels or the box's existing height. Fit text never squeezes
+glyphs with transforms or shrinks below the smaller of the native and requested
+font sizes. Falling back to original typography is a local exception.
+
+Repairs have a finite budget: at most 1,500 text candidates and 40 attempted
+repairs per pass. These are conservative heuristics, not a guarantee that every
+site can be fixed. Long pages may exceed the budget; unusual layouts may receive
+no repair. If a mode is unhelpful, use Off or pause that site.
+
+The previous broad engine has been removed. Modes do not insert table wrappers,
+change colors, move artwork, resize iframes, rewrite grid tracks, change control
+semantics, or convert hidden content into scrolling panels. Restoring an owned
+style preserves later inline updates from the site. Cloned repaired elements
+carry a small reversible record so copied styles do not become a new baseline.
+
+For debugging, the extension's `LEXEND_GET_STATE` response includes the effective
+`layoutMode` and numeric `layout` counts (`candidates`, `changed`, `reverted`,
+`skipped`, `limited`). These stay local and contain no page text or URLs beyond
+the existing hostname field. `healthy` reports runtime completion, not a visual
+quality score. The settings sample previews typography, not live layout repair.

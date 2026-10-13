@@ -138,31 +138,6 @@
   });
 
   extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type === "LEXEND_FRAME_REQUIREMENT") {
-      // Runtime sender metadata identifies the actual extension/frame. Page
-      // postMessage events can lose their source in an isolated content world.
-      if (sender.id !== extension.runtime.id || !Number.isInteger(sender.tab?.id)
-          || !Number.isInteger(sender.frameId) || sender.frameId <= 0) return undefined;
-      let frameUrl;
-      try {
-        frameUrl = new URL(sender.url);
-        if (!["http:", "https:", "about:", "blob:"].includes(frameUrl.protocol)) return undefined;
-      } catch { return undefined; }
-      const requirement = message.requirement;
-      if (requirement !== null && (!requirement || typeof requirement !== "object" || Array.isArray(requirement)
-          || ![requirement.viewportHeight, requirement.requiredHeight, requirement.baselineHeight].every(Number.isFinite)
-          || requirement.viewportHeight <= 0 || requirement.viewportHeight > 160
-          || requirement.requiredHeight <= requirement.viewportHeight || requirement.requiredHeight > 320
-          || requirement.baselineHeight <= 0 || requirement.baselineHeight > 160
-          || requirement.baselineHeight > requirement.viewportHeight + 2)) return undefined;
-      // Every parent checks only its own unique direct embedding. Broadcasting
-      // supports nested frames without adding webNavigation or tabs permission.
-      extension.tabs.sendMessage(sender.tab.id, {
-        type: "LEXEND_APPLY_FRAME_REQUIREMENT", frameUrl: frameUrl.href,
-        sourceFrameId: sender.frameId, requirement
-      }).then(() => sendResponse({ relayed: true }), () => sendResponse({ relayed: false }));
-      return true;
-    }
     if (message?.type === globalThis.LexendPreferences.messageType) {
       // Only our extension pages can mutate settings. Content scripts, which
       // run in third-party tabs, may report state but cannot submit writes.

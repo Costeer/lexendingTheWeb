@@ -64,7 +64,7 @@ try {
   await client.send('Profiler.enable');
   await client.send('Profiler.start');
   await client.send('Tracing.start', { categories: 'devtools.timeline,v8,disabled-by-default-devtools.timeline', transferMode: 'ReturnAsStream' });
-  for (const name of ['settings', 'adaptive-controls', 'adaptive-layout', 'content']) {
+  for (const name of ['settings', 'adaptive-layout', 'content']) {
     let source = await readFile(resolve(sourceRoot, `src/${name}.js`), 'utf8');
     if (name === 'content') {
       source = instrumentContent(source);

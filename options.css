@@ -1787,3 +1787,33 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+.layout-control {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--ui-border);
+  min-width: 0;
+}
+.layout-control > label {
+  font-weight: 500;
+  color: var(--text-title);
+}
+.layout-control select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  font: inherit;
+  color: var(--text-body);
+  background: var(--surface);
+}
+.layout-control .helper { margin: 0; }
+.layout-control select:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}

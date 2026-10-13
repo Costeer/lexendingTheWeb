@@ -290,6 +290,17 @@
                     </div>
                 </div>
 
+                <div class="layout-control">
+                    <label for="layout-mode">Default layout mode</label>
+                    <select id="layout-mode" aria-describedby="layout-mode-description layout-mode-help" disabled>
+                        <option value="off">Off — leave layout alone</option>
+                        <option value="gentle">Gentle repair — grow simple text boxes</option>
+                        <option value="fit">Fit text — adapt type to the space</option>
+                    </select>
+                    <p id="layout-mode-description" class="helper"></p>
+                    <p id="layout-mode-help" class="helper">Applies to sites without a layout choice. Use the toolbar popup to compare modes and remember a choice for each site. Changes apply to open pages; no refresh needed. The sample below previews typography only.</p>
+                </div>
+
                 <div class="readability-preview">
                     <div class="preview-heading">
                         <span>Preview</span>

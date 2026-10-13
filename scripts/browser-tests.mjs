@@ -151,6 +151,43 @@ try {
     }
   });
 
+  await check("layout modes save through the UI, switch live, and retain independent site choices", async () => {
+    await driver.switchTo().window(websiteTab);
+    await script(() => {
+      const box = document.createElement("div");
+      box.id = "layout-probe"; box.style.cssText = "width:280px;height:24px;overflow:hidden";
+      box.innerHTML = '<p style="font:16px/20px Arial;margin:0">A readable caption</p>';
+      document.body.append(box);
+    });
+    await driver.switchTo().window(optionsTab);
+    await patch({ textScale: 140, lineHeight: 1.6 });
+    await driver.findElement(By.css('#layout-mode option[value="gentle"]')).click();
+    await driver.switchTo().window(websiteTab);
+    await wait("document.querySelector('#layout-probe').clientHeight > 24", "Gentle repair grows only the clipped box");
+    await driver.switchTo().window(optionsTab);
+    assert.equal((await saved()).layoutMode, "gentle");
+    await driver.findElement(By.css('#layout-mode option[value="fit"]')).click();
+    await driver.switchTo().window(websiteTab);
+    await wait("document.querySelector('#layout-probe').clientHeight === 24 && document.querySelector('#layout-probe p').dataset.lexendLayoutRepair === 'fit'", "Fit text restores the box and adapts its label");
+    await driver.switchTo().window(optionsTab);
+    const chooseSite = (layoutMode) => extensionCall(async layoutMode => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      return api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: {
+        type: "setSiteLayout", hostname: "127.0.0.1", layoutMode
+      } });
+    }, layoutMode);
+    assert.equal((await chooseSite("fit")).ok, true);
+    await patch({ layoutMode: "off" });
+    assert.equal((await saved()).siteRules.find(rule => rule.hostname === "127.0.0.1").layoutMode, "fit");
+    assert.equal((await chooseSite(null)).ok, true);
+    await driver.switchTo().window(websiteTab);
+    await wait("!document.querySelector('#layout-probe p').hasAttribute('data-lexend-layout-repair')", "Use default removes the site's repair");
+    assert.equal(await script("document.querySelector('#layout-probe').clientHeight"), 24);
+    await script("document.querySelector('#layout-probe').remove()");
+    await driver.switchTo().window(optionsTab);
+    await patch({ textScale: 110, lineHeight: 0 });
+  });
+
   await check("px/rem/em typography scales once while opt-outs and layout keep their original metrics", async () => {
     await driver.switchTo().window(websiteTab);
     await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 22", "110% text scaling");

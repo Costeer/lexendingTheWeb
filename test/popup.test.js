@@ -14,6 +14,7 @@ async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) 
     addEventListener(name, listener) { this.listeners[name] = listener; }
     setAttribute(name, value) { this.attributes[name] = value; }
     replaceChildren(...children) { this.children = children; }
+    querySelector(selector) { return get(selector); }
     emit(name) { return this.listeners[name]?.(); }
   }
   const elements = new Map();
@@ -87,4 +88,24 @@ test("a full rule list reports a failed pause and preserves every rule", async (
   assert.equal(page.writes.length, 0);
   assert.equal(page.stored().siteRules.length, 250);
   assert.equal(page.get("#toggle-site").textContent, "Pause here");
+});
+
+test("site layout choices persist independently and Use default removes only that override", async () => {
+  const page = await openPopup({ initial: { layoutMode: "gentle", siteRules: [{ hostname: "example.com", enabled: false, scope: "all" }] } });
+  assert.equal(page.get('#site-layout-mode').value,'default');
+  page.get('#site-layout-mode').value='fit';page.get('#site-layout-mode').emit('change');await tick();
+  assert.equal(page.stored().layoutMode,'gentle');
+  assert.equal(page.stored().siteRules[0].layoutMode,'fit');
+  assert.equal(page.stored().siteRules[0].enabled,false);
+  assert.equal(page.stored().siteRules[0].scope,'all');
+  page.get('#site-layout-mode').value='default';page.get('#site-layout-mode').emit('change');await tick();
+  assert.equal(page.stored().siteRules[0].layoutMode,undefined);
+  assert.equal(page.stored().siteRules[0].enabled,false);
+});
+
+test("failed site layout saves restore the selector and report the error", async () => {
+  const page=await openPopup({initial:{layoutMode:'off'},failWrite:true});
+  page.get('#site-layout-mode').value='fit';page.get('#site-layout-mode').emit('change');await tick();
+  assert.equal(page.get('#site-layout-mode').value,'default');
+  assert.match(page.get('#popup-feedback').textContent,/Storage unavailable/);
 });

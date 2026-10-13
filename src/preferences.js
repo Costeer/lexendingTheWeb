@@ -4,7 +4,7 @@
   const api = globalThis.LexendSettings;
   const messageType = "LEXEND_SETTINGS_MUTATE";
   const connectionName = "lexend-settings";
-  const preferenceKeys = new Set(["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const preferenceKeys = new Set(["enabled", "scope", "theme", "layoutMode", "textScale", "lineHeight", "letterSpacing"]);
   const legacyKeys = ["disabledSites", "spacing", "uiStyle"];
   const applyOperation = (settings, operation) => {
     switch (operation?.type) {
@@ -22,6 +22,12 @@
           throw api.settingsError("DUPLICATE_RULE", "That site already has a rule.");
         }
         return api.setSiteRule(settings, operation.rule);
+      case "setSiteLayout":
+        if (!api.validHostname(operation.hostname)
+            || (operation.layoutMode !== null && !api.validLayoutMode(operation.layoutMode))) {
+          throw api.settingsError("INVALID_OPERATION", "Choose a valid layout mode and site.");
+        }
+        return api.setSiteRule(settings, { hostname: operation.hostname, includeSubdomains: false, layoutMode: operation.layoutMode });
       case "removeRule":
         return api.removeSiteRule(settings, operation.hostname, operation.includeSubdomains);
       case "toggleSite":

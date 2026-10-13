@@ -4,12 +4,19 @@
   const defaults = Object.freeze({
     enabled: true,
     scope: "body",
+    layoutMode: "off",
     siteRules: [],
     theme: "light",
     textScale: 100,
     lineHeight: 0,
     letterSpacing: 0
   });
+  const layoutModes = Object.freeze({
+    off: Object.freeze({ label: "Off", description: "Keep Lexend and your text settings. Leave the site's layout alone." }),
+    gentle: Object.freeze({ label: "Gentle repair", description: "Let simple text boxes grow when Lexend causes clipping. Keep only verified improvements." }),
+    fit: Object.freeze({ label: "Fit text", description: "Keep boxes in place. Reduce text toward the site's size, or use its original typography where needed." })
+  });
+  const validLayoutMode = (value) => typeof value === "string" && Object.hasOwn(layoutModes, value);
   const MAX_SITE_RULE_BYTES = 7000;
   const legacySpacingValues = Object.freeze({
     default: 0,
@@ -77,13 +84,15 @@
 
     const enabled = typeof rule?.enabled === "boolean" ? rule.enabled : null;
     const scope = ["body", "all"].includes(rule?.scope) ? rule.scope : null;
-    if (enabled === null && scope === null) return null;
+    const layoutMode = validLayoutMode(rule?.layoutMode) ? rule.layoutMode : null;
+    if (enabled === null && scope === null && layoutMode === null) return null;
 
     return {
       hostname,
       includeSubdomains: Boolean(rule.includeSubdomains),
       enabled,
-      scope
+      scope,
+      ...(layoutMode === null ? {} : { layoutMode })
     };
   };
 
@@ -112,6 +121,7 @@
       enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
       scope: value.scope === "all" ? "all" : defaults.scope,
       siteRules,
+      layoutMode: validLayoutMode(value.layoutMode) ? value.layoutMode : defaults.layoutMode,
       theme: value.theme === "dark" ? "dark" : defaults.theme,
       textScale: clampNumber(value.textScale, defaults.textScale, 80, 140),
       lineHeight: (value.lineHeight === 0 || value.lineHeight === "0")
@@ -140,6 +150,7 @@
         || value.siteRules.some((rule) => !normalizeRule(rule)
           || (rule.enabled !== undefined && rule.enabled !== null && typeof rule.enabled !== "boolean")
           || (rule.scope !== undefined && rule.scope !== null && !["body", "all"].includes(rule.scope))
+          || (rule.layoutMode !== undefined && rule.layoutMode !== null && !validLayoutMode(rule.layoutMode))
           || (rule.includeSubdomains !== undefined && typeof rule.includeSubdomains !== "boolean")))) {
       throw settingsError("INVALID_IMPORT", "The settings file contains an invalid site rule. Nothing was imported.");
     }
@@ -150,6 +161,7 @@
     for (const [key, valid] of [
       ["enabled", (v) => typeof v === "boolean"],
       ["scope", (v) => ["body", "all"].includes(v)],
+      ["layoutMode", validLayoutMode],
       ["theme", (v) => ["light", "dark"].includes(v)],
       ["textScale", (v) => typeof v === "number" && v >= 80 && v <= 140],
       ["lineHeight", (v) => typeof v === "number" && (v === 0 || (v >= 1 && v <= 2.4))],
@@ -185,8 +197,10 @@
     const normalizedHostname = normalizeHostname(hostname);
     let enabledRule = null;
     let scopeRule = null;
+    let layoutRule = null;
     for (const rule of settings.siteRules) {
       if (!ruleMatches(rule, normalizedHostname)) continue;
+      if (rule.layoutMode && (!layoutRule || compareRules(rule, layoutRule, normalizedHostname) < 0)) layoutRule = rule;
       if (rule.enabled !== null && (!enabledRule || compareRules(rule, enabledRule, normalizedHostname) < 0)) {
         enabledRule = rule;
       }
@@ -200,6 +214,8 @@
       active: settings.enabled && siteEnabled,
       siteEnabled,
       scope: scopeRule?.scope ?? settings.scope,
+      layoutMode: layoutRule?.layoutMode ?? settings.layoutMode,
+      layoutRule,
       enabledRule: enabledRule ?? null,
       scopeRule: scopeRule ?? null
     };
@@ -259,6 +275,8 @@
 
   globalThis.LexendSettings = Object.freeze({
     defaults,
+    layoutModes,
+    validLayoutMode,
     getDirectRule,
     normalizeSettings,
     removeSiteRule,

@@ -36,6 +36,8 @@
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
   const retryLoad = document.querySelector("#retry-load");
+  const siteLayoutMode = document.querySelector("#site-layout-mode");
+  const siteLayoutDescription = document.querySelector("#site-layout-description");
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
@@ -88,6 +90,18 @@
 
   const renderSite = () => {
     const supported = Boolean(site?.supported);
+    siteLayoutMode.disabled = !preferences.loaded || !supported;
+    const directLayout = supported ? settingsApi.getDirectRule(settings, site.hostname)?.layoutMode : null;
+    const effectiveLayout = supported ? settingsApi.resolveSite(settings, site.hostname).layoutMode : settings.layoutMode;
+    const inheritedLayout = supported
+      ? settingsApi.resolveSite({ ...settings, siteRules: settings.siteRules.map((rule) =>
+        rule.hostname === site.hostname && !rule.includeSubdomains ? { ...rule, layoutMode: null } : rule) }, site.hostname).layoutMode
+      : settings.layoutMode;
+    siteLayoutMode.querySelector('option[value="default"]').textContent = `Use default (${settingsApi.layoutModes[inheritedLayout].label})`;
+    siteLayoutMode.value = directLayout ?? "default";
+    siteLayoutDescription.textContent = supported
+      ? `${settingsApi.layoutModes[effectiveLayout].description} ${directLayout ? "Saved for this site." : "Using the default."}${settingsApi.resolveSite(settings, site.hostname).active ? "" : " Applies when Lexend resumes."}`
+      : "Open a website to compare layout modes. Change the default in Settings → Readability.";
     siteStrip.hidden = !supported;
     restrictedNote.hidden = !site?.restricted;
     if (!supported) return;
@@ -208,6 +222,12 @@
   toggleSiteButton.addEventListener("click", () => {
     if (!site?.supported) return;
     mutate({ type: "toggleSite", hostname: site.hostname });
+  });
+
+  siteLayoutMode.addEventListener("change", () => {
+    if (!site?.supported) return;
+    mutate({ type: "setSiteLayout", hostname: site.hostname,
+      layoutMode: siteLayoutMode.value === "default" ? null : siteLayoutMode.value });
   });
 
   const start = async () => {

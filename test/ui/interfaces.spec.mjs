@@ -49,3 +49,18 @@ test("popup remains accessible and visually stable", async ({ page }, testInfo) 
   await scanAccessibility(page, testInfo);
   await expect(page).toHaveScreenshot("popup.png", { fullPage: true });
 });
+
+test("layout controls save the default and an independent site choice with keyboard support", async ({page}) => {
+  await openInterface(page,"options.html");
+  await page.locator('#layout-mode').selectOption('fit');
+  await expect(page.locator('#layout-mode-description')).toContainText("Keep boxes in place");
+  await page.locator('#layout-mode').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('#layout-mode')).toHaveValue('gentle');
+  await openInterface(page,"popup.html");
+  await page.locator('#site-layout-mode').selectOption('fit');
+  await expect(page.locator('#site-layout-mode')).toHaveValue('fit');
+  await expect(page.locator('#site-layout-description')).toContainText('Saved for this site');
+  await page.locator('#site-layout-mode').selectOption('default');
+  await expect(page.locator('#site-layout-mode')).toHaveValue('default');
+});
