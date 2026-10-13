@@ -43,7 +43,7 @@ test("initialization and cached-page restoration ignore stale reads and preserve
         return result;
       };
     });
-    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+    for (const name of ["settings", "adaptive-layout", "content"]) {
       await page.addScriptTag({ path: resolve(`src/${name}.js`) });
     }
     await page.waitForFunction(() => typeof finishRead === "function");

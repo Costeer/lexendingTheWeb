@@ -49,7 +49,7 @@ test("repeated feed replacement and pause/resume settle within a bounded amount 
       };
       replaceFeed(0);
     });
-    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+    for (const name of ["settings", "adaptive-layout", "content"]) {
       const path = resolve(`src/${name}.js`);
       if (name === "content") await page.addScriptTag({ content: instrumentContent(await readFile(path, "utf8")) });
       else await page.addScriptTag({ path });

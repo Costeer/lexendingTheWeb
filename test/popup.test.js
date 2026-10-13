@@ -5,6 +5,7 @@ import test from "node:test";
 import "../src/settings.js";
 import "../src/preferences.js";
 
+const layoutSource = await readFile(new URL("../src/ui-layout.js", import.meta.url), "utf8");
 const source = await readFile(new URL("../popup.js", import.meta.url), "utf8");
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) {
@@ -13,7 +14,9 @@ async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) 
     classList = { toggle() {}, remove() {} };
     addEventListener(name, listener) { this.listeners[name] = listener; }
     setAttribute(name, value) { this.attributes[name] = value; }
+    append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
+    querySelector(selector) { return get(selector); }
     emit(name) { return this.listeners[name]?.(); }
   }
   const elements = new Map();
@@ -49,6 +52,7 @@ async function openPopup({ initial = {}, getSettings, failWrite = false } = {}) 
     LexendTheme: { apply() {} }, LexendQuotes: { random: () => ({ text: "Preview", author: "Author" }) },
     setTimeout: () => 0, clearTimeout() {}, console: { error() {} }, URL
   };
+  runInNewContext(layoutSource, context);
   runInNewContext(source, context);
   await tick();
   return { get, writes, scope, spacing, stored: () => stored };
@@ -87,4 +91,24 @@ test("a full rule list reports a failed pause and preserves every rule", async (
   assert.equal(page.writes.length, 0);
   assert.equal(page.stored().siteRules.length, 250);
   assert.equal(page.get("#toggle-site").textContent, "Pause here");
+});
+
+test("site layout choices persist independently and Use default removes only that override", async () => {
+  const page = await openPopup({ initial: { layoutMode: "gentle", siteRules: [{ hostname: "example.com", enabled: false, scope: "all" }] } });
+  assert.equal(page.get('#site-layout-mode').value,'default');
+  page.get('#site-layout-mode').value='fit';page.get('#site-layout-mode').emit('change');await tick();
+  assert.equal(page.stored().layoutMode,'gentle');
+  assert.equal(page.stored().siteRules[0].layoutMode,'fit');
+  assert.equal(page.stored().siteRules[0].enabled,false);
+  assert.equal(page.stored().siteRules[0].scope,'all');
+  page.get('#site-layout-mode').value='default';page.get('#site-layout-mode').emit('change');await tick();
+  assert.equal(page.stored().siteRules[0].layoutMode,undefined);
+  assert.equal(page.stored().siteRules[0].enabled,false);
+});
+
+test("failed site layout saves restore the selector and report the error", async () => {
+  const page=await openPopup({initial:{layoutMode:'off'},failWrite:true});
+  page.get('#site-layout-mode').value='fit';page.get('#site-layout-mode').emit('change');await tick();
+  assert.equal(page.get('#site-layout-mode').value,'default');
+  assert.match(page.get('#popup-feedback').textContent,/Storage unavailable/);
 });

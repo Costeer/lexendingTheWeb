@@ -29,7 +29,7 @@ export const conversationHtml = ({ turns = 120, feedback = true, containment = f
 // references or global counters. Timings are inclusive and must not be summed.
 export const instrumentContent = (source) => {
   const names = ['applyIncomingFonts', 'refresh', 'queueRefresh', 'invalidateAutoContent',
-    'measureTypography', 'applyTypography', 'retainOverwrittenTypography', 'notifyFrameRequirement'];
+    'measureTypography', 'applyTypography', 'retainOverwrittenTypography'];
   let wrappers = '';
   for (const name of names) {
     const needle = `const ${name} =`;
@@ -69,7 +69,6 @@ export const instrumentContent = (source) => {
       detachedRoots: [...styledRoots].filter(e => !e.isConnected).length,
       knownAuto: knownAutoContent.size,
       detachedAuto: [...knownAutoContent.keys()].filter(e => !e.isConnected).length,
-      frames: resizedFrames.size,
       authorFamilies: authorFontFamilies.size
     });
     start()`);

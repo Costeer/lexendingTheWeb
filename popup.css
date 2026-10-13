@@ -751,3 +751,8 @@ fieldset:disabled {
     overflow-wrap: anywhere;
   }
 }
+
+:root .layout-section {
+  padding-top: 14px;
+  padding-bottom: 8px;
+}

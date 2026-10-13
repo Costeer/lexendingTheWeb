@@ -4,6 +4,7 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const quotesApi = globalThis.LexendQuotes;
+  const layoutUi = globalThis.LexendLayoutUI;
   const tabs = extension?.tabs;
   const protectedHosts = new Set([
     "chrome.google.com",
@@ -36,10 +37,12 @@
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
   const retryLoad = document.querySelector("#retry-load");
+  const siteLayoutMode = layoutUi.create(document.querySelector("#site-layout-mode"), { label: "Layout on this site", inherit: true, announce: true });
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
   let feedbackTimer;
+  let pendingLayout;
   const quote = quotesApi.random();
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
@@ -88,6 +91,15 @@
 
   const renderSite = () => {
     const supported = Boolean(site?.supported);
+    siteLayoutMode.disabled = !preferences.loaded || !supported;
+    const directLayout = supported ? settingsApi.getDirectRule(settings, site.hostname)?.layoutMode : null;
+    siteLayoutMode.value = pendingLayout?.value ?? directLayout ?? "default";
+    layoutUi.update(siteLayoutMode, {
+      ...(supported ? layoutUi.inheritance(settings, site.hostname) : { inheritedMode: settings.layoutMode, source: "your global default" }),
+      notice: pendingLayout ? "Saving layout choice…" : !supported ? "Open a website to try layout modes."
+        : !settingsApi.resolveSite(settings, site.hostname).active ? "Lexend is paused here. This choice applies when it resumes."
+        : directLayout ? "Saved for this site." : ""
+    });
     siteStrip.hidden = !supported;
     restrictedNote.hidden = !site?.restricted;
     if (!supported) return;
@@ -208,6 +220,19 @@
   toggleSiteButton.addEventListener("click", () => {
     if (!site?.supported) return;
     mutate({ type: "toggleSite", hostname: site.hostname });
+  });
+
+  siteLayoutMode.addEventListener("change", async () => {
+    if (!site?.supported) return;
+    const change = { value: siteLayoutMode.value };
+    pendingLayout = change;
+    const saved = await mutate({ type: "setSiteLayout", hostname: site.hostname,
+      layoutMode: change.value === "default" ? null : change.value });
+    if (pendingLayout === change) {
+      pendingLayout = null;
+      if (saved) showFeedback("", false, 0);
+    }
+    renderSite();
   });
 
   const start = async () => {

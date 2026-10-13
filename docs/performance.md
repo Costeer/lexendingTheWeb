@@ -84,60 +84,43 @@ For models making changes:
 For deeper diagnosis, use the conversation profiler described below. It writes
 CPU profiles and traces; those expensive probes are excluded from this gate.
 
-## Runtime design and previous measurements
+## Runtime design
 
-Font conversion now runs separately from layout repair on settled, visible
-pages. Native typography and layout are captured together, then Lexend is
-applied immediately. The browser receives a rendering frame before the
-geometry repair runs. Each phase preserves the current focus and scroll
-positions, including scrolling performed between the two phases.
+Layout repair is opt-in. With **Off** (the default), typography conversion still
+runs, but the extension skips repair capture and the deferred repair frame.
+Theme changes and layout rules for unrelated sites do not trigger a refresh.
 
-New preferences cancel the previous pending repair. Content and geometry mutations
-invalidate its baseline and make the next refresh complete capture and repair
-together, so animated pages cannot starve repairs. Temporary author style and
-accessibility changes suspend a pending repair while they coalesce; reverting
-them resumes that repair without another conversion. Focused controls, embedded frames, and
-hidden documents also complete both phases in the same task. Offscreen frames
-cannot rely on animation frames to relay their measured height. The runtime
-`pending` flag includes the deferred repair; `refreshRevision` counts successful
-conversions.
+Gentle repair and Fit text capture native geometry alongside typography, then
+apply Lexend immediately. A deferred rendering frame lets converted text paint
+before trials begin. A mode change cancels older scheduled repair work and
+restores owned styles before taking a fresh native baseline. Focus, document
+scroll, and native nested scroll positions survive refreshes.
 
-Startup applies fonts and sizing immediately, then requests the bundled regular
-and bold reading fonts before capturing native layout, with a 50 ms limit before
-the initial scheduled capture proceeds using fallback metrics. Confirmed
-pause/site preferences are respected, and a newer storage event wins over an
-initial read or font preload. A bundled font completing while a repair is
-pending uses that repair rather than starting another full conversion. Late
-author fonts still require a new native baseline.
+The strategy engine caches native ancestor measurements within a capture. It
+limits each pass to 1,500 text candidates and 40 trials. Each trial reads fresh
+geometry after writes; failed fits roll back. The engine no longer scans media
+for composition repairs, moves panels, measures every heading word, rebuilds
+controls, or negotiates iframe resizing.
 
-Local Chromium measurements at 1280 × 800 compared the previous implementation
-with this one on 80- and 400-card pages, each with 500 protected code tokens.
-Results are medians of three fresh contexts; each settings sample alternated
-110% and 120% scale six times, waiting for repairs to settle between updates.
+Startup requests regular and bold bundled fonts, with a 50 ms bound before
+proceeding with fallback metrics. Late fonts, real author mutations, and window
+resizing can trigger a new measurement. Incoming content receives typography
+before a scheduled full refresh. Hidden/paused pages retain the existing
+lifecycle and coalescing protections.
 
-| Work on the 400-card page | Previous | Current |
-| --- | ---: | ---: |
-| First rendering frame with loaded Lexend | 610 ms | 240 ms |
-| Applying a new font-size preference | 716 ms | 192 ms |
-| Rendering newly inserted text in Lexend | 704 ms | 178 ms |
-| Preference change through completed layout repair | 730 ms | 644 ms |
-
-These results measure local fixtures, not every website. Moving repair work
-after the font's first frame improves visible response more than total repair
-time. Measurement caches also freeze ancestor paint properties, bounding boxes,
-and pseudo styles for each synchronous pass; every repair write invalidates
-them. Sibling collision detection measures each branch once, and already fitting
-single-fragment headings avoid measuring every word separately.
-
-The 80-card work-budget fixture dropped from 16,029 bounding-box reads to 2,009
-for a complete preference refresh. Its CI budget is 3,500, including both the
-font and deferred repair phases. Startup tests cover rendering before repair,
-bounded fallback, font failures, preference races, cancellation, and intervening
-scrolling:
+Regression coverage includes mode switching, native scrolling regions, original
+style ownership, copied elements, open shadow roots, repeated feed replacement,
+first font paint, late fonts, and canceled pending repairs:
 
 ```sh
-node --test test/typography-startup.test.mjs test/typography-performance.test.mjs
+node --test test/adaptive-layout.test.js test/layout-modes-browser.test.mjs test/typography-startup.test.mjs test/typography-performance.test.mjs test/typography-stress.test.mjs
 ```
+
+## Historical measurements
+
+The measurements below describe earlier versions of the broad repair engine,
+which has now been removed. They are retained as historical context, not current
+benchmarks or compatibility claims.
 
 ## Earlier measurement optimizations
 

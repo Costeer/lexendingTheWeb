@@ -24,7 +24,7 @@ const prepare = async (page, html, { settings = {}, beforeStart, settle = true, 
     };
     globalThis.__state = () => { let state; runtime.forEach((fn) => fn({ type: "LEXEND_GET_STATE" }, null, (value) => { state = value; })); return state; };
   }, settings);
-  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+  for (const name of ["settings", "adaptive-layout", "content"]) {
     if (name === "content") await beforeStart?.(page);
     const path = resolve(process.env.LEXEND_TEST_SOURCE ?? ".", `src/${name}.js`);
     if (inspect && name === "content") await page.addScriptTag({ content: instrumentContent(await readFile(path, "utf8")) });
@@ -206,6 +206,8 @@ test("responsive navigation measurements settle across observer deliveries inste
       });
       __navObserver.observe(document.querySelector('nav span'), {attributes:true, attributeFilter:['style']});
     </script>`);
+    await page.waitForTimeout(150); // allow the author's deferred accessibility measurement to finish
+    await page.waitForFunction(() => !__state().pending);
     const revision = await page.evaluate(() => __state().refreshRevision);
     await page.waitForTimeout(500);
     assert.equal(await page.evaluate(() => __state().refreshRevision), revision, "restoring typography must not perpetually restart navigation measurement");
@@ -233,46 +235,38 @@ test("responsive navigation measurements settle across observer deliveries inste
   } finally { await browser.close(); }
 });
 
-test("size-observed navigation and its overflow menu keep a stable hidden footprint", async () => {
+test("size-observed navigation does not unfold its menu because of layout repair", async () => {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await prepare(page, `<!doctype html><style>
-      body {font:16px/20px Arial} nav {display:flex;height:40px}
-      .nav-item {display:flex;align-items:center;height:32px;box-sizing:border-box;padding:6px}
-      .nav-item[aria-hidden] {visibility:hidden}
+      body{font:16px/20px Arial}nav{display:flex;height:40px}
+      .nav-item{display:flex;align-items:center;height:32px;box-sizing:border-box;padding:6px}
+      .nav-item[aria-hidden]{visibility:hidden}
     </style><nav><a class="nav-item" href="#content"><span>Repository</span></a></nav>
-    <div id="menu"></div><main id="content">Page content</main>
-    <script>
-      const item = document.querySelector('.nav-item');
-      globalThis.__navObserver = new ResizeObserver(() => {
-        const overflow = item.getBoundingClientRect().height > 33;
-        if (item.hasAttribute('aria-hidden') === overflow) return;
-        item.toggleAttribute('aria-hidden', overflow);
-        document.querySelector('#menu').innerHTML = overflow ? '<button>Repository menu item</button>' : '';
-      });
-      __navObserver.observe(item);
+    <div id="menu"></div><main id="content">Content</main><script>
+      const item=document.querySelector('.nav-item');
+      new ResizeObserver(()=>{
+        const overflow=item.getBoundingClientRect().height>33;
+        if(item.hasAttribute('aria-hidden')===overflow)return;
+        item.toggleAttribute('aria-hidden',overflow);
+        document.querySelector('#menu').innerHTML=overflow?'<button>Repository menu item</button>':'';
+      }).observe(item);
     </script>`);
-    await page.evaluate(() => __update({ textScale: 120 }));
-    await page.waitForFunction(() => !__state().pending && document.querySelector('.nav-item').hasAttribute('aria-hidden')
-      && document.querySelector('#menu button')?.hasAttribute('data-lexend-text'));
-    const revision = await page.evaluate(() => __state().refreshRevision);
-    await page.waitForTimeout(500);
-    assert.equal(await page.evaluate(() => __state().refreshRevision), revision, "hidden links must not alternate between native and repaired heights");
-    const height = await page.locator('.nav-item').evaluate(element => element.getBoundingClientRect().height);
-    await page.locator('#menu button').click();
-    await page.evaluate(() => { document.querySelector('main').innerHTML = '<p>New page content after a click</p>'; });
-    await page.waitForFunction(() => !__state().pending && document.querySelector('main p').hasAttribute('data-lexend-text'));
-    const clickedRevision = await page.evaluate(() => __state().refreshRevision);
-    await page.waitForTimeout(500);
-    assert.equal(await page.evaluate(() => __state().refreshRevision), clickedRevision, "menu clicks and page changes settle without restarting navigation measurement");
-    assert.equal(await page.locator('.nav-item').evaluate(element => element.getBoundingClientRect().height), height);
-    await page.evaluate(() => __update({ enabled: false }));
-    await page.waitForFunction(() => !document.querySelector('.nav-item').hasAttribute('aria-hidden'));
-    assert.equal(await page.locator('.nav-item').getAttribute('style'), null, "pause restores even retained hidden repairs");
-    assert.equal(await page.locator('.nav-item').evaluate(element => element.getBoundingClientRect().height), 32);
-    assert.equal(await page.evaluate(() => __state().healthy), true);
-  } finally { await browser.close(); }
+    for (const layoutMode of ['off','gentle','fit']) {
+      await page.evaluate(layoutMode=>__update({layoutMode,textScale:120}),layoutMode);
+      await page.waitForFunction(()=>!__state().pending);
+      await page.waitForTimeout(150);
+      await page.waitForFunction(()=>!__state().pending);
+      const revision=await page.evaluate(()=>__state().refreshRevision);
+      await page.waitForTimeout(250);
+      assert.equal(await page.locator('.nav-item').evaluate(e=>e.getBoundingClientRect().height),32);
+      assert.equal(await page.locator('#menu button').count(),0);
+      assert.equal(await page.evaluate(()=>__state().refreshRevision),revision);
+    }
+    await page.evaluate(()=>__update({enabled:false}));
+    assert.equal(await page.locator('.nav-item').getAttribute('style'),null);
+  } finally {await browser.close();}
 });
 
 test("expensive refreshes leave input time during continuous text updates without starving the last update", async () => {
@@ -388,7 +382,7 @@ test("large pages reuse measurements, preserve protected branches, and rest whil
       Element.prototype.getBoundingClientRect = function () { __boxReads++; return nativeBox.call(this); };
     });
     const original = await page.evaluate(() => __protected());
-    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) await page.addScriptTag({ path: resolve(`src/${name}.js`) });
+    for (const name of ["settings", "adaptive-layout", "content"]) await page.addScriptTag({ path: resolve(`src/${name}.js`) });
     await page.evaluate(() => __update({ enabled: true }));
     await page.evaluate(() => document.fonts.ready);
     await page.waitForFunction(() => __state()?.healthy && !__state().pending);

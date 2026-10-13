@@ -151,6 +151,43 @@ try {
     }
   });
 
+  await check("layout modes save through the UI, switch live, and retain independent site choices", async () => {
+    await driver.switchTo().window(websiteTab);
+    await script(() => {
+      const box = document.createElement("div");
+      box.id = "layout-probe"; box.style.cssText = "width:280px;height:24px;overflow:hidden";
+      box.innerHTML = '<p style="font:16px/20px Arial;margin:0">A readable caption</p>';
+      document.body.append(box);
+    });
+    await driver.switchTo().window(optionsTab);
+    await patch({ textScale: 140, lineHeight: 1.6 });
+    await driver.findElement(By.css('#layout-mode input[value="gentle"]')).click();
+    await driver.switchTo().window(websiteTab);
+    await wait("document.querySelector('#layout-probe').clientHeight > 24", "Gentle repair grows only the clipped box");
+    await driver.switchTo().window(optionsTab);
+    assert.equal((await saved()).layoutMode, "gentle");
+    await driver.findElement(By.css('#layout-mode input[value="fit"]')).click();
+    await driver.switchTo().window(websiteTab);
+    await wait("document.querySelector('#layout-probe').clientHeight === 24 && document.querySelector('#layout-probe p').dataset.lexendLayoutRepair === 'fit'", "Fit text restores the box and adapts its label");
+    await driver.switchTo().window(optionsTab);
+    const chooseSite = (layoutMode) => extensionCall(async layoutMode => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      return api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: {
+        type: "setSiteLayout", hostname: "127.0.0.1", layoutMode
+      } });
+    }, layoutMode);
+    assert.equal((await chooseSite("fit")).ok, true);
+    await patch({ layoutMode: "off" });
+    assert.equal((await saved()).siteRules.find(rule => rule.hostname === "127.0.0.1").layoutMode, "fit");
+    assert.equal((await chooseSite(null)).ok, true);
+    await driver.switchTo().window(websiteTab);
+    await wait("!document.querySelector('#layout-probe p').hasAttribute('data-lexend-layout-repair')", "Use default removes the site's repair");
+    assert.equal(await script("document.querySelector('#layout-probe').clientHeight"), 24);
+    await script("document.querySelector('#layout-probe').remove()");
+    await driver.switchTo().window(optionsTab);
+    await patch({ textScale: 110, lineHeight: 0 });
+  });
+
   await check("px/rem/em typography scales once while opt-outs and layout keep their original metrics", async () => {
     await driver.switchTo().window(websiteTab);
     await wait("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 22", "110% text scaling");
@@ -218,14 +255,27 @@ try {
     assert((await measurements()).rem.family.includes("Lexend"));
   });
 
-  await check("rule form validation and keyboard deletion confirmation work in the rendered settings", async () => {
+  await check("rule creation and editing save layouts and preserve keyboard deletion", async () => {
     await driver.switchTo().window(optionsTab);
     await driver.findElement(By.css('[data-settings-panel="rules-panel"]')).click();
     const input = await driver.findElement(By.id("new-hostname"));
     assert.equal(await driver.findElement(By.id("add-rule-button")).isEnabled(), false);
     await input.sendKeys("added.example");
+    assert.equal(await driver.findElement(By.id("add-rule-button")).isEnabled(), false, "Default-only rules have nothing to save");
+    await driver.findElement(By.id("new-subdomains")).click();
+    await driver.findElement(By.css('#new-rule-layout input[value="fit"]')).click();
     await driver.findElement(By.id("add-rule-button")).click();
     await wait("[...document.querySelectorAll('.rule-row')].some(row=>row.dataset.hostname === 'added.example')", "Rule is saved");
+    const addedRule = async () => (await saved()).siteRules.find(rule => rule.hostname === "added.example");
+    assert.deepEqual(await addedRule(), { hostname: "added.example", includeSubdomains: true, enabled: null, scope: null, layoutMode: "fit" });
+    await driver.findElement(By.css('[data-hostname="added.example"] [data-field="layoutMode"] input:checked')).sendKeys(Key.ARROW_UP);
+    await driver.wait(async () => (await addedRule()).layoutMode === "gentle", 5000, "Editing a subdomain rule saves its layout");
+    assert.equal(await script("document.activeElement.closest('[data-field]').dataset.field"), "layoutMode", "Saving keeps keyboard focus on the layout choice");
+    await driver.findElement(By.css('[data-hostname="added.example"] [data-field="enabled"]')).sendKeys(Key.END);
+    await driver.wait(async () => (await addedRule()).enabled === false, 5000, "The rule can be paused separately");
+    await driver.findElement(By.css('[data-hostname="added.example"] [data-field="layoutMode"] input[value="default"]')).click();
+    await driver.wait(async () => (await addedRule()).layoutMode === undefined, 5000, "Use default removes only the layout override");
+    assert.equal((await addedRule()).enabled, false);
     let remove = await driver.findElement(By.css('[data-hostname="added.example"] .delete-rule'));
     await remove.click();
     await remove.sendKeys(Key.ESCAPE);
@@ -299,44 +349,23 @@ try {
     await wait("[...document.querySelectorAll('.settings-panel')].filter(p=>!p.hidden).length === 1", "Desktop layout restores one section");
   });
 
-  await check("font specimens compare fixed defaults, accept local text, and fit narrow screens", async () => {
+  await check("quote preview follows readability settings and fits narrow screens", async () => {
     const previous = await saved();
+    const quote = await script("document.querySelector('#preview-copy').textContent");
+    const author = await script("document.querySelector('#preview-author').textContent");
+    assert.equal(await script("document.querySelector('.preview-quote-frame').contains(document.querySelector('#preview-author'))"), true);
     await patch({ textScale: 140, lineHeight: 2, letterSpacing: .2 });
-    await driver.findElement(By.css('.preview-modes label:has(input[value="glyphs"])')).click();
-    assert.equal(await script("document.querySelector('#preview-reading').hidden"), true);
-    await extensionCall(() => document.fonts.ready.then(() => true));
-    assert.deepEqual(await script("[...document.querySelectorAll('.preview-specimen')].map(e=>getComputedStyle(e).fontWeight)"), ["400", "600", "800"]);
-    await driver.actions().sendKeys(Key.ARROW_LEFT).perform();
-    assert.equal(await script("document.querySelector('input[name=previewMode]:checked').value"), "compare", "Native arrow keys switch preview modes");
-    assert.equal(await script("document.querySelector('#preview-original').hidden"), false);
-    await driver.findElement(By.css('.preview-custom summary')).click();
-    const custom = await driver.findElement(By.id("preview-text"));
-    const sample = "A reading sample with <tags> & symbols.\nسارة أحمد";
-    const preferences = await saved();
-    await custom.sendKeys(sample);
-    assert.equal(await script("document.querySelector('#preview-copy').textContent"), sample);
-    assert.equal(await script("document.querySelector('#preview-original-copy').textContent"), sample);
-    assert.equal(await script("document.querySelector('#preview-attribution').hidden"), true);
-    await wait("getComputedStyle(document.querySelector('#preview-copy')).letterSpacing === 'normal' || parseFloat(getComputedStyle(document.querySelector('#preview-copy')).letterSpacing) === 0", "Arabic sample remains untracked");
-    assert.deepEqual(await saved(), preferences, "Preview text and modes never change stored preferences");
     for (const width of [1280, 390, 320]) {
       await driver.manage().window().setRect({ width, height: 900 });
       await wait(`matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches === ${width >= 900}`, "Viewport reaches the requested layout");
-      await wait("document.documentElement.scrollWidth <= innerWidth + 1", "Preview fits the viewport");
-      const desktop = await script("matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches");
-      const base = desktop ? 18 : 16;
-      // Firefox quantizes computed sizes at fractional display scales (for
-      // example 25.1875px for an authored 25.2px). Allow subpixel rounding.
-      await wait(`Math.abs(parseFloat(getComputedStyle(document.querySelector('#preview-copy')).fontSize) - ${base * 1.4}) < .05`, "Live sample reflects text scaling");
-      const referenceSize = await script("parseFloat(getComputedStyle(document.querySelector('#preview-original-copy')).fontSize)");
-      assert(Math.abs(referenceSize - base) < .05, "Reference retains default size");
+      const base = width >= 900 ? 17 : 14;
+      // Firefox quantizes computed sizes at fractional display scales.
+      await wait(`Math.abs(parseFloat(getComputedStyle(document.querySelector('#preview-copy')).fontSize) - ${base * 1.4}) < .05`, "Quote reflects live text scaling");
+      await wait("document.documentElement.scrollWidth <= innerWidth + 1", "Quote frame fits the viewport");
+      await wait("(() => { const style = getComputedStyle(document.querySelector('#preview-copy')); return Math.abs(parseFloat(style.lineHeight) / parseFloat(style.fontSize) - 2) < .01 && Math.abs(parseFloat(style.letterSpacing) / parseFloat(style.fontSize) - .2) < .01; })()", "Quote reflects live line height and spacing");
+      assert.equal(await script("document.querySelector('#preview-copy').textContent"), quote, "Changing size keeps the chosen quote");
+      assert.equal(await script("document.querySelector('#preview-author').textContent"), author, "Attribution stays with the quote");
     }
-    await script(() => {
-      const input = document.querySelector('#preview-text');
-      input.value = '';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    assert.equal(await script("document.querySelector('#preview-attribution').hidden"), false);
     await driver.manage().window().setRect({ width: 1280, height: 900 });
     await patch({ textScale: previous.textScale, lineHeight: previous.lineHeight, letterSpacing: previous.letterSpacing });
   });

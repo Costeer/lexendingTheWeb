@@ -42,7 +42,7 @@ const prepare = async (options) => {
   await page.evaluate(() => {
     const typography = document.createElement('style');
     typography.id = 'typography'; typography.media = 'not all'; document.head.append(typography);
-    window.layout = LexendLayout.create({ withStylesDisabled(callback) {
+    window.layout = LexendLayout.create({ getMode: () => "gentle", withStylesDisabled(callback) {
       const media = typography.media; typography.media = 'not all';
       try { return callback(); } finally { typography.media = media; }
     } });

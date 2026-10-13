@@ -7,6 +7,7 @@
         <script src="src/ui-theme.js"></script>
         <link rel="preload" href="assets/fonts/lexend-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
         <link rel="stylesheet" href="shared.css" />
+        <link rel="stylesheet" href="src/ui-layout.css" />
         <link rel="stylesheet" href="options.css" />
         <link rel="stylesheet" href="options-desktop.css" />
     </head>
@@ -290,6 +291,11 @@
                     </div>
                 </div>
 
+                <div class="layout-control">
+                    <fieldset id="layout-mode" disabled></fieldset>
+                    <p id="layout-mode-help" class="helper">Used on sites without their own layout choice. To try a mode on just one site, use the toolbar popup. The sample below previews typography only.</p>
+                </div>
+
                 <div class="readability-preview">
                     <div class="preview-heading">
                         <span>Preview</span>
@@ -301,36 +307,11 @@
                             Reset to default
                         </button>
                     </div>
-                    <fieldset class="preview-modes">
-                        <legend class="visually-hidden">Preview style</legend>
-                        <div class="segment-group">
-                            <label><input type="radio" name="previewMode" value="reading" checked /><span>Reading</span></label>
-                            <label><input type="radio" name="previewMode" value="compare" /><span>Compare</span></label>
-                            <label><input type="radio" name="previewMode" value="glyphs" /><span>Glyphs</span></label>
-                        </div>
-                    </fieldset>
-                    <div id="preview-reading" class="preview-reading">
-                        <figure id="preview-original" class="preview-original" hidden>
-                            <figcaption class="preview-font-label">System font <span>Default settings</span></figcaption>
-                            <blockquote id="preview-original-copy" dir="auto"></blockquote>
-                        </figure>
-                        <figure class="preview-quote-frame">
-                            <figcaption class="preview-font-label">Lexend <span>Your settings</span></figcaption>
-                            <blockquote id="preview-copy" lang="de" dir="auto" tabindex="0">
-                                “Zu sagen, was ist, bleibt die revolutionärste Tat.”
-                            </blockquote>
-                        </figure>
-                    </div>
-                    <div id="preview-glyphs" class="preview-glyphs" hidden>
-                        <p class="preview-font-label">A closer look <span>Letterforms &amp; weights</span></p>
-                        <div class="glyph-pairs" aria-label="Similar letterforms">
-                            <span>Il1</span><span>O0Q</span><span>rn m</span><span>bd pq</span>
-                        </div>
-                        <div class="glyph-weight"><span>Regular · 400</span><p class="preview-specimen" lang="en">The quick brown fox jumps over the lazy dog.</p></div>
-                        <div class="glyph-weight"><span>Semibold · 600</span><p class="preview-specimen">0123456789 &amp; @ # % ? !</p></div>
-                        <div class="glyph-weight"><span>Bold · 800</span><p class="preview-specimen" lang="vi">À É Ö ß Ł · Tiếng Việt</p></div>
-                    </div>
-                    <p id="preview-attribution" class="preview-attribution">
+                    <figure class="preview-quote-frame">
+                        <blockquote id="preview-copy" lang="de" tabindex="0">
+                            “Zu sagen, was ist, bleibt die revolutionärste Tat.”
+                        </blockquote>
+                        <figcaption class="preview-attribution">
                             —
                             <a
                                 id="preview-author"
@@ -339,13 +320,8 @@
                                 rel="noopener noreferrer"
                                 >Rosa Luxemburg</a
                             >
-                    </p>
-                    <details class="preview-custom">
-                        <summary>Try your own text</summary>
-                        <label for="preview-text">Reading sample</label>
-                        <textarea id="preview-text" rows="3" maxlength="2000" dir="auto" placeholder="Type or paste something you like to read…" aria-describedby="preview-text-hint"></textarea>
-                        <p id="preview-text-hint" class="helper">Only used in this preview. Clear it to return to the quote.</p>
-                    </details>
+                        </figcaption>
+                    </figure>
                 </div>
             </section>
 
@@ -353,7 +329,7 @@
                 <div class="section-heading">
                     <h2 id="rules-title">Site rules</h2>
                     <p class="helper">
-                        Exact-host rules take priority over subdomain rules.
+                        Choose how Lexend behaves on each site. Changes save automatically. More specific rules take priority.
                     </p>
                 </div>
 
@@ -376,21 +352,30 @@
                             role="alert"
                         ></p>
                     </div>
-                    <label class="check-label">
-                        <input id="new-subdomains" type="checkbox" />
-                        <span>
-                            <strong>Include subdomains</strong>
-                            <small id="subdomain-preview">*.example.com</small>
-                        </span>
-                    </label>
-                    <button
-                        id="add-rule-button"
-                        class="primary-button"
-                        type="submit"
-                        disabled
-                    >
-                        Add rule
-                    </button>
+                    <div class="new-rule-settings">
+                        <fieldset id="new-rule-layout" disabled></fieldset>
+                        <div class="new-rule-options">
+                            <label class="rule-control" for="new-rule-enabled">
+                                <span>Lexend</span>
+                                <select id="new-rule-enabled" disabled>
+                                    <option value="default">Use default</option>
+                                    <option value="on">On</option>
+                                    <option value="paused">Paused</option>
+                                </select>
+                            </label>
+                            <label class="check-label">
+                                <input id="new-subdomains" type="checkbox" />
+                                <span>
+                                    <strong>Include subdomains</strong>
+                                    <small id="subdomain-preview">*.example.com</small>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="rule-form-actions">
+                        <button id="add-rule-button" class="primary-button" type="submit" aria-describedby="new-rule-help" disabled>Add rule</button>
+                        <p id="new-rule-help" class="helper rule-form-help">Choose a layout mode or change Lexend’s on/off setting to create a rule.</p>
+                    </div>
                 </form>
 
                 <div id="rule-toolbar" class="rule-toolbar" hidden>
@@ -426,7 +411,7 @@
                 </p>
                 <div id="empty-rules" class="empty-state">
                     <h3>No site rules yet</h3>
-                    <p>Add a site above to pause Lexend on it.</p>
+                    <p>Add a site above to choose its layout or turn Lexend on or off for it.</p>
                 </div>
             </section>
 
@@ -557,6 +542,7 @@
 
         <script src="src/settings.js"></script>
         <script src="src/preferences.js"></script>
+        <script src="src/ui-layout.js"></script>
         <script src="src/quotes.js"></script>
         <script src="options.js"></script>
     </body>

@@ -26,7 +26,7 @@ try {
   const worker = context.serviceWorkers().find(w => w.url().endsWith('/src/background.js'))
     ?? await context.waitForEvent('serviceworker', w => w.url().endsWith('/src/background.js'));
   const hashes = {};
-  for (const name of ['settings', 'adaptive-controls', 'adaptive-layout', 'content']) {
+  for (const name of ['settings', 'adaptive-layout', 'content']) {
     const path = `src/${name}.js`;
     const sourceHash = createHash('sha256').update(await readFile(resolve(path))).digest('hex');
     const loadedHash = await worker.evaluate(async path => {

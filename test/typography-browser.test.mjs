@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
-import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
 
@@ -61,7 +59,7 @@ test("typography preserves protected content and refreshes atomic inherited base
     await page.evaluate(() => {
       const shadow = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
       shadow.innerHTML = '<style>p {font:18px/1.4 Arial;letter-spacing:0} code {font:inherit}</style><p id=shadow-text>Shadow prose <code id=shadow-code>code()</code></p>';
-      globalThis.__settings = { enabled: false, scope: "body", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 };
+      globalThis.__settings = { layoutMode: "gentle", enabled: false, scope: "body", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 };
       globalThis.__listeners = [];
       globalThis.__runtimeListeners = [];
       globalThis.chrome = {
@@ -87,7 +85,6 @@ test("typography preserves protected content and refreshes atomic inherited base
     const baselinePseudo = await page.evaluate(() => __metrics("pseudo", "::before"));
     const badgeHeight = await page.locator("#badge").evaluate((element) => element.getBoundingClientRect().height);
     await page.addScriptTag({ path: resolve("src/settings.js") });
-    await page.addScriptTag({ path: resolve("src/adaptive-controls.js") });
     await page.addScriptTag({ path: resolve("src/adaptive-layout.js") });
     await page.evaluate(() => {
       const create = globalThis.LexendLayout.create;
@@ -225,7 +222,7 @@ test("typography preserves protected content and refreshes atomic inherited base
 
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(150);
-    assert.match(await page.locator("#fit-title").getAttribute("data-lexend-layout-repair"), /fit-heading/);
+    assert.equal(await page.locator("#fit-title").getAttribute("data-lexend-layout-repair"), null, "Gentle mode leaves naturally wrapping headings alone");
     const fittedSize = await page.evaluate(() => __metrics("fit-title").size);
     await page.evaluate(() => {
       const cloned = document.querySelector("#fit-title").cloneNode(true);
@@ -237,7 +234,9 @@ test("typography preserves protected content and refreshes atomic inherited base
       const table=document.createElement("table");table.id="keyboard-table";
       table.style.cssText="font:20px Arial;letter-spacing:0;border-collapse:collapse";
       table.innerHTML='<tr><td style="white-space:nowrap">MMMMMMMMMMMMMM</td><td style="white-space:nowrap">MMMMMMMMMMMMMM</td></tr>';
-      document.body.append(table);
+      const region=document.createElement("div");region.id="author-table-region";
+      region.setAttribute("role","region");region.tabIndex=0;region.style.overflowX="auto";
+      region.append(table);document.body.append(region);
       table.scrollIntoView({block:"center"});
     });
     await page.waitForTimeout(150);
@@ -251,8 +250,8 @@ test("typography preserves protected content and refreshes atomic inherited base
     assert.ok(tableX>5,"keyboard ArrowRight scrolls enlarged table: "+JSON.stringify(await page.locator("#keyboard-table").evaluate(table=>({scroll:table.parentElement.scrollLeft,width:table.parentElement.clientWidth,extent:table.parentElement.scrollWidth,active:document.activeElement.tagName,focus:document.activeElement===table.parentElement,rect:table.getBoundingClientRect().toJSON(),style:table.parentElement.style.cssText,state:__state()}))));
     await page.evaluate(() => {document.querySelector("#wrapper").textContent="Focused table region survives refresh";});
     await page.waitForTimeout(150);
-    assert.equal(await page.locator("#keyboard-table").evaluate((table) => document.activeElement===table.parentElement),true,"replacement table wrapper retains keyboard focus");
-    assert.ok(Math.abs((await page.locator("#keyboard-table").evaluate((table) => table.parentElement.scrollLeft))-tableX)<1,"replacement table wrapper retains keyboard scroll offset");
+    assert.equal(await page.locator("#keyboard-table").evaluate((table) => document.activeElement===table.parentElement),true,"native table wrapper retains keyboard focus");
+    assert.ok(Math.abs((await page.locator("#keyboard-table").evaluate((table) => table.parentElement.scrollLeft))-tableX)<1,"native table wrapper retains keyboard scroll offset");
     await page.evaluate(() => {
       document.documentElement.style.height=`${innerHeight}px`;
       document.documentElement.style.overflow="hidden";
@@ -330,20 +329,20 @@ test("typography preserves protected content and refreshes atomic inherited base
   } finally { await browser.close(); }
 });
 
-test("already focused repaired panel actions remain visible after typography settings refresh", async () => {
+test("native scrolling panels preserve focus, bounds, and scroll after typography changes", async () => {
   const browser=await chromium.launch({headless:true});
   try {
     const page=await browser.newPage({viewport:{width:600,height:420}});
     await page.route("http://panel.test/**",async route=>route.fulfill({body:await readFile(resolve(`.${new URL(route.request().url()).pathname}`)),contentType:"font/woff2"}));
-    await page.setContent(`<!doctype html><style>body{margin:0;font:16px/20px Arial;min-height:5000px}.panel{position:fixed;left:20px;top:40px;width:300px;height:300px;max-height:300px;overflow:hidden;background:white}p{margin:0}button{font:inherit}</style><main>Document content</main><div class=panel role=dialog aria-label="Instructions">${Array.from({length:12},(_,i)=>`<p>Panel instruction ${i+1}</p>`).join("")}<button id=action>Continue</button></div>`);
+    await page.setContent(`<!doctype html><style>body{margin:0;font:16px/20px Arial;min-height:5000px}.panel{position:fixed;left:20px;top:40px;width:300px;height:300px;max-height:300px;overflow:auto;background:white}p{margin:0}button{font:inherit}</style><main>Document content</main><div class=panel role=dialog aria-label="Instructions">${Array.from({length:12},(_,i)=>`<p>Panel instruction ${i+1}</p>`).join("")}<button id=action>Continue</button></div>`);
     await page.evaluate(()=>{
       globalThis.__settings={enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};globalThis.__listeners=[];
       globalThis.chrome={runtime:{getURL:p=>`http://panel.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
       globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       globalThis.__focusedBounds=()=>{const p=document.querySelector('.panel'),a=document.querySelector('#action'),r=p.getBoundingClientRect(),q=a.getBoundingClientRect();return{repair:p.dataset.lexendLayoutRepair,paneTop:r.top,paneBottom:r.bottom,actionTop:q.top,actionBottom:q.bottom,scrollTop:p.scrollTop,scrollY,focused:document.activeElement===a};};
     });
-    for(const name of ["settings","adaptive-controls","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
-    await page.waitForFunction(()=>/bounded-panel|reachable-scroll/.test(document.querySelector('.panel').dataset.lexendLayoutRepair??""));
+    for(const name of ["settings","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector("#action")).fontFamily.includes("Lexend"));
     await page.evaluate(()=>{window.scrollTo(0,1500);document.querySelector('#action').focus();});
     await page.waitForTimeout(150);
     const before=await page.evaluate(()=>__focusedBounds());
@@ -353,190 +352,10 @@ test("already focused repaired panel actions remain visible after typography set
     await page.evaluate(()=>__update({textScale:140}));
     const after=await page.evaluate(()=>__focusedBounds());
     assert.equal(after.focused,true);
-    assert.ok(after.actionTop>=after.paneTop-1&&after.actionBottom<=after.paneBottom+1,"existing focus is kept visible after the same pane's typography grows: "+JSON.stringify({before,after}));
+    assert.equal(after.scrollTop,before.scrollTop,"the native scroll position stays under author control");
+    assert.equal(after.paneBottom,before.paneBottom,"the panel keeps its authored size");
     assert.equal(after.scrollY,before.scrollY,"focused-panel reveal preserves document scroll");
   } finally {await browser.close();}
-});
-
-test("small cross-origin announcements resize by measured demand and restore", async () => {
-  const browser=await chromium.launch({headless:true});
-  try {
-    const page=await browser.newPage({viewport:{width:390,height:844}});
-    const pageErrors=[];
-    page.on("pageerror",error=>pageErrors.push(error.message));
-    await page.route("http://frame.test/**",async route=>{
-      const path=new URL(route.request().url()).pathname;
-      if(path.startsWith("/fonts/"))await route.fulfill({body:await readFile(resolve(`.${path}`)),contentType:"font/woff2"});
-      else await route.fulfill({contentType:"text/html",body:`<!doctype html><style>body{margin:0;font:12px/14px Arial}span{display:inline-block;width:160px}button{position:absolute;right:0;top:0;font:12px Arial}${path.includes("centered") ? "html,body{height:100%}body{display:flex;align-items:center}button{top:50%;transform:translateY(-50%)}" : ""}</style><span>Readable bonus announcement</span><button>Close</button>`});
-    });
-    await page.setContent('<!doctype html><iframe src="http://frame.test/banner" style="height:150px;max-height:150px;width:240px;border:0"></iframe><nav>Following navigation</nav>');
-    const install=async target=>{
-      await target.evaluate(()=>{
-        globalThis.__settings={enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
-        globalThis.__listeners=[];
-        globalThis.chrome={runtime:{getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT")window.parent.postMessage({type:"lexend-measured-frame-height",requirement:message.requirement},"*");},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
-        globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
-      });
-      for(const path of ["settings","adaptive-controls","adaptive-layout","content"])await target.addScriptTag({path:resolve(`src/${path}.js`)});
-    };
-    await install(page);
-    const child=page.frames().find(frame=>frame.url().startsWith("http://frame.test"));
-    await install(child);
-    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),150,"document-start embed initially has a larger placeholder viewport");
-    await page.locator("iframe").evaluate(element=>{element.style.height="30px";element.style.maxHeight="30px";});
-    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
-    const expanded=await page.locator("iframe").evaluate(element=>element.clientHeight);
-    assert.ok(expanded<=120,"announcement growth is bounded");
-    const footprint=await page.evaluate(()=>({frameBottom:document.querySelector("iframe").getBoundingClientRect().bottom,navTop:document.querySelector("nav").getBoundingClientRect().top}));
-    assert.ok(footprint.navTop>=footprint.frameBottom,"expanded announcement retains space before the following navigation");
-    const geometry=await child.locator("span").evaluate(element=>({bottom:element.getBoundingClientRect().bottom,viewport:innerHeight,font:getComputedStyle(element).fontFamily}));
-    assert.match(geometry.font,/Lexend/);assert.ok(geometry.bottom<=geometry.viewport,"complete converted caption fits inside embedding viewport");
-    await child.evaluate(()=>document.body.dataset.refresh="again");
-    await page.waitForTimeout(250);
-    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded,"expanded viewport does not oscillate back to its original clipping height");
-    await page.evaluate(()=>window.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:9999}},"*"));
-    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded,"unrelated and unbounded frame messages are ignored");
-    await child.evaluate(()=>{
-      for(const requirement of [undefined,"bad",[],{viewportHeight:30,baselineHeight:-1,requiredHeight:60}])window.parent.postMessage({type:"lexend-measured-frame-height",requirement},"*");
-    });
-    await page.waitForTimeout(30);
-    assert.deepEqual(pageErrors,[],"malformed messages from the actual embedded window do not throw");
-    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded);
-    await child.evaluate(()=>__update({enabled:false}));
-    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
-    assert.equal(await page.locator("iframe").getAttribute("style"),"height: 30px; max-height: 30px; width: 240px; border: 0px;");
-
-    const centeredNavigation=page.waitForEvent("framenavigated",{predicate:frame=>frame.url().includes("centered-banner")});
-    await page.evaluate(()=>{
-      document.querySelector("iframe").remove();
-      const frame=document.createElement("iframe");
-      frame.src="http://frame.test/centered-banner";
-      frame.style.cssText="height:30px;max-height:30px;width:240px;border:0";
-      document.body.prepend(frame);
-      globalThis.__frameRequests=[];
-      window.addEventListener("message",event=>{
-        if(event.source===frame.contentWindow && event.data?.type==="lexend-measured-frame-height" && event.data.requirement)
-          __frameRequests.push(event.data.requirement.requiredHeight);
-      });
-    });
-    const centeredChild=await centeredNavigation;
-    await install(centeredChild);
-    await page.waitForFunction(()=>__frameRequests.length>0 && document.querySelector("iframe").clientHeight>30);
-    const firstMeasuredHeight=await page.evaluate(()=>__frameRequests[0]);
-    await page.waitForTimeout(500);
-    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),firstMeasuredHeight,"centering in the repaired viewport does not repeatedly grow an already fitting announcement");
-    const centeredGeometry=await centeredChild.locator("span").evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);const box=range.getBoundingClientRect();return{top:box.top,bottom:box.bottom,viewport:innerHeight};});
-    assert.ok(centeredGeometry.top>=0 && centeredGeometry.bottom<=centeredGeometry.viewport,"centered converted announcement is fully inside the expanded frame");
-    await centeredChild.evaluate(()=>document.body.dataset.externalChange="again");
-    await page.waitForTimeout(250);
-    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),firstMeasuredHeight,"a later baseline refresh keeps the fitting frame height");
-    await centeredChild.evaluate(()=>__update({enabled:false}));
-    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
-  } finally {await browser.close();}
-});
-
-test("isolated extension frames use authenticated sizing and retain clipped embedding footprints",async()=>{
- const temporary=await mkdtemp(join(tmpdir(),"lexend-isolated-frame-"));
- const extensionPath=join(temporary,"extension"),profile=join(temporary,"profile");
- for(const path of ["src","assets","shared.css","options.html","options.css","options.js","popup.html","popup.css","popup.js"])
-  await cp(resolve(path),join(extensionPath,path),{recursive:true});
- await cp(resolve("manifests/manifest.chrome.json"),join(extensionPath,"manifest.json"));
- const server=createServer((request,response)=>{
-  response.setHeader("content-type","text/html");
-  if(request.url==="/banner") response.end('<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>');
-  else if(["/caption","/below-caption","/closed-caption","/hidden-caption"].includes(request.url)) response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}p{margin:0;width:200px}</style><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
-  else if(request.url==="/centered-caption") response.end('<!doctype html><style>html,body{height:100%}body{margin:0;font:16px/20px Arial;display:flex;align-items:center}p{margin:0;width:200px;flex:none}</style><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
-  else if(request.url==="/media") response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}img{display:block;width:200px;height:100px}p{margin:0}</style><img alt="" src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'100\'%3E%3Crect width=\'200\' height=\'100\' fill=\'navy\'/%3E%3C/svg%3E"><p>Caption originally outside the native frame.</p>');
-  else if(request.url==="/photo") response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}img{display:block;width:240px;height:100px}p{position:absolute;top:0;margin:0;width:200px;color:white}</style><img alt="" src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'240\' height=\'100\'%3E%3Crect width=\'240\' height=\'100\' fill=\'navy\'/%3E%3C/svg%3E"><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
-  else if(request.url==="/captions") response.end(`<!doctype html><style>body{margin:0;font:16px Arial}.embed{width:240px;height:100px;max-height:100px;overflow:hidden}iframe{display:block;width:240px;height:100px;max-height:100px;border:0}#closed{height:0;max-height:0;overflow:hidden}#hidden{opacity:0}</style><div class="embed"><iframe id="caption" src="http://localhost:${server.address().port}/caption"></iframe></div><div class="embed"><iframe id="media" src="http://localhost:${server.address().port}/media"></iframe></div><div class="embed"><iframe id="photo" src="http://localhost:${server.address().port}/photo"></iframe></div><div class="embed"><iframe id="centered-caption" src="http://localhost:${server.address().port}/centered-caption"></iframe></div><div style="height:1800px"></div><div class="embed"><iframe id="below-caption" src="http://localhost:${server.address().port}/below-caption"></iframe></div><div id="closed" class="embed"><iframe id="closed-caption" src="http://localhost:${server.address().port}/closed-caption"></iframe></div><div id="hidden" class="embed"><iframe id="hidden-caption" src="http://localhost:${server.address().port}/hidden-caption"></iframe></div>`);
-  else response.end(`<!doctype html><style>body{margin:0;font:16px Arial}#clip{position:fixed;top:0;left:0;width:240px;height:30px;max-height:30px;overflow:hidden}iframe{display:block;width:240px;height:30px;max-height:30px;border:0}nav{position:fixed;top:30px;height:28px;width:240px;background:white}main{margin-top:80px}</style><div id="clip"><iframe src="http://localhost:${server.address().port}/banner"></iframe></div><nav>Following navigation</nav><main>Readable page prose</main>`);
- });
- await new Promise(resolve=>server.listen(0,"0.0.0.0",resolve));
- let context;
- try{
-  context=await chromium.launchPersistentContext(profile,{channel:"chromium",headless:true,args:[`--disable-extensions-except=${extensionPath}`,`--load-extension=${extensionPath}`]});
-  const worker=context.serviceWorkers()[0]??await context.waitForEvent("serviceworker");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true,scope:"all",siteRules:[],textScale:110,lineHeight:1.6,letterSpacing:.02}));
-  const page=await context.newPage();await page.setViewportSize({width:390,height:844});
-  await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:"domcontentloaded"});
-  await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30,{},{timeout:5000});
-  const child=page.frames().find(frame=>frame.url().endsWith("/banner"));
-  const fitting=await child.locator("span").evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);return{glyphs:range.getBoundingClientRect().toJSON(),viewport:innerHeight,font:getComputedStyle(element).fontFamily};});
-  assert.match(fitting.font,/Lexend/);
-  assert.ok(fitting.glyphs.top>=0 && fitting.glyphs.bottom<=fitting.viewport,"isolated cross-origin child typography fits its authenticated resized viewport");
-  const expanded=await page.evaluate(()=>({frame:document.querySelector("iframe").getBoundingClientRect().toJSON(),clip:document.querySelector("#clip").getBoundingClientRect().toJSON(),nav:document.querySelector("nav").getBoundingClientRect().toJSON()}));
-  assert.ok(expanded.clip.bottom>=expanded.frame.bottom,"finite clipping embed wrapper expands with its frame");
-  assert.ok(expanded.nav.top>=expanded.clip.bottom,"following fixed navigation is displaced only by the new overlap");
-  await page.waitForTimeout(500);
-  assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),fitting.viewport,"isolated sizing remains stable after author centering and repair refreshes");
-  await page.evaluate(()=>window.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:200}},"*"));
-  await page.waitForTimeout(100);
-  assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),fitting.viewport,"unrelated page messages cannot impersonate an embedding request");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
-  await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
-  const restored=await page.evaluate(()=>({clip:document.querySelector("#clip").style.cssText,nav:document.querySelector("nav").style.cssText,frame:document.querySelector("iframe").style.cssText}));
-  assert.deepEqual(restored,{clip:"",nav:"",frame:""},"pause exactly restores the original frame, wrapper and fixed navigation inline styles");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true}));
-  await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
-  await page.locator("iframe").evaluate(element=>element.remove());
-  await page.waitForFunction(()=>document.querySelector("nav").style.getPropertyValue("top")==="");
-  const removed=await page.evaluate(()=>({clipHeight:document.querySelector("#clip").style.getPropertyValue("height"),clipMaxHeight:document.querySelector("#clip").style.getPropertyValue("max-height"),navTop:getComputedStyle(document.querySelector("nav")).top}));
-  assert.deepEqual(removed,{clipHeight:"",clipMaxHeight:"",navTop:"30px"},"removing an embed while enabled restores its wrapper and following navigation without a child null request");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
-  await page.goto(`http://127.0.0.1:${server.address().port}/captions`,{waitUntil:"load"});
-  const captionChild=page.frames().find(frame=>frame.url().endsWith("/caption"));
-  const captionGeometry=async()=>captionChild.locator("p").evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);return{bottom:range.getBoundingClientRect().bottom,viewport:innerHeight,fontSize:parseFloat(getComputedStyle(element).fontSize)};});
-  const nativeCaption=await captionGeometry();
-  assert.equal(nativeCaption.viewport,100);
-  assert.ok(nativeCaption.bottom<=100,"three authored caption lines originally fit their100px frame");
-  const photoChild=page.frames().find(frame=>frame.url().endsWith("/photo"));
-  const nativePhotoTextBottom=await photoChild.locator("p").evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);return range.getBoundingClientRect().bottom;});
-  assert.ok(nativePhotoTextBottom<=100,"the photo overlay text also originally fits, independently of the media-footprint exclusion");
-  assert.ok(await page.locator("#below-caption").evaluate(element=>element.getBoundingClientRect().top>innerHeight),"the measured caption starts below its parent's native viewport");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true}));
-  await page.waitForFunction(()=>document.querySelector("#caption").clientHeight>100,{},{timeout:5000});
-  const grownCaption=await captionGeometry();
-  assert.ok(grownCaption.bottom<=grownCaption.viewport,"all enlarged caption lines fit the resized100px embed");
-  assert.ok(grownCaption.viewport<=320,"caption frame growth remains bounded");
-  assert.equal(grownCaption.fontSize,17.6,"frame sizing retains the requested readable text scale");
-  const grownFootprint=await page.locator("#caption").evaluate(element=>({frame:element.clientHeight,parent:element.parentElement.clientHeight}));
-  assert.ok(grownFootprint.parent>=grownFootprint.frame,"the originally100px clipping wrapper grows with its caption");
-  for(let iteration=0;iteration<3;iteration++){
-   await captionChild.evaluate(value=>document.body.dataset.authorRefresh=value,String(iteration));
-   await page.waitForTimeout(150);
-   assert.equal((await captionGeometry()).viewport,grownCaption.viewport,"caption sizing remains stable under repeated author updates");
-  }
-  assert.equal(await page.locator("#media").evaluate(element=>element.clientHeight),100,"media whose caption was already outside its native viewport is not indiscriminately resized");
-  assert.equal(await page.locator("#photo").evaluate(element=>element.clientHeight),100,"a full-frame photograph with overlay text keeps its authored footprint");
-  const centeredCaptionChild=page.frames().find(frame=>frame.url().endsWith("/centered-caption"));
-  await centeredCaptionChild.waitForFunction(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector("p"));const box=range.getBoundingClientRect();return innerHeight>140 && box.top>=0 && box.bottom<=innerHeight;},{},{timeout:5000});
-  const centeredHeight=await page.locator("#centered-caption").evaluate(element=>element.clientHeight);
-  for(let iteration=0;iteration<3;iteration++){
-   await centeredCaptionChild.evaluate(value=>document.body.dataset.authorRefresh=value,String(iteration));
-   await page.waitForTimeout(150);
-   assert.equal(await page.locator("#centered-caption").evaluate(element=>element.clientHeight),centeredHeight,"strong centered-caption growth retains its original fit qualification and baseline height across refreshes");
-  }
-  const belowChild=page.frames().find(frame=>frame.url().endsWith("/below-caption"));
-  // Font decoding and authenticated resize replies settle in separate tasks.
-  // The first enlarged height can still belong to the fallback font's metrics.
-  await belowChild.waitForFunction(()=>{
-   const range=document.createRange();range.selectNodeContents(document.querySelector("p"));
-   const box=range.getBoundingClientRect();
-   return innerHeight>100 && box.top>=0 && box.bottom<=innerHeight;
-  },{},{timeout:5000});
-  const belowGlyphs=await belowChild.locator("p").evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);return{top:range.getBoundingClientRect().top,bottom:range.getBoundingClientRect().bottom,viewport:innerHeight};});
-  assert.ok(belowGlyphs.top>=0 && belowGlyphs.bottom<=belowGlyphs.viewport,"a request arriving below the fold retains every enlarged caption glyph before native reveal");
-  await page.locator("#below-caption").scrollIntoViewIfNeeded();
-  assert.equal(await page.locator("#below-caption").evaluate(element=>element.clientHeight),belowGlyphs.viewport,"native parent scrolling preserves the measured caption height");
-  assert.deepEqual(await page.evaluate(()=>({closedFrame:document.querySelector("#closed-caption").clientHeight,closedPane:document.querySelector("#closed").clientHeight,closedStyle:document.querySelector("#closed").style.cssText,hiddenFrame:document.querySelector("#hidden-caption").clientHeight,hiddenStyle:document.querySelector("#hidden").style.cssText})),{closedFrame:100,closedPane:0,closedStyle:"",hiddenFrame:100,hiddenStyle:""},"zero-height closed and transparent ancestor panes retain their authored frame footprints");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
-  await page.waitForFunction(()=>document.querySelector("#caption").clientHeight===100);
-  assert.equal((await captionGeometry()).fontSize,16);
-  assert.deepEqual(await page.locator("#caption").evaluate(element=>({frame:element.style.cssText,wrapper:element.parentElement.style.cssText})),{frame:"",wrapper:""},"pause exactly restores the100px caption embed and its wrapper");
-  await page.waitForFunction(()=>document.querySelector("#centered-caption").clientHeight===100);
-  await page.waitForFunction(()=>document.querySelector("#below-caption").clientHeight===100);
-  assert.deepEqual(await page.locator("#below-caption").evaluate(element=>({frame:element.style.cssText,wrapper:element.parentElement.style.cssText})),{frame:"",wrapper:""},"pause restores the below-fold caption frame and wrapper exactly");
- }finally{await context?.close();await new Promise(resolve=>server.close(resolve));await rm(temporary,{recursive:true,force:true});}
 });
 
 test("newly painted automatic content gets a fresh layout baseline without refresh loops",async()=>{
@@ -548,9 +367,9 @@ test("newly painted automatic content gets a fresh layout baseline without refre
   await page.evaluate(()=>{
    globalThis.__listeners=[];globalThis.__captureCount=0;globalThis.__reveals=0;
    document.addEventListener('contentvisibilityautostatechange',e=>{if(e.target.id==='lazy'&&!e.skipped)__reveals++;},true);
-   globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({enabled:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
+   globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({layoutMode:"fit",enabled:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
   });
-  for(const name of ['settings','adaptive-controls','adaptive-layout'])await page.addScriptTag({path:resolve(`src/${name}.js`)});
+  for(const name of ['settings','adaptive-layout'])await page.addScriptTag({path:resolve(`src/${name}.js`)});
   await page.evaluate(()=>{const create=LexendLayout.create;globalThis.LexendLayout={create:options=>{const controller=create(options);return{...controller,capture:(...args)=>{__captureCount++;return controller.capture(...args);}};}};});
   await page.addScriptTag({path:resolve('src/content.js')});
   await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(250);
@@ -558,21 +377,21 @@ test("newly painted automatic content gets a fresh layout baseline without refre
   assert.equal(await page.locator('#box').getAttribute('data-lexend-layout-repair'),null,'skipped placeholder geometry receives no fixed-height repair');
   const before=await page.evaluate(()=>__captureCount);
   await page.evaluate(()=>scrollTo(0,4800));
-  await page.waitForFunction(()=>__reveals>0&&__captureCount>0&&document.querySelector('#box').clientHeight>48);
+  await page.waitForFunction(before=>__reveals>0&&__captureCount>before&&document.querySelector('#caption').checkVisibility({contentVisibilityAuto:true}),before);
   assert.ok((await page.evaluate(()=>__captureCount))>before,'native reveal schedules a fresh baseline without DOM mutation');
   const geometry=await page.locator('#caption').evaluate(e=>({text:e.getBoundingClientRect().height,container:e.parentElement.clientHeight,family:getComputedStyle(e).fontFamily}));
-  assert.match(geometry.family,/Lexend/);assert.ok(geometry.container>=geometry.text-1,'newly visible converted caption remains inside the expanded box');
+  assert.match(geometry.family,/Lexend/);assert.equal(geometry.container,48,'newly visible content retains its authored box');
   await page.waitForTimeout(200);const quiet=await page.evaluate(()=>__captureCount);await page.waitForTimeout(300);
   assert.equal(await page.evaluate(()=>__captureCount),quiet,'paint-state events and baseline restoration do not repeatedly refresh a settled subtree');
   await page.evaluate(()=>scrollTo(0,9800));
-  await page.waitForFunction(()=>document.querySelector('#box-second').clientHeight>48);
+  await page.waitForFunction(()=>document.querySelector('#box-second').firstElementChild.checkVisibility({contentVisibilityAuto:true}));
   assert.equal(await page.locator('#caption').evaluate(e=>e.checkVisibility({contentVisibilityAuto:true})),false,'revealing second distant subtree skips the first');
   const secondBaseline=await page.evaluate(()=>__captureCount);
   await page.evaluate(()=>scrollTo(0,4800));
-  await page.waitForFunction(()=>document.querySelector('#box').clientHeight>48);
+  await page.waitForFunction(before=>__captureCount>before&&document.querySelector('#caption').checkVisibility({contentVisibilityAuto:true}),secondBaseline);
   assert.ok((await page.evaluate(()=>__captureCount))>secondBaseline,'A→B→A recaptures a subtree whose earlier repairs were restored while skipped');
   const returned=await page.locator('#caption').evaluate(e=>({text:e.getBoundingClientRect().height,container:e.parentElement.clientHeight}));
-  assert.ok(returned.container>=returned.text-1,'returning to the first subtree restores its full readable layout');
+  assert.equal(returned.container,48,'returning content keeps its authored box');
   await page.waitForTimeout(200);const returnedQuiet=await page.evaluate(()=>__captureCount);await page.waitForTimeout(300);
   assert.equal(await page.evaluate(()=>__captureCount),returnedQuiet,'return reveal remains quiet without author changes');
   await page.evaluate(()=>scrollTo(0,0));
@@ -580,11 +399,11 @@ test("newly painted automatic content gets a fresh layout baseline without refre
   await page.setViewportSize({width:160,height:800});await page.waitForTimeout(200);
   const skippedEpoch=await page.evaluate(()=>__captureCount);
   await page.evaluate(()=>scrollTo(0,4800));
-  await page.waitForFunction(()=>__captureCount>0&&document.querySelector('#box').clientHeight>60);
+  await page.waitForFunction(before=>__captureCount>before&&document.querySelector('#caption').checkVisibility({contentVisibilityAuto:true}),skippedEpoch);
   assert.ok((await page.evaluate(()=>__captureCount))>skippedEpoch,'resize while skipped allows another reveal baseline');
   const resized=await page.locator('#caption').evaluate(e=>({text:e.getBoundingClientRect().height,container:e.parentElement.clientHeight}));
-  assert.ok(resized.container>geometry.container,'narrower revealed content receives a larger repaired height');
-  assert.ok(resized.container>=resized.text-1,'second reveal repairs the new wrapping geometry');
+  assert.equal(resized.container,geometry.container,'Fit mode preserves the authored height after resize');
+
   await page.waitForTimeout(200);const quietAgain=await page.evaluate(()=>__captureCount);await page.waitForTimeout(300);
   assert.equal(await page.evaluate(()=>__captureCount),quietAgain,'second reveal remains quiet within its new epoch');
  }finally{await browser.close();}
@@ -612,7 +431,7 @@ test("slotted typography overrides inner important rules and loads exact Latin s
       globalThis.__metrics=id=>{const css=getComputedStyle(document.getElementById(id));return{family:css.fontFamily,size:parseFloat(css.fontSize),line:parseFloat(css.lineHeight),spacing:css.letterSpacing};};
     });
     const before = await page.evaluate(() => ({title:__metrics("title"),body:__metrics("body"),code:__metrics("code"),fallback:document.querySelector("#fallback").textContent}));
-    for (const name of ["settings","adaptive-controls","adaptive-layout","content"]) await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    for (const name of ["settings","adaptive-layout","content"]) await page.addScriptTag({path:resolve(`src/${name}.js`)});
     await page.waitForFunction(() => /Lexend/.test(__metrics("title").family));
     await page.evaluate(() => document.fonts.ready);
     const assertScaled = async (id, size, line) => {
@@ -659,7 +478,7 @@ test("incoming feed text outruns coalesced animation updates and exposes pending
       globalThis.chrome={runtime:{getURL:path=>`http://feed.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:listener=>__runtime.push(listener)}},storage:{sync:{get:async()=>({enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:()=>{}}}};
       globalThis.__state=()=>{let state;__runtime.forEach(listener=>listener({type:"LEXEND_GET_STATE"},null,value=>state=value));return state;};
     });
-    for(const name of ["settings","adaptive-controls","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    for(const name of ["settings","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
     await page.waitForFunction(()=>document.querySelector("#feed p").hasAttribute("data-lexend-text")&&__state().pending===false);
     await page.evaluate(()=>document.fonts.ready);
     await page.waitForFunction(()=>__state().pending===false);

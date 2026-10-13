@@ -4,8 +4,12 @@
   const api = globalThis.LexendSettings;
   const messageType = "LEXEND_SETTINGS_MUTATE";
   const connectionName = "lexend-settings";
-  const preferenceKeys = new Set(["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const preferenceKeys = new Set(["enabled", "scope", "theme", "layoutMode", "textScale", "lineHeight", "letterSpacing"]);
   const legacyKeys = ["disabledSites", "spacing", "uiStyle"];
+  const validRuleChoices = (choices) => (
+    (!Object.hasOwn(choices, "enabled") || choices.enabled === null || typeof choices.enabled === "boolean")
+    && (!Object.hasOwn(choices, "layoutMode") || choices.layoutMode === null || api.validLayoutMode(choices.layoutMode))
+  );
   const applyOperation = (settings, operation) => {
     switch (operation?.type) {
       case "patch": {
@@ -18,10 +22,34 @@
       }
       case "addRule":
         if (!api.validHostname(operation.rule?.hostname)) throw api.settingsError("INVALID_RULE", "Enter a valid domain.");
+        if (!validRuleChoices(operation.rule)) throw api.settingsError("INVALID_RULE", "Choose a valid Lexend state and layout mode.");
+        if (typeof operation.rule.enabled !== "boolean" && !api.validLayoutMode(operation.rule.layoutMode)
+            && !["body", "all"].includes(operation.rule.scope)) {
+          throw api.settingsError("INVALID_RULE", "Choose a layout mode or set Lexend to On or Paused.");
+        }
         if (api.getDirectRule(settings, operation.rule.hostname, operation.rule.includeSubdomains)) {
           throw api.settingsError("DUPLICATE_RULE", "That site already has a rule.");
         }
         return api.setSiteRule(settings, operation.rule);
+      case "updateRule": {
+        const changes = operation.changes;
+        if (!api.validHostname(operation.hostname) || typeof operation.includeSubdomains !== "boolean"
+            || !changes || typeof changes !== "object" || Array.isArray(changes)
+            || !Object.keys(changes).length || Object.keys(changes).some(key => !["enabled", "layoutMode"].includes(key))
+            || !validRuleChoices(changes)) {
+          throw api.settingsError("INVALID_OPERATION", "Choose a valid rule setting.");
+        }
+        if (!api.getDirectRule(settings, operation.hostname, operation.includeSubdomains)) {
+          throw api.settingsError("RULE_NOT_FOUND", "This rule was removed. Add it again to change its settings.");
+        }
+        return api.setSiteRule(settings, { hostname: operation.hostname, includeSubdomains: operation.includeSubdomains, ...changes });
+      }
+      case "setSiteLayout":
+        if (!api.validHostname(operation.hostname)
+            || (operation.layoutMode !== null && !api.validLayoutMode(operation.layoutMode))) {
+          throw api.settingsError("INVALID_OPERATION", "Choose a valid layout mode and site.");
+        }
+        return api.setSiteRule(settings, { hostname: operation.hostname, includeSubdomains: false, layoutMode: operation.layoutMode });
       case "removeRule":
         return api.removeSiteRule(settings, operation.hostname, operation.includeSubdomains);
       case "toggleSite":

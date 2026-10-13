@@ -4,9 +4,10 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   const quotesApi = globalThis.LexendQuotes;
+  const layoutUi = globalThis.LexendLayoutUI;
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
-  const PREVIEW_DEFAULT_LINE_HEIGHT = 1.65;
+  const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
   const darkThemeInput = document.querySelector("#dark-theme");
   const appearanceState = document.querySelector("#appearance-state");
   const advancedModeInput = document.querySelector("#advanced-mode");
@@ -19,20 +20,12 @@
   const textScaleSlider = document.querySelector("#text-scale");
   const lineHeightSlider = document.querySelector("#line-height");
   const letterSpacingSlider = document.querySelector("#letter-spacing");
+  const layoutModeInput = layoutUi.create(document.querySelector("#layout-mode"), { label: "Default layout mode" });
   const textScaleOutput = document.querySelector("#text-scale-output");
   const lineHeightOutput = document.querySelector("#line-height-output");
   const letterSpacingOutput = document.querySelector("#letter-spacing-output");
   const previewCopy = document.querySelector("#preview-copy");
   const previewAuthor = document.querySelector("#preview-author");
-  const previewAttribution = document.querySelector("#preview-attribution");
-  const previewReading = document.querySelector("#preview-reading");
-  const previewOriginal = document.querySelector("#preview-original");
-  const previewOriginalCopy = document.querySelector("#preview-original-copy");
-  const previewGlyphs = document.querySelector("#preview-glyphs");
-  const previewText = document.querySelector("#preview-text");
-  const previewModeInputs = [...document.querySelectorAll('input[name="previewMode"]')];
-  const previewSpecimens = [...document.querySelectorAll(".preview-specimen")];
-  let previewMode = "reading";
   const resetReadabilityButton = document.querySelector("#reset-readability");
   const saveStatus = document.querySelector("#save-status");
   const saveStatusText = document.querySelector("#save-status-text");
@@ -42,6 +35,8 @@
   const hostnameInput = document.querySelector("#new-hostname");
   const hostnameError = document.querySelector("#hostname-error");
   const subdomainsInput = document.querySelector("#new-subdomains");
+  const newRuleEnabled = document.querySelector("#new-rule-enabled");
+  const newRuleLayout = layoutUi.create(document.querySelector("#new-rule-layout"), { label: "Layout", inherit: true });
   const subdomainPreview = document.querySelector("#subdomain-preview");
   const ruleToolbar = document.querySelector("#rule-toolbar");
   const searchInput = document.querySelector("#rule-search");
@@ -112,10 +107,12 @@
   let renderedRulesKey;
   let pendingRuleDeletion = null;
   const ruleRowData = new WeakMap();
+  const pendingRuleChanges = new Map();
+  const ruleChangeKey = (rule, field) => JSON.stringify([rule.hostname, rule.includeSubdomains, field]);
   const quote = quotesApi.random();
   const mutationControls = [darkThemeInput, advancedModeInput, textScaleSlider,
-    lineHeightSlider, letterSpacingSlider, resetReadabilityButton, hostnameInput,
-    subdomainsInput, exportButton, importButton, importFile,
+    lineHeightSlider, letterSpacingSlider, layoutModeInput, resetReadabilityButton, hostnameInput,
+    subdomainsInput, newRuleEnabled, newRuleLayout, exportButton, importButton, importFile,
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
@@ -174,50 +171,18 @@
     .replace(/\.?0+$/, "");
 
   const renderQuote = () => {
-    const custom = previewText.value.trim();
-    const text = custom || `“${quote.text}”`;
-    for (const copy of [previewCopy, previewOriginalCopy]) {
-      copy.textContent = text;
-      // An empty language tag lets a custom multilingual sample stand on its
-      // own instead of inheriting the randomly chosen quote's language.
-      copy.lang = custom ? "" : quote.lang;
-    }
-    previewAttribution.hidden = Boolean(custom) || previewMode === "glyphs";
+    previewCopy.textContent = `“${quote.text}”`;
+    previewCopy.lang = quote.lang;
     previewAuthor.textContent = quote.author;
     previewAuthor.href = quote.url;
   };
 
   const renderPreview = (readability = settings) => {
-    const baseSize = desktopSettingsLayout.matches ? 18 : 16;
-    for (const copy of [previewCopy, ...previewSpecimens]) {
-      copy.style.fontSize = `${baseSize * readability.textScale / 100}px`;
-      copy.style.lineHeight = readability.lineHeight || PREVIEW_DEFAULT_LINE_HEIGHT;
-      copy.style.letterSpacing = /\p{Script=Arabic}/u.test(copy.textContent) ? "0em" : `${readability.letterSpacing}em`;
-    }
-    previewOriginalCopy.style.fontSize = `${baseSize}px`;
+    const baseSize = desktopSettingsLayout.matches ? 17 : 14;
+    previewCopy.style.fontSize = `${baseSize * readability.textScale / 100}px`;
+    previewCopy.style.lineHeight = readability.lineHeight || PREVIEW_DEFAULT_LINE_HEIGHT;
+    previewCopy.style.letterSpacing = `${readability.letterSpacing}em`;
   };
-
-  const renderPreviewMode = () => {
-    previewReading.hidden = previewMode === "glyphs";
-    previewGlyphs.hidden = previewMode !== "glyphs";
-    previewOriginal.hidden = previewMode !== "compare";
-    previewReading.classList.toggle("is-comparing", previewMode === "compare");
-    renderQuote();
-  };
-
-  previewModeInputs.forEach((input) => input.addEventListener("change", () => {
-    if (!input.checked) return;
-    previewMode = input.value;
-    renderPreviewMode();
-  }));
-  previewText.addEventListener("input", () => {
-    if (previewMode === "glyphs") {
-      previewMode = "reading";
-      previewModeInputs.forEach((input) => { input.checked = input.value === previewMode; });
-    }
-    renderPreviewMode();
-    renderPreview();
-  });
 
   const renderReadabilityMode = (animate = false) => {
     const showAdvanced = advancedModeInput.checked;
@@ -286,6 +251,8 @@
   };
 
   const renderReadability = () => {
+    layoutModeInput.value = settings.layoutMode;
+    layoutUi.update(layoutModeInput, { notice: settings.enabled ? "Changes apply to open pages; no reload needed." : "Lexend is paused everywhere. This default applies when it resumes." });
     setRadioValue(basicTextScaleInputs, settings.textScale);
     setRadioValue(basicLineHeightInputs, settings.lineHeight);
     setRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
@@ -391,9 +358,14 @@
   const renderRules = () => {
     const query = searchInput.value.trim().toLowerCase();
     const key = JSON.stringify([
-      settings.siteRules, query, desktopSettingsLayout.matches, rulesExpanded
+      settings.siteRules, settings.layoutMode, settings.enabled, query, desktopSettingsLayout.matches, rulesExpanded, preferences.loaded,
+      [...pendingRuleChanges].map(([key, change]) => [key, change.value])
     ]);
     if (key === renderedRulesKey) return;
+    const focusedControl = document.activeElement?.closest(".rule-setting-control");
+    const focusedRow = focusedControl?.closest(".rule-row");
+    const focusedRule = focusedRow && ruleRowData.get(focusedRow)?.rule;
+    let restoreControl;
     cancelRuleDeletion();
     renderedRulesKey = key;
     const rules = settings.siteRules
@@ -431,11 +403,51 @@
 
       const status = document.createElement("span");
       status.className = "rule-status";
-      status.textContent = rule.enabled === null ? "Inherit" : (rule.enabled ? "Active" : "Paused");
 
       const button = makeDeleteButton(rule);
+      const controls = document.createElement("div");
+      controls.className = "rule-settings";
+      const picker = layoutUi.create(document.createElement("fieldset"), { label: "Layout", inherit: true });
+      picker.className += " rule-setting-control";
+      picker.dataset.field = "layoutMode";
+      picker.setAttribute("aria-label", `Layout for ${rule.hostname}${rule.includeSubdomains ? " and its subdomains" : ""}`);
+      picker.disabled = !preferences.loaded;
+      picker.value = pendingRuleChanges.get(ruleChangeKey(rule, "layoutMode"))?.value ?? rule.layoutMode ?? "default";
+      const ruleSettings = rule.includeSubdomains ? { ...settings, siteRules: settings.siteRules.filter(other => other.hostname !== rule.hostname || other.includeSubdomains) } : settings;
+      const active = settingsApi.resolveSite(ruleSettings, rule.hostname).active;
+      status.textContent = !settings.enabled ? "Paused globally" : !active ? "Paused" : "";
+      const removesRule = rule.enabled === null && rule.scope === null && rule.layoutMode;
+      layoutUi.update(picker, {
+        ...layoutUi.inheritance(settings, rule.hostname, rule.includeSubdomains),
+        notice: [
+          !active ? "Lexend is paused. This choice applies when it resumes." : "",
+          removesRule ? "Choosing Use default removes this rule." : ""
+        ].filter(Boolean).join(" ")
+      });
+      controls.append(picker);
+      if (focusedRule && ruleChangeKey(rule, "layoutMode") === ruleChangeKey(focusedRule, focusedControl.dataset.field)) restoreControl = picker;
+      const wrapper = document.createElement("label");
+      wrapper.className = "rule-control";
+      const caption = document.createElement("span");
+      caption.textContent = "Lexend";
+      const select = document.createElement("select");
+      select.className = "rule-setting-control";
+      select.dataset.field = "enabled";
+      select.disabled = !preferences.loaded;
+      select.setAttribute("aria-label", `Lexend for ${rule.hostname}${rule.includeSubdomains ? " and its subdomains" : ""}`);
+      for (const [value, text] of [["default", "Use default"], ["on", "On"], ["paused", "Paused"]]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        select.append(option);
+      }
+      select.value = pendingRuleChanges.get(ruleChangeKey(rule, "enabled"))?.value
+        ?? (rule.enabled === null ? "default" : rule.enabled ? "on" : "paused");
+      if (focusedRule && ruleChangeKey(rule, "enabled") === ruleChangeKey(focusedRule, focusedControl.dataset.field)) restoreControl = select;
+      wrapper.append(caption, select);
+      controls.append(wrapper);
       ruleRowData.set(row, { domain, status, button, rule });
-      row.append(domain, status, button);
+      row.append(domain, status, button, controls);
       ruleList.append(row);
     });
 
@@ -448,6 +460,8 @@
     toggleRuleListLabel.textContent = rulesExpanded
       ? "Show fewer rules"
       : `Show all ${rules.length} rules`;
+    if (restoreControl?.dataset.field === "layoutMode") layoutUi.focus(restoreControl, focusedControl.value);
+    else if (focusedRule) (restoreControl ?? hostnameInput).focus({ preventScroll: true });
   };
 
   const render = () => {
@@ -505,7 +519,21 @@
 
   const updateAddRuleState = () => {
     const hostname = normalizeHostnameInput(hostnameInput.value);
-    addRuleButton.disabled = !preferences.loaded || !settingsApi.validHostname(hostname);
+    const valid = settingsApi.validHostname(hostname);
+    const prospective = valid ? { ...settings, siteRules: [...settings.siteRules.filter(rule =>
+      rule.hostname !== hostname || (!subdomainsInput.checked && rule.includeSubdomains)),
+    { hostname, includeSubdomains: subdomainsInput.checked,
+      enabled: newRuleEnabled.value === "default" ? null : newRuleEnabled.value === "on" }] } : settings;
+    layoutUi.update(newRuleLayout, {
+      ...(valid ? layoutUi.inheritance(settings, hostname, subdomainsInput.checked) : { inheritedMode: settings.layoutMode, source: "your global default" }),
+      notice: !settingsApi.resolveSite(prospective, hostname).active ? "Lexend is paused. This choice applies when it resumes." : ""
+    });
+    document.querySelector("#new-rule-help").textContent = !valid ? "Enter a domain, like example.com."
+      : newRuleEnabled.value === "default" && newRuleLayout.value === "default"
+        ? "Choose a layout mode or change Lexend’s on/off setting to create a rule."
+        : "Ready to add. You can change these choices anytime.";
+    addRuleButton.disabled = !preferences.loaded || !valid
+      || (newRuleEnabled.value === "default" && newRuleLayout.value === "default");
   };
 
   advancedModeInput.addEventListener("change", async () => {
@@ -520,6 +548,8 @@
       showToast("The advanced view preference could not be saved");
     }
   });
+
+  layoutModeInput.addEventListener("change", () => save({ layoutMode: layoutModeInput.value }));
 
   darkThemeInput.addEventListener("change", () => {
     save({
@@ -595,6 +625,7 @@
     updateSubdomainPreview();
     updateAddRuleState();
   });
+  [newRuleEnabled, newRuleLayout, subdomainsInput].forEach(control => control.addEventListener("change", updateAddRuleState));
 
   addRuleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -615,8 +646,13 @@
     const rule = {
       hostname,
       includeSubdomains,
-      enabled: false
+      enabled: newRuleEnabled.value === "default" ? null : newRuleEnabled.value === "on",
+      layoutMode: newRuleLayout.value === "default" ? null : newRuleLayout.value
     };
+    if (rule.enabled === null && rule.layoutMode === null) {
+      layoutUi.focus(newRuleLayout);
+      return;
+    }
     if (!await persist({ type: "addRule", rule })) {
       showHostnameError(saveStatusText.textContent);
       return;
@@ -624,6 +660,8 @@
 
     hostnameInput.value = "";
     subdomainsInput.checked = false;
+    newRuleEnabled.value = "default";
+    newRuleLayout.value = "default";
     updateSubdomainPreview();
     updateAddRuleState();
   });
@@ -632,6 +670,22 @@
 
   toggleRuleListButton.addEventListener("click", () => {
     rulesExpanded = !rulesExpanded;
+    renderRules();
+  });
+
+  ruleList.addEventListener("change", async (event) => {
+    if (!preferences.loaded) return;
+    const control = event.target.closest(".rule-setting-control");
+    const row = control?.closest(".rule-row");
+    const rule = row && ruleRowData.get(row)?.rule;
+    if (!rule) return;
+    const field = control.dataset.field;
+    const change = { value: control.value };
+    const key = ruleChangeKey(rule, field);
+    pendingRuleChanges.set(key, change);
+    const value = change.value === "default" ? null : field === "enabled" ? change.value === "on" : change.value;
+    await persist({ type: "updateRule", hostname: rule.hostname, includeSubdomains: rule.includeSubdomains, changes: { [field]: value } });
+    if (pendingRuleChanges.get(key) === change) pendingRuleChanges.delete(key);
     renderRules();
   });
 

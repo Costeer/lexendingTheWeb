@@ -20,24 +20,33 @@ of the popup to turn Lexend off everywhere. You can also pause or resume the
 current site with `Ctrl+Shift+L` (`Command+Shift+L` on macOS).
 
 Open **Settings** with the gear button to adjust text size, line height, and
-letter spacing. The preview offers **Reading**, **Compare**, and **Glyphs** views.
-Compare puts a system font at default settings beside Lexend with your settings;
-Glyphs shows similar letterforms, numbers, accents, and three font weights.
-Use **Try your own text** to preview a sample without saving or sending it.
-
-You can also search and edit saved site rules, or add a rule
+letter spacing. You can also search and edit saved site rules, or add a rule
 that covers a domain and its subdomains. A rule for `example.com` covers only
 that hostname unless you select **Include subdomains**; with that option, it
 also covers addresses such as `news.example.com`.
+
+In **Site rules**, choose **Layout** when adding a rule or change it directly
+on an existing rule. **Lexend** separately controls whether that site is on,
+paused, or follows the default. Choose at least one non-default setting when
+adding a rule. Edits save automatically; **Use default** removes that override
+and follows matching parent rules, then global settings. A rule with no
+remaining overrides is removed.
+
+Layout choices stay visible, with an explanation of the selected mode.
+**Use default** shows the inherited mode and where it comes from. Pickers
+support arrow keys, and paused sites explain when the choice will take effect.
 
 Settings sync through your browser when browser sync is enabled. Use the
 import and export controls in Settings to save or restore a JSON backup.
 
 ## On the page
 
-When text no longer fits, Lexend makes room by letting boxes grow, labels wrap,
-or panels scroll. Pause it on a site to return to that site's styles. There's a
-short guide to [layout adjustments](docs/adaptive-layout.md).
+Layout repair starts **Off**. Use **Layout on this site** in the toolbar popup
+to compare **Off**, **Gentle repair** (grow simple clipped text boxes), and
+**Fit text** (adapt constrained text, with local original-font exceptions).
+Choices apply immediately and are saved for that site. Set the default in
+**Settings → Readability**. Pause a site to restore its original typography too.
+Read the [layout modes and testing guide](docs/adaptive-layout.md).
 
 Code, math, SVG artwork, and common icon fonts keep their original fonts.
 Missing icons can use the included Nerd Fonts symbols. Browser settings and

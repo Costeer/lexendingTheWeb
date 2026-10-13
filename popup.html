@@ -7,6 +7,7 @@
     <script src="src/ui-theme.js"></script>
     <link rel="preload" href="assets/fonts/lexend-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="shared.css" />
+    <link rel="stylesheet" href="src/ui-layout.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -53,6 +54,11 @@
           <p id="site-message" class="site-message"></p>
         </div>
         <button id="toggle-site" class="text-link" type="button">Pause here</button>
+      </section>
+
+      <section class="popup-section layout-section" aria-label="Layout on this site">
+        <fieldset id="site-layout-mode" disabled></fieldset>
+        <p class="layout-save-hint">Choices save automatically. No reload needed.</p>
       </section>
 
       <fieldset id="scope-fieldset" class="popup-section scope-section">
@@ -107,6 +113,7 @@
     </main>
     <script src="src/settings.js"></script>
     <script src="src/preferences.js"></script>
+    <script src="src/ui-layout.js"></script>
     <script src="src/quotes.js"></script>
     <script src="popup.js"></script>
   </body>
