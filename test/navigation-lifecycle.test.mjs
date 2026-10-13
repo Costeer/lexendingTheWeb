@@ -21,8 +21,9 @@ test("initialization and synthetic persisted-pageshow handling ignore stale read
       globalThis.saved = { enabled: true, scope: "all", textScale: 110 };
       globalThis.deferRead = true;
       globalThis.failRead = false;
+      globalThis.notifications = [];
       globalThis.chrome = {
-        runtime: { getURL: (path) => `http://navigation.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => messages.push(fn) } },
+        runtime: { getURL: (path) => `http://navigation.test/${path}`, sendMessage: async (message) => { notifications.push(message); }, onMessage: { addListener: (fn) => messages.push(fn) } },
         storage: {
           sync: { get: async () => {
             if (failRead) throw new Error("Storage unavailable");
@@ -65,8 +66,16 @@ test("initialization and synthetic persisted-pageshow handling ignore stale read
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     assert.equal(await page.evaluate(() => state().active), true, "Ordinary pageshow events do not trigger redundant reloads");
-    await page.evaluate(() => restored());
-    await page.waitForFunction(() => !state().active);
+    const heldRestore = await page.evaluate(() => {
+      deferRead = true;
+      restored();
+      return { state: state(), notification: notifications.at(-1) };
+    });
+    assert.equal(heldRestore.state.pending, true, "A cached page remains pending while its saved preferences are reloaded");
+    assert.equal(heldRestore.state.active, true, "Pending reload keeps the previously applied typography until reconciliation");
+    assert.equal(heldRestore.notification.pending, true, "Toolbar receives the pending restoration state immediately");
+    await page.evaluate(() => { finishRead(); deferRead = false; });
+    await page.waitForFunction(() => !state().active && !state().pending);
     assert.equal(await page.locator("#text").getAttribute("style"), null);
     await page.evaluate(() => { saved.enabled = true; saved.textScale = 130; restored(); });
     await page.waitForFunction(() => state().active && getComputedStyle(document.querySelector("#text")).fontSize === "26px");
@@ -95,7 +104,22 @@ test("initialization and synthetic persisted-pageshow handling ignore stale read
       "A theme event during cached restore must preserve the saved pause and untouched snapshot");
     assert.equal(await page.evaluate(() => state().scope), "all");
     await page.evaluate(() => { deferRead = false; saved.enabled = true; saved.textScale = 120; restored(); });
-    await page.waitForFunction(() => state().active && getComputedStyle(document.querySelector("#text")).fontSize === "24px");
+    await page.waitForFunction(() => state().active && !state().pending && getComputedStyle(document.querySelector("#text")).fontSize === "24px");
+    await page.evaluate(() => {
+      deferRead = true;
+      restored();
+      globalThis.finishOlderRead = finishRead;
+      saved.enabled = false;
+      restored();
+    });
+    await page.evaluate(async () => { finishOlderRead(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    assert.equal(await page.evaluate(() => state().pending), true, "An obsolete restore cannot clear the newest read's pending state");
+    assert.equal(await page.evaluate(() => state().active), true);
+    await page.evaluate(() => { finishRead(); deferRead = false; });
+    await page.waitForFunction(() => !state().pending && !state().active);
+    assert.equal(await page.evaluate(() => notifications.at(-1).pending), false);
+    await page.evaluate(() => { saved.enabled = true; restored(); });
+    await page.waitForFunction(() => state().active && !state().pending);
     await page.evaluate(async () => {
       deferRead = false;
       failRead = true;
@@ -105,6 +129,7 @@ test("initialization and synthetic persisted-pageshow handling ignore stale read
     assert.equal(await page.locator("#text").evaluate((element) => getComputedStyle(element).fontSize), "24px",
       "Failed restoration reads preserve the last confirmed preferences");
     assert.equal(await page.evaluate(() => state().healthy), true);
+    assert.equal(await page.evaluate(() => state().pending), false, "A failed reload ends pending state while preserving confirmed typography");
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

@@ -1270,7 +1270,7 @@
 
   const pageState = () => ({
     ready: settingsLoaded && settingsLoadError === null,
-    pending: initializing || refreshing || refreshTimer !== null || pendingRepair !== null,
+    pending: initializing || restoringChanges !== null || refreshing || refreshTimer !== null || pendingRepair !== null,
     refreshRevision,
     healthy: settingsLoaded && settingsLoadError === null && lastRefreshError === null,
     error: settingsLoadError ?? lastRefreshError,
@@ -1454,6 +1454,7 @@
       // read replace a newer storage event or overlapping restoration.
       const generation = ++settingsReadGeneration;
       restoringChanges = {};
+      notifyState();
       try {
         const saved = await extension.storage.sync.get(null);
         if (generation === settingsReadGeneration) {
