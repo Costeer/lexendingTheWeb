@@ -1,5 +1,91 @@
 # Typography performance
 
+## Empirical regression gate
+
+Run this on an otherwise idle machine, after building and separately from other
+tests. It uses the pinned Playwright Chromium already installed for `npm test`:
+
+```sh
+npm run test:performance -- --base HEAD
+# For committed changes, select the revision from before the changes:
+npm run test:performance -- --base origin/main
+```
+
+The command compares that Git revision's runtime scripts and bundled fonts with
+the working tree, using the same current harness and fixtures for both. It reads
+the old files directly from Git, freezes all tested bytes before running, and
+does not check out files or rewrite baselines. Missing revisions/resources,
+browser errors, unloaded fonts, unhealthy runtimes, incomplete workloads, and
+timeouts fail the command. The installed-extension suites remain necessary for
+real storage, background workers, document-start injection, and Firefox.
+
+Each version gets one discarded warm-up and five measured runs per workload,
+in fresh browser contexts at 1280 × 800. Versions alternate execution order;
+no measured workloads run concurrently. Six settings updates within a context
+are averaged into one sample. `--samples 3` is a quicker local check;
+`--samples 9` can help investigate noise. CI uses the default five. A changed
+sample count must apply equally to both versions.
+
+The reading fixtures have 80 or 400 cards and 500 protected code tokens. They
+measure startup against an already populated DOM, six alternating 110%/120%
+preference changes, and insertion through completed layout repair. The synthetic
+120-reply conversation adds a four-second idle observation with an author style
+observer, 100 streamed text edits across microtasks, six tree replacements with
+120 shadow roots each, post-GC heap/DOM retention, and pause/resume. The stream
+is a burst of existing-text edits, not a timed network stream. Each phase checks
+actual Lexend application and sizing, protected code, and a healthy settled
+runtime; replacement also checks shadow text. Measurements include deferred
+repair. These fixtures cannot establish performance on every real site.
+
+The JSON report records every measured sample, medians, p95, min/max, exact
+source/font/harness hashes, Git state, browser/Node/OS/CPU versions, sampling
+order, thresholds, and failures. It is written even when a workload fails.
+Timing units are milliseconds, heap units are bytes, and work metrics are
+counts. `firstFontFrameMs` is the first animation-frame callback observing
+loaded Lexend at the requested size; it is a rendering opportunity, not a
+compositor paint measurement. `settledMs` includes two consecutive settled
+frames. `taskMs` is Chromium's main-thread task-time delta, including the test
+driver's small in-page probes, not wall time or whole-browser CPU. Heap is
+post-GC V8 heap, not process RSS. Browser layout/style recalculation counts and
+refresh counts are also recorded as diagnostics.
+
+The gate checks per-workload medians. An increase must exceed **both** the
+relative tolerance and the absolute noise floor:
+
+- First font frame: 30% and 30 ms; complete settling: 30% and 50 ms.
+- Main-thread task time: 30% and 25 ms.
+- Computed-style reads: 15% and 100 reads; bounding-box reads: 15% and 50 reads.
+- Post-GC heap: 20% and 1 MB; live DOM: 5% and 20 nodes.
+
+P95 is reported for diagnosis, not gated with only five samples. Every measured
+candidate run must have zero typography reads/refreshes while idle or paused,
+at most 1 MB heap growth and at most 20 extra DOM nodes between replacements
+2 and 6. These absolute checks apply even when the baseline is already bad.
+Existing deterministic regression tests in `npm test` supply tighter targeted
+work budgets and longer stress coverage. Tolerances trade sensitivity for
+repeatability; a pass means no regression exceeding these limits was detected.
+
+Exit status is 0 for a pass and 1 for a regression or invalid run. CI compares
+PRs with their base SHA, pushes with the previous tip, and scheduled/manual runs
+with `HEAD^`, uploading the report as `performance-regressions`. A separate job
+avoids contention with this repository's other test processes.
+
+For models making changes:
+
+1. Choose a baseline from before the change (`HEAD` only for uncommitted work).
+2. Make the change, run correctness checks, then run the comparison by itself.
+3. Inspect failures and raw distributions in `dist/performance/report.json`.
+   Use `--output dist/performance/investigation.json` to preserve another run.
+   Builds clear `dist`; copy evidence elsewhere before rebuilding.
+4. Fix regressions. If contention explains a result, preserve the failure and
+   rerun both versions together; do not cherry-pick samples or relax thresholds.
+5. Report the baseline SHA, result, and report path with the change.
+
+For deeper diagnosis, use the conversation profiler described below. It writes
+CPU profiles and traces; those expensive probes are excluded from this gate.
+
+## Runtime design and previous measurements
+
 Font conversion now runs separately from layout repair on settled, visible
 pages. Native typography and layout are captured together, then Lexend is
 applied immediately. The browser receives a rendering frame before the

@@ -97,6 +97,19 @@ the Android add-on still needs device testing before release.
 
 ### Additional regression checks
 
+For runtime changes, compare the working tree against its previous revision:
+
+```sh
+npm run test:performance -- --base HEAD
+```
+
+Use the PR base (for example `--base origin/main`) if the changes are already
+committed. This runs serial Chromium workloads, fails on measured regressions,
+and saves raw results and comparison thresholds to `dist/performance/report.json`.
+Run it after builds and separately from other tests. See the
+[performance guide](docs/performance.md#empirical-regression-gate) for metrics,
+tolerances, limitations, and the workflow for models making changes.
+
 `npm test` also runs reproducible generated settings/rule cases, cached-page
 restoration checks, and a 12-cycle dynamic feed stress test. CI repeats the full
 suite nightly at 03:17 UTC, with 100 stress cycles. To run the longer test locally:
