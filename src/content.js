@@ -874,6 +874,15 @@
     } else {
       lastRefreshError = null;
       warnedRefreshError = null;
+      // A timed-out preload can finish before this repair, while loadingdone
+      // is still queued. These decoded metrics already participated in the
+      // completed pass; its later event must not trigger another capture.
+      for (const face of document.fonts ?? []) {
+        const family = face.family.replace(/["']/g, "");
+        if (face.status === "loaded" && (family === "Lexend for the Web" || family === SYMBOLS_FAMILY)) {
+          settledBundledFaces.add(bundledFaceKey(face));
+        }
+      }
       if (completedConversion) refreshRevision++;
       // A global repair restores earlier overrides, including those belonging
       // to a subtree that has since been skipped. Only painted subtrees have
