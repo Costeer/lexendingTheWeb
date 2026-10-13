@@ -71,6 +71,18 @@ test("About keeps the cached dark theme while synced settings load and on a fail
   assert.equal(failed.errors.length, 1);
 });
 
+test("About ignores an older initial theme read after a synced theme change or deletion", async () => {
+  for (const newValue of ["dark", undefined]) {
+    let resolveSettings;
+    const page = await openAbout(() => new Promise((resolve) => { resolveSettings = resolve; }));
+    page.onChanged({ theme: { newValue } }, "sync");
+    resolveSettings({ theme: newValue === "dark" ? "light" : "dark" });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(page.root.dataset.theme, newValue ?? "light");
+    assert.equal(page.cache.get("lexend-ui-theme"), newValue ?? "light");
+  }
+});
+
 function openSupport({ reducedMotion = false, focusVisible = true } = {}) {
   const listeners = new Map();
   const particles = new Set();

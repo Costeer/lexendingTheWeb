@@ -12,6 +12,16 @@ export const test = base.extend({
         errors.push(`${response.status()} ${response.url()}`);
       }
     });
+    // Build hashes change with any packaged source edit. Keep only that value
+    // fixed for visual comparisons; exercise the real generated schema/asset.
+    await page.route("**/build-identity.json", async (route) => {
+      const response = await route.fetch();
+      const identity = await response.json();
+      expect(identity.schemaVersion).toBe(1);
+      expect(identity.target).toBe("chrome");
+      expect(identity.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+      await route.fulfill({ response, json: { ...identity, sourceHash: "0123456789abcdef".repeat(4) } });
+    });
     await page.addInitScript(({ theme }) => {
       Math.random = () => 0;
       localStorage.removeItem("lexendLastQuoteIndex");
@@ -41,6 +51,7 @@ export const test = base.extend({
           onChanged: { addListener: (listener) => listeners.push(listener) } },
         runtime: {
           getURL: (path) => new URL(path, location.origin).href,
+          getManifest: () => ({ version: "0.5.0" }),
           sendMessage: async ({ operation }) => {
             store ??= LexendPreferences.createStore(sync);
             try { return { ok: true, settings: await store.mutate(operation) }; }
@@ -49,7 +60,8 @@ export const test = base.extend({
         },
         tabs: {
           query: async () => [{ id: 1, url: "https://reading.example.org/article" }],
-          sendMessage: async () => ({ hostname: "reading.example.org", supported: true, active: true, healthy: true })
+          sendMessage: async () => ({ ready: true, hostname: "reading.example.org", supported: true,
+            active: true, healthy: true, pending: false, refreshRevision: 3, scope: "body" })
         },
         commands: { getAll: async () => [{ name: "toggle-current-site", shortcut: "Ctrl+Shift+L" }] }
       };
@@ -65,6 +77,7 @@ export async function openInterface(page, url) {
   await page.goto(url);
   if (url.startsWith("options")) await expect(page.locator("#dark-theme")).toBeEnabled();
   if (url.startsWith("popup")) await expect(page.locator("#enabled")).toBeEnabled();
+  if (url.startsWith("about")) await expect(page.locator("#build-fingerprint")).toHaveText("0123456789abcdef".repeat(4));
   await page.evaluate(() => document.fonts.ready);
   // Keep hover and keyboard focus out of the baseline; interactive tests cover them.
   await page.mouse.move(0, 0);

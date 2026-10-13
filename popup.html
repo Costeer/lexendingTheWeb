@@ -8,6 +8,7 @@
     <link rel="preload" href="assets/fonts/lexend-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="shared.css" />
     <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="src/diagnostics.css" />
   </head>
   <body>
     <main class="panel">
@@ -104,10 +105,18 @@
         <p>Browser pages like settings and new tab can't be changed by extensions.</p>
       </aside>
 
+      <section class="popup-diagnostics" aria-label="Diagnostics">
+        <button type="button" class="text-link" id="popup-export-diagnostics" data-diagnostics-export data-diagnostics-status="popup-diagnostics-status" aria-describedby="popup-diagnostics-help">Save diagnostics</button>
+        <p id="popup-diagnostics-help">Local report; excludes website addresses, site rules, and page text. Nothing is sent.</p>
+        <p id="popup-diagnostics-status" role="status" aria-live="polite"></p>
+      </section>
+
     </main>
     <script src="src/settings.js"></script>
     <script src="src/preferences.js"></script>
     <script src="src/quotes.js"></script>
+    <script src="src/diagnostics.js"></script>
+    <script src="src/diagnostics-ui.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

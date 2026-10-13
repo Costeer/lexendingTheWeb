@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createBuildIdentity } from "./build-identity.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Interface checks must not delete release ZIPs or installed-browser artifacts.
@@ -39,6 +40,8 @@ for (const target of targets) {
     "utf8"
   );
   await writeFile(join(output, "manifest.json"), manifest);
+  const identity = await createBuildIdentity({ root, output, target });
+  await writeFile(join(output, "build-identity.json"), `${JSON.stringify(identity, null, 2)}\n`);
 }
 
 console.log(`Built Chrome extension: ${join(dist, "chrome")}`);
