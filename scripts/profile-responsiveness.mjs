@@ -12,6 +12,7 @@ import { chromium } from 'playwright';
 import { conversationHtml } from '../test/helpers/conversation.mjs';
 import { instrumentPhaseSource, installPhaseProfile } from './performance/phase-profile.mjs';
 import { workloads } from './performance/workloads.mjs';
+import { runtimeScriptPaths } from './performance/runtime-resources.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const { values } = parseArgs({ options: {
@@ -35,9 +36,7 @@ try {
   const read = path => values['source-ref'] ? git('show', `${commit}:${path}`) : readFile(resolve(root, path));
   const manifestPath = 'manifests/manifest.chrome.json';
   const manifestBytes = await read(manifestPath), manifest = JSON.parse(manifestBytes);
-  assert.equal(manifest.content_scripts.length, 1, 'Update diagnostic loader for changed manifest');
-  assert(!manifest.content_scripts[0].css?.length, 'Update diagnostic loader for CSS entry points');
-  const scripts = manifest.content_scripts[0].js;
+  const scripts = runtimeScriptPaths(manifest);
   const files = new Map([[manifestPath, manifestBytes]]);
   for (const path of new Set([...scripts, ...manifest.web_accessible_resources.flatMap(entry => entry.resources)])) {
     assert(/^(src|assets)\/[a-zA-Z0-9_./-]+$/.test(path) && !path.split('/').includes('..'), `Unsupported resource ${path}`);
@@ -49,6 +48,7 @@ try {
     hashes: Object.fromEntries([...files].map(([path, bytes]) => [path, hash(bytes)])),
     instrumentedHashes: Object.fromEntries([...transformed].map(([path, source]) => [path, hash(source)])) };
   report.harnessHashes = Object.fromEntries(await Promise.all(['scripts/profile-responsiveness.mjs',
+    'scripts/performance/runtime-resources.mjs',
     'scripts/performance/phase-profile.mjs', 'test/helpers/conversation.mjs', 'scripts/performance/workloads.mjs',
     'scripts/performance/responsiveness.mjs'].map(async path => [path, hash(await readFile(resolve(root, path)))])));
   report.environment = { node: process.version, playwright: createRequire(import.meta.url)('playwright/package.json').version,

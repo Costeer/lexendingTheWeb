@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { runtimeScriptPaths } from './runtime-resources.mjs';
 
 export const git = (root, ...args) => execFileSync('git', args, { cwd: root, maxBuffer: 20 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -17,10 +18,7 @@ export async function runtimeSnapshot(root, revision) {
   const manifestPath = 'manifests/manifest.chrome.json';
   const manifestBytes = await read(manifestPath);
   const manifest = JSON.parse(manifestBytes);
-  const scripts = manifest.content_scripts[0].js;
-  if (manifest.content_scripts.length !== 1 || manifest.content_scripts[0].css?.length) {
-    throw new Error('Update the benchmark loader to cover the changed content-script manifest');
-  }
+  const scripts = runtimeScriptPaths(manifest);
   const resources = manifest.web_accessible_resources.flatMap(entry => entry.resources);
   const files = new Map([[manifestPath, manifestBytes]]);
   for (const path of new Set([...scripts, ...resources])) {
@@ -33,6 +31,7 @@ export async function runtimeSnapshot(root, revision) {
 }
 
 export const harnessFiles = ['scripts/test-performance.mjs', 'scripts/performance/sources.mjs',
+  'scripts/performance/runtime-resources.mjs',
   'scripts/performance/workloads.mjs', 'scripts/performance/comparison.mjs',
   'scripts/performance/responsiveness.mjs', 'test/helpers/conversation.mjs'];
 export async function harnessHashes(root, revision) {
