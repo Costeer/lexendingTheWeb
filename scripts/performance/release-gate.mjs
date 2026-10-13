@@ -41,11 +41,65 @@ export function requiredMetrics(workload) {
   const phases = { startup: timed, settings: timed, insertion: timed };
   if (workload.conversation) Object.assign(phases, {
     idle: work, stream: timed, replacement: work,
-    memory: ['heapBytes', 'domNodes', 'heapGrowthBytes', 'nodeGrowth'], paused: work, resume: timed
+    memory: ['heapBytes', 'domNodes', 'heapGrowthBytes', 'nodeGrowth'], paused: work, resume: timed,
+    responsiveness: ['maxLongTaskMs', 'longTaskCount', 'totalBlockingMs']
   });
   const keys = Object.entries(phases).flatMap(([phase, names]) => names.map(name => `${phase}.${name}`));
   assert(keys.every(key => Object.hasOwn(policy, key.split('.').at(-1))), 'Release metric coverage must match the comparison policy');
   return keys;
+}
+
+function verifyResponsiveness(raw, sample) {
+  const finiteTime = value => Number.isFinite(value) && value >= 0;
+  const { edits, intervalMs, calibrationBlockMs } = protocol.responsiveness;
+  assert(raw && finiteTime(raw.startTime) && finiteTime(raw.endTime)
+    && raw.endTime - raw.startTime >= edits * intervalMs - 1,
+  'Missing or invalid responsiveness window');
+  assert.equal(raw.injectedBlock, null, 'Raw responsiveness contains an injected block or omits its declaration');
+  const calibration = raw.calibration;
+  assert(calibration && finiteTime(calibration.startTime) && finiteTime(calibration.endTime)
+    && calibration.endTime - calibration.startTime >= calibrationBlockMs
+    && calibration.endTime <= raw.startTime, 'Invalid responsiveness calibration window');
+
+  const checkTasks = (tasks, start, end) => {
+    assert(Array.isArray(tasks), 'Missing raw responsiveness task observations');
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      // The observer includes tasks that START in the half-open measurement
+      // window. A final task may finish after it; do not silently clip its cost.
+      assert(task && finiteTime(task.startTime) && Number.isFinite(task.duration) && task.duration >= 50
+        && Number.isFinite(task.startTime + task.duration) && task.startTime >= start && task.startTime < end,
+      'Raw responsiveness task falls outside its observation window');
+      assert(i === 0 || (task.startTime > tasks[i - 1].startTime
+        && task.startTime >= tasks[i - 1].startTime + tasks[i - 1].duration - 2),
+      'Raw responsiveness tasks overlap or are unordered');
+    }
+  };
+  checkTasks(calibration.tasks, 0, raw.startTime);
+  assert(calibration.tasks.some(task => task.startTime <= calibration.startTime
+    && task.startTime + task.duration >= calibration.endTime - 2),
+  'Native responsiveness calibration was not observed');
+  checkTasks(raw.longTasks, raw.startTime, raw.endTime);
+
+  assert(Array.isArray(raw.stream) && raw.stream.length === edits, 'Responsiveness stream edit count differs');
+  for (let index = 0; index < edits; index++) {
+    const edit = raw.stream[index];
+    assert(edit && edit.index === index && edit.scheduledAt === raw.startTime + (index + 1) * intervalMs
+      && finiteTime(edit.deliveredAt) && edit.deliveredAt >= edit.scheduledAt - 1
+      && edit.deliveredAt < raw.endTime && (index === 0 || edit.deliveredAt >= raw.stream[index - 1].deliveredAt),
+    'Responsiveness stream timing or edit order differs');
+  }
+  for (const field of ['authorWrites', 'observerDeliveries']) {
+    assert(Number.isInteger(raw[field]) && raw[field] >= edits, `Responsiveness author contention is missing: ${field}`);
+  }
+  const metrics = {
+    maxLongTaskMs: raw.longTasks.reduce((maximum, task) => Math.max(maximum, task.duration), 0),
+    longTaskCount: raw.longTasks.length,
+    totalBlockingMs: raw.longTasks.reduce((total, task) => total + Math.max(0, task.duration - 50), 0)
+  };
+  for (const [metric, value] of Object.entries(metrics)) {
+    assert.equal(sample[`responsiveness.${metric}`], value, `Raw responsiveness metric differs: ${metric}`);
+  }
 }
 
 export async function verifyReleaseEvidence(root, tag, report) {
@@ -54,7 +108,7 @@ export async function verifyReleaseEvidence(root, tag, report) {
   assert.equal(report.status, 'passed', 'Performance report is not passed');
   assert.equal(report.schemaVersion, 2, 'Unsupported performance evidence schema');
   assert.equal(report.error, undefined, 'Errored performance evidence cannot publish');
-  assert(report.negativeControl == null, 'Injected negative-control reports cannot qualify a release');
+  assert.equal(report.negativeControl, null, 'Injected or undeclared negative-control reports cannot qualify a release');
   assert.deepEqual(report.regressions, [], 'Performance regressions block publishing');
   const release = releaseBaseline(root, tag);
   assert.equal(report.candidate?.commit, release.candidate, 'Performance evidence is for a different tagged commit');
@@ -77,6 +131,11 @@ export async function verifyReleaseEvidence(root, tag, report) {
       versions: round % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'] })), 'Performance sampling order differs');
     for (const sample of [...runs.baseline, ...runs.candidate]) {
       for (const metric of requiredMetrics(workload)) assert(Object.hasOwn(sample, metric), `Missing required metric: ${workload.name}/${metric}`);
+    }
+    if (workload.conversation) for (const version of ['baseline', 'candidate']) {
+      const raw = runs.rawResponsiveness?.[version];
+      assert(Array.isArray(raw) && raw.length === 5, `Raw responsiveness sample count differs: ${version}`);
+      for (const [index, observation] of raw.entries()) verifyResponsiveness(observation, runs[version][index]);
     }
     const comparison = compareSamples(runs.baseline, runs.candidate);
     assert(!comparison.some(row => row.regression), `Raw performance samples regress: ${workload.name}`);
