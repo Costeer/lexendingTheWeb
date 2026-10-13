@@ -1497,6 +1497,16 @@
     };
     const repairLayout = () => {
       if (!baseline.size) return;
+      // Reuse only a complete no-write scan within this synchronous repair.
+      // A write late in a scan can affect an earlier sibling or :has() ancestor,
+      // so finishing a write-producing scan does not establish convergence.
+      let settledContainerMeasurements = null;
+      const ensureContainers = () => {
+        if (measurements !== null && measurements === settledContainerMeasurements) return;
+        const before = measurements;
+        repairContainers();
+        settledContainerMeasurements = before !== null && before === measurements ? before : null;
+      };
       for (const [mask, { track, active, offset }] of maskedTickers) {
         if (!mask.isConnected || !active.isConnected) continue;
         const before = baseline.get(mask), box = boxFor(active);
@@ -1510,11 +1520,11 @@
         }
       }
       for (const element of textElements) if (element.isConnected) repairText(element, baseline.get(element));
-      repairContainers(); repairSiblings(); repairContainers();
-      repairMediaFootprints(); repairContainers();
+      ensureContainers(); repairSiblings(); ensureContainers();
+      repairMediaFootprints(); ensureContainers();
       globalThis.LexendControls?.repair({ baseline, textElements, descendants, snapshot, write, mark, ancestor, bounds, directTextRects, containedText, expandContainer });
       repairFloatingBounds();
-      repairExpandedFades(); repairContainers(); repairPseudoTooltips();
+      repairExpandedFades(); ensureContainers(); repairPseudoTooltips();
       repairPanels(); repairBackdropSpacing(); repairBorderBackdrops(); repairImageLayers(); repairOverlays(); repairTables(); repairMaskedContent();
       repairSolidContrast();
       globalThis.LexendControls?.finalizeIconLabels?.({ baseline, snapshot, write });
