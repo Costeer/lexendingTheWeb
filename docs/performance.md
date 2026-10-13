@@ -434,3 +434,63 @@ The normal Helium session and `/home/costeer/git/lexendingTheWeb/dist/chrome`
 are separate from this worktree's tested build. Retesting the affected
 conversation requires loading this rebuilt checkout on the affected device;
 version 0.5.0 alone does not identify the tested code.
+
+## Release evidence and detector controls
+
+CI and tag publishing call the same reusable `performance.yml` workflow. A
+release cannot publish until its empirical job succeeds; the publishing job
+then downloads and verifies that exact run's report immediately before creating
+the release. Reports are uploaded with `if: always()`, including regressions
+and invalid browser runs. Packaging does not delete the report because the
+publishing job downloads it after all builds and installed-browser checks.
+
+A release tag must be a stable `vMAJOR.MINOR.PATCH` tag matching `package.json`.
+The checkout must be that exact clean commit. Its baseline is the highest
+lower-version release tag, which must resolve to a **strict ancestor** of the
+candidate. An unrelated previous tag or a same-commit version tag fails;
+neither can silently fall back to `HEAD`, `HEAD^`, or another newer baseline.
+If no lower-version tag exists, the explicit initial anchor is the audited
+pre-roadmap revision `9ba8c632ba900c39c0b102daa163ae3f0409488e`. A checkout
+missing that anchor or the previous release's resources fails rather than
+choosing another baseline. Fetch the full history and tags when reproducing.
+
+```sh
+node scripts/release-performance.mjs baseline --tag v0.6.0
+npm run test:performance -- --base <printed-baseline-commit>
+node scripts/release-performance.mjs verify --tag v0.6.0 --report dist/performance/report.json
+```
+
+The version-2 report binds the candidate commit and Git tree, clean source state
+at both ends, exact runtime/font hashes for both versions, and current harness
+hashes. The release verifier requires all workloads and phases, the unchanged
+protocol and comparison policy, five samples plus alternating warm-ups, and
+browser/environment identity. It recomputes comparisons from the raw samples;
+a manually changed `status: passed`, missing metric, stale commit, altered
+harness, relaxed threshold, or candidate-as-baseline report cannot pass.
+Local uncommitted comparisons remain supported; their reports simply cannot
+serve as release evidence.
+
+Conversation profiling probes require exactly one source anchor for every
+insertion. `test/conversation-instrumentation.test.mjs` checks absent and duplicate
+anchors (including the previously silent whitespace change), observes a positive
+count for newly inserted elements, then restores the historical expensive
+existing-text scan in memory and proves that the normal zero-scan assertion
+rejects it. These probes do not replace the empirical gate's unmodified-source
+measurements.
+
+When changing the harness, run the comparator and release gate negatives:
+
+```sh
+node --test test/performance-comparison.test.mjs test/release-performance.test.mjs test/conversation-instrumentation.test.mjs
+```
+
+Also demonstrate the actual browser gate rejecting a temporary synchronous
+500 ms delay at the start of the candidate's `refresh` function, with exactly
+one injection match. Preserve the original bytes, run the full default comparison
+against the pre-change revision with `--output` outside `dist`, and restore the
+source in a `finally` block. Require exit 1, report status `failed`, and a measured
+`settings.taskMs` regression, rather than accepting a harness error. Pass that
+same failed report to `release-performance.mjs verify` and require its
+`Performance report is not passed` rejection. This is the verifier on the
+publishing path; never run a publication to test a negative control. Preserve
+the failed report and command logs before rerunning the restored candidate.

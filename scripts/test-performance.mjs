@@ -1,6 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { cpus, platform, release, arch } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +7,7 @@ import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 import { compareSamples, policy } from './performance/comparison.mjs';
 import { protocol, runWorkload, workloads } from './performance/workloads.mjs';
+import { commitFor, gitState, harnessHashes, runtimeSnapshot } from './performance/sources.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const { values } = parseArgs({ options: {
@@ -30,45 +29,21 @@ See docs/performance.md for metrics, noise tolerances, and model workflow.`);
 
 async function main() {
   const output = resolve(root, values.output);
-  const report = { schemaVersion: 1, status: 'error', startedAt: new Date().toISOString(), protocol, policy, workloads: {} };
+  const report = { schemaVersion: 2, status: 'error', startedAt: new Date().toISOString(), protocol, policy, workloads: {} };
   let browser;
   try {
     const samples = Number(values.samples);
     if (!Number.isInteger(samples) || samples < 3 || samples > 15) throw new Error('--samples must be an integer from 3 to 15');
-    const git = (...args) => execFileSync('git', args, { cwd: root, maxBuffer: 20 * 1024 * 1024 });
-    const baseCommit = git('rev-parse', '--verify', '--end-of-options', `${values.base}^{commit}`).toString().trim();
-    const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-    const loadVersion = async committed => {
-      const read = path => committed ? git('show', `${baseCommit}:${path}`) : readFile(resolve(root, path));
-      const manifestPath = 'manifests/manifest.chrome.json';
-      const manifestBytes = await read(manifestPath);
-      const manifest = JSON.parse(manifestBytes);
-      const scripts = manifest.content_scripts[0].js;
-      if (manifest.content_scripts.length !== 1 || manifest.content_scripts[0].css?.length) {
-        throw new Error('Update the benchmark loader to cover the changed content-script manifest');
-      }
-      const resources = manifest.web_accessible_resources.flatMap(entry => entry.resources);
-      const files = new Map([[manifestPath, manifestBytes]]);
-      for (const path of new Set([...scripts, ...resources])) {
-        if (!/^(src|assets)\/[a-zA-Z0-9_./-]+$/.test(path) || path.split('/').includes('..')) {
-          throw new Error(`Unsupported runtime resource path: ${path}`);
-        }
-        files.set(path, await read(path));
-      }
-      return { scripts, files, hashes: Object.fromEntries([...files].map(([path, bytes]) => [path, hash(bytes)])) };
-    };
+    const baseCommit = commitFor(root, values.base);
     // Freeze both sets of source and font bytes before sampling, including any
     // uncommitted candidate edits. Never run git checkout or rewrite a baseline.
-    const baseline = await loadVersion(true);
-    const candidate = await loadVersion(false);
+    const candidateState = gitState(root);
+    const baseline = await runtimeSnapshot(root, baseCommit);
+    const candidate = await runtimeSnapshot(root);
     report.samplesPerVersion = samples;
     report.baseline = { ref: values.base, commit: baseCommit, hashes: baseline.hashes };
-    report.candidate = {
-      commit: git('rev-parse', 'HEAD').toString().trim(),
-      gitStatus: git('status', '--porcelain=v1').toString(), hashes: candidate.hashes
-    };
-    const harnessFiles = ['scripts/test-performance.mjs', 'scripts/performance/workloads.mjs', 'scripts/performance/comparison.mjs', 'test/helpers/conversation.mjs'];
-    report.harnessHashes = Object.fromEntries(await Promise.all(harnessFiles.map(async path => [path, hash(await readFile(resolve(root, path)))])));
+    report.candidate = { ...candidateState, hashes: candidate.hashes };
+    report.harnessHashes = await harnessHashes(root);
     report.environment = {
       node: process.version, playwright: createRequire(import.meta.url)('playwright/package.json').version,
       platform: platform(), release: release(), arch: arch(), cpu: cpus()[0]?.model, logicalCpus: cpus().length
@@ -97,6 +72,7 @@ async function main() {
     }
     report.regressions = Object.entries(report.workloads).flatMap(([workload, runs]) =>
       runs.comparison.filter(row => row.regression).map(row => ({ workload, ...row })));
+    report.endGitStatus = gitState(root).gitStatus;
     report.status = report.regressions.length ? 'failed' : 'passed';
     if (report.regressions.length) process.exitCode = 1;
   } catch (error) {
@@ -104,7 +80,12 @@ async function main() {
     console.error(report.error);
     process.exitCode = 1;
   } finally {
-    await browser?.close();
+    try { await browser?.close(); }
+    catch (error) {
+      report.status = 'error';
+      report.error = [report.error, `Browser shutdown failed: ${error.stack ?? error}`].filter(Boolean).join('\n');
+      process.exitCode = 1;
+    }
     report.finishedAt = new Date().toISOString();
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, JSON.stringify(report, null, 2) + '\n');

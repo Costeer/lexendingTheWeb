@@ -1,0 +1,59 @@
+name: Empirical performance gate
+
+on:
+  workflow_call:
+    inputs:
+      base:
+        type: string
+        default: ''
+      release-tag:
+        type: string
+        default: ''
+      artifact-name:
+        type: string
+        default: performance-regressions
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Select a baseline predating the changes
+        id: baseline
+        env:
+          PERFORMANCE_BASE: ${{ inputs.base }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            PERFORMANCE_BASE=$(node scripts/release-performance.mjs baseline --tag "$RELEASE_TAG")
+          fi
+          test -n "$PERFORMANCE_BASE"
+          echo "commit=$(git rev-parse --verify --end-of-options "$PERFORMANCE_BASE^{commit}")" >> "$GITHUB_OUTPUT"
+      - name: Compare runtime performance
+        env:
+          PERFORMANCE_BASE: ${{ steps.baseline.outputs.commit }}
+        run: npm run test:performance -- --base "$PERFORMANCE_BASE"
+      - name: Bind release evidence to the exact tagged source
+        if: inputs.release-tag != ''
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: node scripts/release-performance.mjs verify --tag "$RELEASE_TAG" --report dist/performance/report.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist/performance/
+          if-no-files-found: error
