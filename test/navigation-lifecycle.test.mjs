@@ -4,7 +4,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 
-test("initialization and cached-page restoration ignore stale reads and preserve confirmed preferences", async () => {
+// This exercises the handler with synthetic events. Installed-browser history
+// coverage separately requires trusted pageshow.persisted and document reuse.
+test("initialization and synthetic persisted-pageshow handling ignore stale reads and preserve confirmed preferences", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();

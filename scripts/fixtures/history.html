@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Installed extension history fixture</title>
+    <script>
+      // No unload handler, network connection, frame, or synthetic lifecycle event.
+      // This state survives only when the browser restores the original document.
+      window.fixtureHistory = { token: crypto.randomUUID(), pageshow: [], pagehide: [] };
+      for (const type of ["pageshow", "pagehide"]) {
+        addEventListener(type, (event) => fixtureHistory[type].push({ persisted: event.persisted, trusted: event.isTrusted }));
+      }
+    </script>
+    <style>html { font-size: 20px; } body { font-family: Georgia, serif; } p { font-size: 1rem; }</style>
+  </head>
+  <body>
+    <p id="rem">A reading session restored by the browser.</p>
+    <a id="history-next" href="/history-next">Next document</a>
+  </body>
+</html>

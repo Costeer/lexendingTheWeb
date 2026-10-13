@@ -15,6 +15,9 @@
       code { font-family: inherit; }
       nav { display: flex; gap: 1rem; }
       nav a { font-size: 16px; }
+      #rtl { max-width: 24rem; }
+      #native-details { max-width: 24rem; }
+      #plain-editor { min-height: 2rem; border: 1px solid; }
     </style>
   </head>
   <body>
@@ -29,10 +32,43 @@
     <span class="material-symbols-outlined" style="font-family: 'Material Symbols Outlined'; font-size: 20px"><span id="nested-glyph">home</span></span>
     <svg width="80" height="25"><text id="svg-text" y="20">SVG text</text></svg>
     <div class="layout" id="layout"><p>Content</p></div>
+    <p id="rtl" lang="ar" dir="rtl">سارة تقرأ نصاً واضحاً من اليمين إلى اليسار.</p>
+    <label for="plain-input">Editable input</label><input id="plain-input" value="Original">
+    <div id="plain-editor" role="textbox" aria-label="Editable text" contenteditable="true">Original</div>
+    <details id="native-details"><summary id="native-summary">Reading details</summary><p id="disclosure-copy">This reading text appears when its native disclosure opens.</p></details>
     <div id="host"></div>
-    <iframe id="frame" src="/frame" title="Related frame"></iframe>
+    <div id="frame-matrix"></div>
     <script>
       window.fixtureAttachShadow = Element.prototype.attachShadow;
+      window.fixtureFrameDocument = '<!doctype html><style>html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}</style><p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
+      window.fixtureFrameKinds = ["same-origin", "about-blank", "srcdoc", "blob"];
+      window.fixtureFrameURLs = [];
+      window.fixtureCreateFrame = (kind) => new Promise((resolve) => {
+        const frame = document.createElement("iframe");
+        frame.id = `frame-${kind}`;
+        frame.title = `${kind} frame`;
+        frame.addEventListener("load", () => {
+          if (kind === "about-blank") {
+            const document = frame.contentDocument;
+            const style = document.createElement("style");
+            style.textContent = "html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}";
+            document.head.append(style);
+            document.body.innerHTML = '<p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
+          }
+          resolve(true);
+        }, { once: true });
+        if (kind === "same-origin") frame.src = "/frame";
+        if (kind === "about-blank") frame.src = "about:blank";
+        if (kind === "srcdoc") frame.srcdoc = fixtureFrameDocument;
+        if (kind === "blob") {
+          frame.src = URL.createObjectURL(new Blob([fixtureFrameDocument], { type: "text/html" }));
+          fixtureFrameURLs.push(frame.src);
+        }
+        document.querySelector(`#${frame.id}`)?.remove();
+        document.querySelector("#frame-matrix").append(frame);
+      });
+      window.fixtureFramesReady = false;
+      Promise.all(fixtureFrameKinds.map(fixtureCreateFrame)).then(() => { fixtureFramesReady = true; });
     </script>
   </body>
 </html>
