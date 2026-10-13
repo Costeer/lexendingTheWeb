@@ -228,6 +228,7 @@
       get loaded() { return loaded; },
       get readError() { return readError; },
       get settings() { return current(); },
+      // Import recovery needs committed state without pending optimistic edits.
       get confirmedSettings() { return api.normalizeSettings(confirmed); },
       async load() {
         const revision = ++generation;

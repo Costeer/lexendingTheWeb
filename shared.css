@@ -271,6 +271,18 @@ input[type="radio"] {
   border-bottom-right-radius: calc(var(--ui-radius) - 1px);
 }
 
+/* Custom occupies its own full-width row, outside the three preset slots. */
+:root :is(.segment-group, .segments):has(.custom-choice input:checked)::before {
+  opacity: 0;
+}
+
+@media (forced-colors: none) {
+  :root body :is(.segment-group, .segments) .custom-choice input:checked + span {
+    background: var(--accent);
+    border-radius: 0 0 calc(var(--ui-radius) - 1px) calc(var(--ui-radius) - 1px);
+  }
+}
+
 /* Keep the longest label readable in equal slots on small phone screens. */
 @media (max-width: 360px) {
   :root :is(.segment-group, .segments) label span {

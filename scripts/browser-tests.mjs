@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Builder, By, Key } from "selenium-webdriver";
+import { Builder, By, Key, Select } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import firefox from "selenium-webdriver/firefox.js";
 import { unzipSync } from "fflate";
@@ -237,6 +237,51 @@ try {
     await wait("![...document.querySelectorAll('.rule-row')].some(row=>row.dataset.hostname === 'added.example')", "Only confirmed rule is removed");
     assert.equal((await saved()).siteRules.length, 1);
     assert.equal(await script("document.activeElement.classList.contains('delete-rule')"), true);
+  });
+
+  await check("scope-only rules and reversible import use the installed background writer", async () => {
+    const original = await extensionCall(async () => LexendSettings.normalizeSettings(await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null)));
+    const mutate = (operation) => extensionCall(async (operation) => {
+      const client = LexendPreferences.createClient(globalThis.browser ?? globalThis.chrome);
+      await client.load();
+      return client.mutate(operation);
+    }, operation);
+    try {
+      await mutate({ type: "addRule", rule: { hostname: "scope-only.example", enabled: null, scope: "all" } });
+      const row = '[data-hostname="scope-only.example"]';
+      await wait("Boolean(document.querySelector('[data-hostname=\"scope-only.example\"] summary'))", "Scope-only rule appears");
+      await driver.findElement(By.css(`${row} summary`)).click();
+      assert.equal(await driver.findElement(By.css(`${row} select[name="enabled"]`)).getAttribute("value"), "inherit");
+      await new Select(await driver.findElement(By.css(`${row} select[name="enabled"]`))).selectByValue("true");
+      await new Select(await driver.findElement(By.css(`${row} select[name="scope"]`))).selectByValue("inherit");
+      await driver.findElement(By.css(`${row} .rule-editor-save`)).click();
+      await driver.wait(async () => (await saved()).siteRules.some((rule) => rule.hostname === "scope-only.example"
+        && rule.enabled === true && rule.scope === null), 5000, "Edited rule is saved");
+      const edited = await extensionCall(async () => LexendSettings.getDirectRule(await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null), "scope-only.example"));
+      assert.equal(edited.enabled, true);
+      assert.equal(edited.scope, null);
+      const backup = { ...original, textScale: 127, lineHeight: 1.73, letterSpacing: .057, siteRules: [] };
+      const file = join(profile, "replacement-preview.json");
+      await writeFile(file, JSON.stringify({ schemaVersion: 2, settings: backup }));
+      await driver.findElement(By.css('[data-settings-panel="tools-panel"]')).click();
+      await driver.findElement(By.id("import-file")).sendKeys(file);
+      await wait("!document.querySelector('#import-preview').hidden", "Replacement preview opens");
+      assert((await driver.findElement(By.id("import-preview-list")).getText()).includes("scope-only.example"));
+      await driver.findElement(By.id("cancel-import")).click();
+      assert((await saved()).siteRules.some((rule) => rule.hostname === "scope-only.example"));
+      await driver.findElement(By.id("import-file")).sendKeys(file);
+      await wait("!document.querySelector('#import-preview').hidden", "Replacement preview reopens");
+      await driver.findElement(By.id("apply-import")).click();
+      await wait("!document.querySelector('#import-undo').hidden", "Successful import exposes undo");
+      await patch({ textScale: 139 });
+      await driver.findElement(By.id("undo-import")).click();
+      await driver.findElement(By.id("apply-import")).click();
+      await driver.wait(async () => (await saved()).siteRules.some((rule) => rule.hostname === "scope-only.example"), 5000);
+      assert.equal((await saved()).textScale, 139, "Undo preserves the later scale edit");
+      assert.equal((await saved()).lineHeight, original.lineHeight);
+    } finally {
+      await mutate({ type: "replace", settings: original });
+    }
   });
 
   await check("oversized imports explicitly fail and preserve existing rules", async () => {

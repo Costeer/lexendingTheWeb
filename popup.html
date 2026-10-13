@@ -37,7 +37,7 @@
           </a>
         </div>
         <label class="master-control ui-switch">
-          <span id="master-state">On</span>
+          <span class="visually-hidden">Global Lexend </span><span id="master-state">On</span>
           <input id="enabled" type="checkbox" aria-label="Turn Lexend off" />
           <span class="switch-track ui-switch-track" aria-hidden="true">
             <span class="switch-thumb ui-switch-thumb"></span>
@@ -54,12 +54,14 @@
         <div class="site-strip-copy">
           <p id="site-status-text"></p>
           <p id="site-message" class="site-message"></p>
+          <p id="site-sources" class="site-message"></p>
+          <button id="use-inherited-site" class="text-link" type="button" hidden>Use inherited site settings</button>
         </div>
         <button id="toggle-site" class="text-link" type="button">Pause here</button>
       </section>
 
       <fieldset id="scope-fieldset" class="popup-section scope-section">
-        <legend>Apply Lexend to</legend>
+        <legend>Global scope</legend>
         <label class="choice-card">
           <input type="radio" name="scope" value="body" />
           <span class="choice-copy">
@@ -77,7 +79,7 @@
       </fieldset>
 
       <fieldset id="spacing-fieldset" class="popup-section spacing-section">
-        <legend>Spacing</legend>
+        <legend>Global spacing</legend>
         <div class="segments" aria-label="Letter spacing">
           <label>
             <input type="radio" name="spacing" value="0" />
@@ -91,7 +93,12 @@
             <input type="radio" name="spacing" value="0.08" />
             <span>Spacious</span>
           </label>
+          <label id="spacing-custom-choice" class="custom-choice" hidden>
+            <input id="spacing-custom" type="radio" name="spacing" value="custom" data-custom="true" />
+            <span id="spacing-custom-label">Custom</span>
+          </label>
         </div>
+        <button id="adjust-custom-spacing" class="text-link" type="button" hidden>Adjust custom spacing in settings</button>
         <figure id="quote-preview" class="spacing-preview">
           <blockquote id="spacing-preview-text" lang="de" tabindex="0">“Zu sagen, was ist, bleibt die revolutionärste Tat.”</blockquote>
           <figcaption class="quote-footer">

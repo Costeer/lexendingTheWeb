@@ -31,10 +31,12 @@ that hostname unless you select **Include subdomains**; with that option, it
 also covers addresses such as `news.example.com`.
 
 Settings sync through your browser when browser sync is enabled. Use the
-import and export controls in Settings to save or restore a JSON backup. Importing
-replaces your preferences and site rules after confirmation. Current-format backups
-must be complete; supported legacy backups are still accepted. See the
-[preference persistence and recovery contract](docs/preferences.md).
+import and export controls in Settings to save or restore a JSON backup.
+Imports show a replacement preview and offer a conditional undo while Settings
+stays open. See [site rules and backup recovery](docs/rule-controls.md) for rule
+inheritance, Custom values, and recovery limits.
+Current-format backups must be complete; supported legacy backups are still accepted.
+See the [preference persistence and recovery contract](docs/preferences.md).
 
 ## On the page
 

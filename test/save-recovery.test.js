@@ -305,15 +305,13 @@ test("failed dedicated import and undo operations never enter or get reconstruct
     const h = await directClientHarness((operation, store) => {
       if (operation.type === "patch") failure();
       if (rejectDedicated) throw new Error("Dedicated operation failed");
-      // Workflow05 owns undo's writer implementation. This boundary test only
-      // verifies its operation and reviewed snapshot stay caller-owned.
-      if (operation.type === "undoImport") return api.normalizeSettings();
       return store.mutate(operation);
     });
     await assert.rejects(h.tracker.mutate({ type: "patch", changes: { textScale: 120 } }));
     const reviewed = type === "replace"
       ? { type, settings: api.normalizeSettings({ theme: "dark" }), expected: h.client.confirmedSettings }
-      : { type, fields: { textScale: 100 }, expected: h.client.confirmedSettings };
+      : { type, before: api.normalizeSettings({ textScale: 110 }), after: api.normalizeSettings(),
+        expected: h.client.confirmedSettings };
     const snapshot = structuredClone(reviewed);
     h.tracker.supersede(type === "replace" ? publicFields : ["textScale"]);
     await assert.rejects(h.client.mutate(reviewed), /Dedicated operation failed/);
@@ -376,4 +374,59 @@ test("invalid supersession validates every field before changing retry ownership
   await h.tracker.retry();
   assert.equal(h.settings().theme, "dark");
   assert.equal(h.settings().textScale, 120);
+});
+
+test("failed rule updates keep their original full-rule guard across external changes", async () => {
+  const h = harness();
+  h.remote({ siteRules: [{ hostname: "example.com", enabled: false, scope: "body" }] });
+  await assert.rejects(h.tracker.mutate({ type: "updateRule", hostname: "example.com", includeSubdomains: false,
+    changes: { enabled: true } }));
+  h.remote({ siteRules: [{ hostname: "example.com", enabled: false, scope: "all" }] });
+  h.allow();
+  for (let retry = 0; retry < 2; retry++) {
+    await h.tracker.retry();
+    assert.deepEqual(h.settings().siteRules[0], { hostname: "example.com", includeSubdomains: false, enabled: false, scope: "all" });
+    assert.equal(h.tracker.state.failures[0].error.code, "STALE_SETTINGS");
+  }
+});
+
+test("lost rule update replies recognize identity renames and inherit-both removal", async () => {
+  for (const changes of [{ includeSubdomains: true, scope: "all" }, { enabled: null, scope: null }]) {
+    let raw = api.normalizeSettings({ siteRules: [{ hostname: "example.com", enabled: false, scope: "body" }] });
+    let calls = 0;
+    const store = globalThis.LexendPreferences.createStore({ get: async () => raw,
+      set: async (patch) => { raw = { ...raw, ...patch }; } });
+    const tracker = globalThis.LexendSaveRecovery.createTracker({ getSettings: () => api.decodeSettings(raw),
+      mutate: async (operation) => { calls++; await store.mutate(operation); throw new Error("Reply lost"); } });
+    await assert.rejects(tracker.mutate({ type: "updateRule", hostname: "example.com", includeSubdomains: false, changes }));
+    const committed = api.decodeSettings(raw);
+    await tracker.retry();
+    assert.equal(calls, 1, "No replay can rename, recreate or edit another identity");
+    assert.deepEqual(api.decodeSettings(raw), committed);
+    assert.equal(tracker.state.failures.length, 0);
+  }
+});
+
+test("new rule intent at either side of a failed rename supersedes that indivisible update", async () => {
+  for (const mode of [false, true]) {
+    const h = harness();
+    h.remote({ siteRules: [{ hostname: "example.com", enabled: false }] });
+    await assert.rejects(h.tracker.mutate({ type: "updateRule", hostname: "EXAMPLE.COM.", includeSubdomains: false,
+      changes: { includeSubdomains: true, scope: "all" } }));
+    await assert.rejects(h.tracker.mutate({ type: "addRule", rule: { hostname: "unrelated.example", enabled: false } }));
+    h.allow();
+    if (mode) await h.tracker.mutate({ type: "addRule", rule: { hostname: "example.com", includeSubdomains: true, enabled: true } });
+    else await h.tracker.mutate({ type: "removeRule", hostname: "example.com", includeSubdomains: false });
+    assert.equal(h.tracker.state.failures.length, 1, "Only unrelated rule intent survives");
+    assert.match(h.tracker.state.failures[0].keys[0], /unrelated.example/);
+    await h.tracker.retry();
+    assert.equal(h.operations.filter((operation) => operation.type === "updateRule").length, 1);
+    assert.equal(api.getDirectRule(h.settings(), "unrelated.example"), null,
+      "An unrelated rule edit still uses the conservative whole-collection guard");
+    assert.equal(h.tracker.state.failures.length, 1);
+    assert.equal(h.tracker.state.failures[0].error.code, "STALE_SETTINGS");
+    await h.tracker.mutate({ type: "addRule", rule: { hostname: "unrelated.example", enabled: false } });
+    assert.ok(api.getDirectRule(h.settings(), "unrelated.example"), "A reviewed new edit remains actionable");
+    assert.equal(h.tracker.state.failures.length, 0);
+  }
 });

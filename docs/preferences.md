@@ -42,10 +42,10 @@ including `disabledSites` and `spacing`; omitted fields follow legacy defaults.
 
 `validateImport(payload)` returns normalized settings and performs no mutation.
 Import replaces the configuration, including the complete rule list. The settings
-page discloses replacement and requires an explicit confirmation; cancellation
-does not write. The background `replace` operation independently validates the
-complete normalized object. A future preview/undo flow can reuse this parser and
-writer operation without depending on the storage codec.
+page shows the complete replacement preview and requires explicit Apply;
+cancellation does not write. The background `replace` operation independently validates the
+complete normalized object. Import and conditional Undo keep their exact reviewed
+snapshot and dedicated retry controls; see [rule and import recovery](rule-controls.md).
 
 Replacement operations may include an `expected` normalized snapshot. The writer
 compares it with current settings inside the same serialized queue and rejects
@@ -58,7 +58,7 @@ devices or detect a value changed away and back to its original state.
 Retries can guard smaller operations too. A patch's optional `expected` must
 contain each patched field; the writer compares only those fields and rejects
 `STALE_SETTINGS` on change. Rule retries compare the expected rule collection,
-and site toggles also compare global enablement. These conservative checks keep
+including rule edits, and site toggles also compare global enablement. These conservative checks keep
 newer confirmed edits intact. The client's `confirmedSettings` snapshot excludes
 optimistic pending values, so retry baselines reflect confirmed preferences.
 
@@ -96,3 +96,8 @@ intent. Supersession does not cancel writes already in flight.
 Tracker state callbacks can still run when obsolete requests settle; interfaces
 must give dedicated import/undo pending or failure messages priority over an
 empty generic retry state.
+
+A rule edit that changes matching mode owns both its old and new identity for
+retry supersession. A newer edit at either identity retires the entire older
+atomic operation. A confirmed rename or inherit-both removal fulfills a lost
+reply without replaying the operation against a different rule.

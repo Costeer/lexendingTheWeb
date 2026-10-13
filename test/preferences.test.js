@@ -97,12 +97,20 @@ test("failed writes roll back optimistic values and do not poison later writes",
 });
 
 test("change listeners distinguish optimistic intent from confirmed storage and ignore older replies", async () => {
-  const f = fixture({ textScale: 100 });
+  const f = fixture({ textScale: 100, siteRules: [{ hostname: "saved.example", enabled: false }] });
   const seen = [];
   const client = preferences.createClient(f.extension, {
-    onChange: (current, loaded, confirmed) => seen.push(structuredClone({ current, loaded, confirmed }))
+    onChange: (current, loaded) => seen.push(structuredClone({ current, loaded, confirmed: client.confirmedSettings }))
   });
   await client.load();
+  const externalCopy = client.confirmedSettings;
+  externalCopy.textScale = 135;
+  externalCopy.siteRules[0].enabled = true;
+  externalCopy.siteRules.push({ hostname: "other.example", includeSubdomains: false, enabled: false, scope: null });
+  assert.equal(client.confirmedSettings.textScale, 100);
+  assert.equal(client.confirmedSettings.siteRules[0].enabled, false);
+  assert.equal(client.confirmedSettings.siteRules.length, 1);
+  assert.deepEqual(client.settings, client.confirmedSettings, "mutating a getter snapshot cannot corrupt internal state");
   let reply;
   f.extension.runtime.sendMessage = () => new Promise((resolve) => { reply = resolve; });
   const mutation = client.mutate({ type: "patch", changes: { textScale: 110 } });
@@ -349,7 +357,9 @@ test("replacement guards compare normalized rule identities and values rather th
   })) };
   assert.equal(api.settingsEqual(initial, expected), true);
   const replacement = { ...initial, textScale: 120 };
-  await f.store.mutate({ type: "replace", settings: replacement, expected });
+  await assert.rejects(f.store.mutate({ type: "replace", settings: replacement, expected }), { code: "INVALID_OPERATION" },
+    "Guard snapshots must already be complete and normalized");
+  await f.store.mutate({ type: "replace", settings: replacement, expected: api.normalizeSettings(expected) });
   assert.deepEqual(api.decodeSettings(f.saved()), replacement);
   for (const changed of [
     { ...replacement, theme: "light" },

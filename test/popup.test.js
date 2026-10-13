@@ -10,17 +10,22 @@ const source = await readFile(new URL("../popup.js", import.meta.url), "utf8");
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function openPopup({ initial = {}, getSettings, failWrite = false, state, url = "https://example.com/article", queryTabs } = {}) {
   class Element {
-    style = {}; attributes = {}; listeners = {}; children = [];
+    style = {}; dataset = {}; attributes = {}; listeners = {}; children = [];
     classList = { toggle() {}, remove() {} };
     addEventListener(name, listener) { this.listeners[name] = listener; }
     setAttribute(name, value) { this.attributes[name] = value; }
     replaceChildren(...children) { this.children = children; }
     emit(name) { return this.listeners[name]?.(); }
+    focus() { this.focused = true; }
   }
   const elements = new Map();
   const get = (selector) => { if (!elements.has(selector)) elements.set(selector, new Element()); return elements.get(selector); };
   const scope = ["body", "all"].map((value) => Object.assign(new Element(), { value }));
   const spacing = [0, 0.04, 0.08].map((value) => Object.assign(new Element(), { value: String(value) }));
+  const custom = get("#spacing-custom");
+  custom.value = "custom";
+  custom.dataset.custom = "true";
+  spacing.push(custom);
   let stored = structuredClone(initial);
   let listener;
   const writes = [];
@@ -172,4 +177,55 @@ test("global pause waits for the page to confirm before claiming it is off", asy
   assert.equal(page.get("#site-message").textContent, "Lexend is paused everywhere.");
   assert.equal(page.get("#retry-page").hidden, true);
   assert.equal(page.writes.length, 0, "Checking the page only reads its confirmed state");
+});
+
+test("popup identifies independent matching sources beside global controls and removes exact overrides", async () => {
+  const page = await openPopup({ initial: { scope: "body", siteRules: [
+    { hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all" },
+    { hostname: "example.com", includeSubdomains: false, enabled: true, scope: null }
+  ] } });
+  assert.equal(page.scope.find((input) => input.value === "body").checked, true);
+  assert.match(page.get("#site-sources").textContent, /Enabled from example.com \(exact host\)/);
+  assert.match(page.get("#site-sources").textContent, /Body and headings from example.com \(including subdomains\)/);
+  assert.equal(page.get("#use-inherited-site").hidden, false);
+  await page.get("#use-inherited-site").emit("click");
+  assert.equal(page.stored().siteRules.length, 1);
+  assert.equal(page.stored().siteRules[0].includeSubdomains, true);
+  assert.match(page.get("#site-sources").textContent, /Paused from example.com \(including subdomains\)/);
+  assert.equal(page.get("#toggle-site").textContent, "Resume here");
+  assert.equal(page.get("#use-inherited-site").hidden, true);
+});
+
+test("popup Custom spacing is the only selected radio and selecting a preset keeps unrelated settings", async () => {
+  const page = await openPopup({ initial: { textScale: 127, lineHeight: 1.73, letterSpacing: .057 } });
+  assert.equal(page.get("#spacing-custom").checked, true);
+  assert.equal(page.get("#spacing-custom-choice").hidden, false);
+  assert.equal(page.get("#spacing-custom-label").textContent, "Custom · 0.057em");
+  assert.equal(page.spacing.filter((input) => input.checked).length, 1);
+  page.spacing.find((input) => input.value === "0.04").emit("change");
+  await tick();
+  assert.equal(page.get("#spacing-custom-choice").hidden, true);
+  assert.equal(page.stored().letterSpacing, .04);
+  assert.equal(page.stored().textScale, 127);
+  assert.equal(page.stored().lineHeight, 1.73);
+});
+
+test("popup explains the global Off switch even with an enabled matching rule", async () => {
+  const page = await openPopup({ initial: { enabled: false, siteRules: [{ hostname: "example.com", enabled: true }] } });
+  assert.equal(page.get("#site-status-text").textContent, "Off");
+  assert.match(page.get("#site-sources").textContent, /Site preference: Enabled/);
+  assert.match(page.get("#site-sources").textContent, /global Off switch takes priority/);
+  assert.match(page.get("#enabled").attributes["aria-label"], /everywhere/);
+});
+
+test("scope-only preferences never expose stale source actions for a missing or pending page", async () => {
+  for (const state of [null, { ready: false, pending: true, hostname: "example.com" }]) {
+    const page = await openPopup({ initial: { siteRules: [{ hostname: "example.com", scope: "all" }] }, state });
+    assert.equal(page.get("#site-sources").hidden, true);
+    assert.equal(page.get("#use-inherited-site").hidden, true);
+    assert.equal(page.get("#use-inherited-site").disabled, true);
+    await page.get("#use-inherited-site").emit("click");
+    assert.equal(page.writes.length, 0);
+    assert.notEqual(page.get("#site-status-text").children[0]?.textContent, "Active on ");
+  }
 });

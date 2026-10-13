@@ -15,6 +15,9 @@
     const keysFor = (operation) => {
       if (operation.type === "patch") return Object.keys(operation.changes);
       if (operation.type === "replace") return fields;
+      if (operation.type === "updateRule") return [ruleKey(operation), ruleKey({
+        ...operation, includeSubdomains: operation.changes?.includeSubdomains ?? operation.includeSubdomains
+      })];
       if (operation.type === "toggleSite") return [...(getSettings().enabled ? [] : ["enabled"]), ruleKey(operation)];
       return [ruleKey(operation)];
     };
@@ -69,6 +72,23 @@
         return current && desired && JSON.stringify(current) === JSON.stringify(desired);
       }
       if (operation.type === "removeRule") return !api.getDirectRule(settings, operation.hostname, operation.includeSubdomains);
+      if (operation.type === "updateRule") {
+        // Compare the complete intended rule with its original confirmed state.
+        // A lost reply after a rename/removal must not replay against another
+        // identity; a later different edit must still reach the writer guard.
+        let desiredSettings;
+        try {
+          desiredSettings = api.updateSiteRule(entry.baseline, operation.hostname,
+            operation.includeSubdomains, operation.changes);
+        } catch { return false; }
+        const mode = operation.changes.includeSubdomains ?? operation.includeSubdomains;
+        const desired = api.getDirectRule(desiredSettings, operation.hostname, mode);
+        const current = api.getDirectRule(settings, operation.hostname, mode);
+        const original = api.getDirectRule(settings, operation.hostname, operation.includeSubdomains);
+        if (!desired) return !original;
+        return (Boolean(mode) === Boolean(operation.includeSubdomains) || !original)
+          && current && JSON.stringify(current) === JSON.stringify(desired);
+      }
       return operation.type === "toggleSite" && settings.enabled
         && api.resolveSite(settings, operation.hostname).siteEnabled === entry.target;
     };

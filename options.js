@@ -19,6 +19,12 @@
   const textScaleSlider = document.querySelector("#text-scale");
   const lineHeightSlider = document.querySelector("#line-height");
   const letterSpacingSlider = document.querySelector("#letter-spacing");
+  const adjustCustomValues = document.querySelector("#adjust-custom-values");
+  const customControls = [
+    ["text-scale", basicTextScaleInputs, "textScale", (value) => `${value}%`],
+    ["line-height", basicLineHeightInputs, "lineHeight", (value) => String(value)],
+    ["letter-spacing", basicLetterSpacingInputs, "letterSpacing", (value) => `${value}em`]
+  ];
   const textScaleOutput = document.querySelector("#text-scale-output");
   const lineHeightOutput = document.querySelector("#line-height-output");
   const letterSpacingOutput = document.querySelector("#letter-spacing-output");
@@ -56,6 +62,20 @@
   const importButton = document.querySelector("#import-settings");
   const importFile = document.querySelector("#import-file");
   const importError = document.querySelector("#import-error");
+  const importPreview = document.querySelector("#import-preview");
+  const importPreviewTitle = document.querySelector("#import-preview-title");
+  const importPreviewDescription = document.querySelector("#import-preview-description");
+  const importPreviewList = document.querySelector("#import-preview-list");
+  const applyImportButton = document.querySelector("#apply-import");
+  const cancelImportButton = document.querySelector("#cancel-import");
+  const importUndo = document.querySelector("#import-undo");
+  const importUndoMessage = document.querySelector("#import-undo-message");
+  const undoImportButton = document.querySelector("#undo-import");
+  let importDraft = null;
+  let undoRecord = null;
+  let importBusy = false;
+  let importSaveStatus = null;
+  let importSelection = 0;
   const shortcutOutput = document.querySelector("#shortcut");
   const shortcutAction = document.querySelector("#shortcut-action");
   const shortcutInstructions = document.querySelector("#shortcut-instructions");
@@ -103,6 +123,7 @@
   renderSettingsNavigation();
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
+  let confirmedSettings = settings;
   let loadFailed = false;
   let advancedPreferenceLoaded = false;
   let toastTimer;
@@ -117,8 +138,16 @@
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
-    onChange(value, _loaded, readError) {
+    onChange(value, loaded, readError) {
       settings = value;
+      if (loaded) {
+        const confirmed = preferences.confirmedSettings;
+        if (importBusy && importDraft && !settingsApi.settingsEqual(confirmedSettings, confirmed)
+            && settingsApi.settingsEqual(confirmed, importDraft.preview.after)) {
+          importDraft.observedApplied = true;
+        }
+        confirmedSettings = confirmed;
+      }
       render();
       if (readError) {
         loadFailed = true;
@@ -158,17 +187,17 @@
 
   const setRadioValue = (inputs, value) => {
     inputs.forEach((input) => {
-      input.checked = Number(input.value) === value;
+      input.checked = !input.dataset.custom && Number(input.value) === value;
     });
   };
 
   const lineHeightFromSlider = (value) => {
     const step = Number(value);
-    return step === 0 ? 0 : Number((0.95 + step * 0.05).toFixed(2));
+    return step === 0 ? 0 : Number((0.99 + step / 100).toFixed(2));
   };
 
   const lineHeightToSlider = (value) => (
-    value === 0 ? 0 : Math.min(29, Math.max(1, Math.round((value - 0.95) / 0.05)))
+    value === 0 ? 0 : Math.min(141, Math.max(1, Math.round((value - 0.99) * 100)))
   );
 
   const formatNumber = (value, precision) => Number(value)
@@ -223,6 +252,7 @@
 
   const renderReadabilityMode = (animate = false) => {
     const showAdvanced = advancedModeInput.checked;
+    adjustCustomValues.hidden = showAdvanced || !customControls.some(([id]) => document.querySelector(`#custom-${id}`).checked);
     const incoming = showAdvanced ? advancedReadability : basicReadability;
     const outgoing = showAdvanced ? basicReadability : advancedReadability;
     const token = ++readabilityAnimationToken;
@@ -292,6 +322,17 @@
     setRadioValue(basicLineHeightInputs, settings.lineHeight);
     setRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
 
+    let hasCustom = false;
+    for (const [id, inputs, key, format] of customControls) {
+      const custom = document.querySelector(`#custom-${id}`);
+      const isCustom = !inputs.some((input) => !input.dataset.custom && input.checked);
+      custom.checked = isCustom;
+      custom.value = String(settings[key]);
+      document.querySelector(`#custom-${id}-choice`).hidden = !isCustom;
+      document.querySelector(`#custom-${id}-label`).textContent = `Custom · ${format(settings[key])}`;
+      hasCustom ||= isCustom;
+    }
+    adjustCustomValues.hidden = !hasCustom || advancedModeInput.checked;
     textScaleSlider.value = String(settings.textScale);
     lineHeightSlider.value = String(lineHeightToSlider(settings.lineHeight));
     letterSpacingSlider.value = String(settings.letterSpacing);
@@ -390,10 +431,105 @@
     pendingRuleDeletion = { row, domain, status, button, rule, originalContent, confirmButton };
   };
 
+  const ruleSource = (rule) => rule
+    ? `${rule.hostname} (${rule.includeSubdomains ? "including subdomains" : "exact host"})`
+    : "global setting";
+
+  const sourceExplanation = (hostname) => {
+    const effective = settingsApi.resolveSite(settings, hostname);
+    const activation = effective.siteEnabled ? "Enabled" : "Paused";
+    const gate = settings.enabled ? "" : " Global switch is Off, so Lexend is paused.";
+    return `At ${hostname}: site preference ${activation} from ${effective.enabledRule ? ruleSource(effective.enabledRule) : "default site preference (no activation rule)"}; scope ${effective.scope === "all" ? "Body and headings" : "Body text"} from ${ruleSource(effective.scopeRule)}.${gate}`;
+  };
+
+  const makeRuleEditor = (rule) => {
+    const editor = document.createElement("details");
+    editor.className = "rule-editor";
+    const summary = document.createElement("summary");
+    summary.textContent = "Edit rule";
+    summary.setAttribute("aria-label", `Edit rule for ${ruleSource(rule)}`);
+    const form = document.createElement("form");
+    const controls = {};
+    const specs = [
+      ["enabled", "Activation", [["inherit", "Use global / inherited rule"], ["true", "Active"], ["false", "Paused"]]],
+      ["scope", "Scope", [["inherit", "Use global / inherited rule"], ["body", "Body text"], ["all", "Body and headings"]]],
+      ["includeSubdomains", "Match", [["false", "Exact host only"], ["true", "Host and subdomains"]]]
+    ];
+    for (const [name, title, choices] of specs) {
+      const label = document.createElement("label");
+      const text = document.createElement("span");
+      text.textContent = title;
+      const select = document.createElement("select");
+      select.name = name;
+      select.disabled = !preferences.loaded;
+      for (const [value, caption] of choices) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = caption;
+        select.append(option);
+      }
+      select.value = rule[name] === null ? "inherit" : String(rule[name]);
+      controls[name] = select;
+      label.append(text, select);
+      form.append(label);
+    }
+    const explanation = document.createElement("p");
+    explanation.className = "rule-sources";
+    explanation.textContent = `${sourceExplanation(rule.hostname)} Inherited values can come from a broader rule. Inherit both values to remove this rule.${rule.includeSubdomains ? " More specific rules can change the result on subdomains." : ""}`;
+    const error = document.createElement("p");
+    error.className = "field-error";
+    error.setAttribute("role", "alert");
+    const actions = document.createElement("div");
+    actions.className = "button-row";
+    const saveButton = document.createElement("button");
+    saveButton.type = "submit";
+    saveButton.className = "secondary-button rule-editor-save";
+    saveButton.textContent = "Save rule";
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "inline-link rule-editor-cancel";
+    cancelButton.textContent = "Cancel";
+    cancelButton.addEventListener("click", () => {
+      for (const [key, select] of Object.entries(controls)) select.value = rule[key] === null ? "inherit" : String(rule[key]);
+      editor.open = false;
+      error.textContent = "";
+      summary.focus();
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!preferences.loaded || saveButton.disabled) return;
+      const draft = {
+        enabled: controls.enabled.value === "inherit" ? null : controls.enabled.value === "true",
+        scope: controls.scope.value === "inherit" ? null : controls.scope.value,
+        includeSubdomains: controls.includeSubdomains.value === "true"
+      };
+      const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => value !== rule[key]));
+      if (!Object.keys(changes).length) { editor.open = false; summary.focus(); return; }
+      saveButton.disabled = true;
+      const ok = await persist({ type: "updateRule", hostname: rule.hostname,
+        includeSubdomains: rule.includeSubdomains, changes });
+      saveButton.disabled = false;
+      if (!ok) {
+        // Optimistic rendering may have replaced this editor; keep the failed
+        // operation visible and actionable through the shared save status.
+        error.textContent = saveStatusText.textContent;
+        retrySaveButton.focus();
+        return;
+      }
+      const row = [...ruleList.children].find((item) => item.dataset.hostname === rule.hostname
+        && item.dataset.subdomains === String(draft.includeSubdomains));
+      (ruleRowData.get(row)?.editorSummary ?? hostnameInput).focus();
+    });
+    actions.append(saveButton, cancelButton);
+    form.append(explanation, error, actions);
+    editor.append(summary, form);
+    return { editor, summary };
+  };
+
   const renderRules = () => {
     const query = searchInput.value.trim().toLowerCase();
     const key = JSON.stringify([
-      settings.siteRules, query, desktopSettingsLayout.matches, rulesExpanded
+      settings.siteRules, settings.enabled, settings.scope, query, desktopSettingsLayout.matches, rulesExpanded
     ]);
     if (key === renderedRulesKey) return;
     cancelRuleDeletion();
@@ -433,10 +569,12 @@
 
       const status = document.createElement("span");
       status.className = "rule-status";
-      status.textContent = rule.enabled === null ? "Inherit" : (rule.enabled ? "Active" : "Paused");
+      status.textContent = `${rule.enabled === null ? "Inherit activation" : (rule.enabled ? "Active" : "Paused")} · ${rule.scope === null ? "Inherit scope" : (rule.scope === "all" ? "Body and headings" : "Body text")}`;
+      const { editor, summary } = makeRuleEditor(rule);
+      domain.append(editor);
 
       const button = makeDeleteButton(rule);
-      ruleRowData.set(row, { domain, status, button, rule });
+      ruleRowData.set(row, { domain, status, button, rule, editorSummary: summary });
       row.append(domain, status, button);
       ruleList.append(row);
     });
@@ -458,6 +596,12 @@
     renderRules();
     mutationControls.forEach((control) => { control.disabled = !preferences.loaded; });
     advancedModeInput.disabled = !preferences.loaded || !advancedPreferenceLoaded;
+    importButton.disabled ||= importBusy;
+    importFile.disabled ||= importBusy;
+    applyImportButton.disabled = !preferences.loaded || importBusy;
+    cancelImportButton.disabled = importBusy;
+    undoImportButton.disabled = !preferences.loaded || importBusy;
+    retrySaveButton.disabled = importBusy;
     updateAddRuleState();
   };
 
@@ -467,14 +611,20 @@
       setSaveState("error", `Settings could not be read. ${preferences.readError.message}`);
       return;
     }
-    if (failures.length) {
+    // Preview Apply owns its status and retry. Generic callbacks may arrive
+    // synchronously during supersession or after an obsolete request settles.
+    if (importSaveStatus && importSaveStatus.state !== "saved") {
+      setSaveState(importSaveStatus.state, importSaveStatus.message);
+    } else if (failures.length) {
       const labels = { theme: "appearance", textScale: "text size", lineHeight: "line height",
         letterSpacing: "letter spacing", enabled: "on/off setting", scope: "scope", siteRules: "site rules" };
       const fields = [...new Set(failures.flatMap((failure) => failure.keys)
         .map((key) => labels[key] ?? "site rule"))].join(", ");
       setSaveState("error", `Not saved: ${fields}. ${failures[0].error.message || "Try again."}`);
     } else if (pending) setSaveState("saving", "Saving…");
-    else setSaveState("saved", "All changes saved");
+    else setSaveState("saved", importSaveStatus?.message || "All changes saved");
+    retrySaveButton.hidden = !failures.length && !loadFailed;
+    retrySaveButton.disabled = importBusy;
   };
   const recovery = globalThis.LexendSaveRecovery.createTracker({
     mutate: (operation) => preferences.mutate(operation),
@@ -483,11 +633,13 @@
     onChange: renderSaveRecovery
   });
 
+  const renderSaveStatus = () => renderSaveRecovery(recovery.state);
   const persist = async (operation) => {
     if (!preferences.loaded) {
       render();
       return false;
     }
+    if (importSaveStatus?.state === "saved") importSaveStatus = null;
     try {
       await recovery.mutate(operation);
       return true;
@@ -520,6 +672,12 @@
     addRuleButton.disabled = !preferences.loaded || !settingsApi.validHostname(hostname);
   };
 
+  adjustCustomValues.addEventListener("click", () => {
+    advancedModeInput.checked = true;
+    advancedModeInput.dispatchEvent(new Event("change"));
+    textScaleSlider.focus();
+  });
+
   advancedModeInput.addEventListener("change", async () => {
     if (!preferences.loaded || !advancedPreferenceLoaded) return;
     renderReadabilityMode(true);
@@ -547,10 +705,13 @@
 
   basicControlGroups.forEach(({ inputs, key }) => {
     inputs.forEach((input) => {
-      input.addEventListener("click", () => {
+      const selectValue = () => {
+        if (input.dataset.custom) return;
         const value = Number(input.value);
         if (settings[key] !== value) save({ [key]: value });
-      });
+      };
+      input.addEventListener("click", selectValue);
+      input.addEventListener("change", selectValue);
     });
   });
 
@@ -598,6 +759,7 @@
   });
 
   retrySaveButton.addEventListener("click", () => {
+    if (importBusy) return;
     if (loadFailed) loadSettings();
     else return recovery.retry();
   });
@@ -700,23 +862,158 @@
     showToast("Settings exported");
   });
 
+  const importValue = (key, value) => {
+    if (key === "enabled") return value ? "On" : "Off";
+    if (key === "scope") return value === "all" ? "Body and headings" : "Body text";
+    if (key === "textScale") return `${value}%`;
+    if (key === "letterSpacing") return `${value}em`;
+    if (key === "lineHeight" && value === 0) return "Default";
+    return String(value);
+  };
+  const importKeys = { enabled: "Global switch", scope: "Global scope", theme: "Theme",
+    textScale: "Text size", lineHeight: "Line height", letterSpacing: "Letter spacing" };
+  const ruleDescription = (rule) => `${ruleSource(rule)}: activation ${rule.enabled === null ? "inherit" : rule.enabled ? "active" : "paused"}, scope ${rule.scope === null ? "inherit" : importValue("scope", rule.scope)}`;
+
+  const showImportPreview = (preview, kind = "import") => {
+    importDraft = { preview, kind, operation: kind === "undo"
+      ? { type: "undoImport", before: undoRecord.before, after: undoRecord.after, expected: preview.before }
+      : { type: "replace", settings: preview.after, expected: preview.before } };
+    importPreviewTitle.textContent = kind === "undo" ? "Review undo" : "Review replacement";
+    applyImportButton.textContent = kind === "undo" ? "Apply undo" : "Apply import";
+    importPreviewDescription.textContent = kind === "undo"
+      ? "Restore only imported values that are still unchanged. Later edits are kept. Review the recovery below before applying."
+      : "This file replaces your saved settings and site rules. Check every change before applying.";
+    const lines = preview.changes.map(({ key, before, after }) => `${importKeys[key]}: ${importValue(key, before)} → ${importValue(key, after)}`);
+    lines.push(...preview.rules.removed.map((rule) => `Remove rule: ${ruleDescription(rule)}`));
+    lines.push(...preview.rules.added.map((rule) => `Add rule: ${ruleDescription(rule)}`));
+    lines.push(...preview.rules.changed.map(({ before, after }) => `Change rule: ${ruleDescription(before)} → ${ruleDescription(after)}`));
+    if (!lines.length) lines.push("No saved values will change.");
+    importPreviewList.replaceChildren();
+    for (const line of lines) {
+      const item = document.createElement("li");
+      item.textContent = line;
+      importPreviewList.append(item);
+    }
+    importPreview.hidden = false;
+    importPreviewTitle.focus();
+  };
+
   importButton.addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", async () => {
-    if (!preferences.loaded) return;
+    if (!preferences.loaded || importBusy) return;
     const file = importFile.files?.[0];
     if (!file) return;
+    const selection = ++importSelection;
     importError.textContent = "";
+    importDraft = null;
+    importSaveStatus = null;
+    renderSaveStatus();
+    importPreview.hidden = true;
     try {
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
-      const payload = JSON.parse(await file.text());
+      const text = await file.text();
+      if (selection !== importSelection) return;
+      const payload = JSON.parse(text);
       const imported = settingsApi.validateImport(payload);
-      if (!window.confirm("Replace all your current settings and site rules with this file? This cannot be undone. Export your current settings first if you want a backup.")) return;
-      if (await persist({ type: "replace", settings: imported, expected: settingsApi.normalizeSettings(settings) })) showToast("Settings imported");
-      else importError.textContent = saveStatusText.textContent;
+      showImportPreview(settingsApi.previewImport(confirmedSettings, imported));
     } catch (error) {
-      importError.textContent = error.code ? error.message : "Choose a valid Lexend settings file.";
+      if (selection === importSelection) importError.textContent = error.code ? error.message : "Choose a valid Lexend settings file.";
     } finally {
-      importFile.value = "";
+      if (selection === importSelection) importFile.value = "";
+    }
+  });
+
+  cancelImportButton.addEventListener("click", () => {
+    if (importBusy) return;
+    ++importSelection;
+    importDraft = null;
+    importSaveStatus = null;
+    importPreview.hidden = true;
+    importError.textContent = "";
+    renderSaveStatus();
+    importButton.focus();
+  });
+
+  undoImportButton.addEventListener("click", () => {
+    if (!undoRecord || importBusy) return;
+    ++importSelection;
+    importError.textContent = "";
+    importSaveStatus = null;
+    renderSaveStatus();
+    showImportPreview(settingsApi.previewImport(confirmedSettings,
+      settingsApi.restoreImport(confirmedSettings, undoRecord.before, undoRecord.after)), "undo");
+  });
+
+  const finishImport = (draft) => {
+    importSaveStatus = { state: "saved", message: draft.kind === "import" ? "Settings imported" : "Import undone" };
+    if (draft.kind === "import") {
+      undoRecord = { before: draft.preview.before, after: draft.preview.after };
+      importUndo.hidden = false;
+      importUndoMessage.textContent = "Settings imported. Undo restores unchanged imported values and keeps later edits. Undo is available while this settings page stays open.";
+      undoImportButton.hidden = false;
+    } else {
+      undoRecord = null;
+      importUndoMessage.textContent = "Import undone. Later changes were kept.";
+      undoImportButton.hidden = true;
+    }
+    importDraft = null;
+    importPreview.hidden = true;
+  };
+
+  const refreshImportPreview = (draft) => {
+    const target = draft.kind === "undo"
+      ? settingsApi.restoreImport(confirmedSettings, undoRecord.before, undoRecord.after)
+      : draft.preview.after;
+    showImportPreview(settingsApi.previewImport(confirmedSettings, target), draft.kind);
+    importError.textContent = "Settings changed after this preview. Review the updated changes, then apply again.";
+    importSaveStatus = { state: "error", message: "Settings changed. Review the updated preview before applying." };
+    renderSaveStatus();
+  };
+
+  applyImportButton.addEventListener("click", async () => {
+    if (!importDraft || importBusy || !preferences.loaded) return;
+    const draft = importDraft;
+    if (!settingsApi.settingsEqual(confirmedSettings, draft.operation.expected)) {
+      refreshImportPreview(draft);
+      return;
+    }
+    const replacedFields = draft.kind === "import"
+      ? Object.keys(draft.preview.after)
+      : draft.preview.changes.map(({ key }) => key);
+    if (draft.kind === "undo" && Object.values(draft.preview.rules).some((rules) => rules.length)) {
+      replacedFields.push("siteRules");
+    }
+    importSaveStatus = { state: "saving", message: draft.kind === "import" ? "Importing settings…" : "Applying undo…" };
+    importBusy = true;
+    recovery.supersede(replacedFields);
+    draft.observedApplied = false;
+    render();
+    importError.textContent = "";
+    try {
+      await preferences.mutate(draft.operation);
+      finishImport(draft);
+    } catch (error) {
+      if (error.code === "STALE_IMPORT" || error.code === "STALE_UNDO") {
+        // Refresh disclosure, never apply against a new snapshot without
+        // another deliberate Apply action.
+        refreshImportPreview(draft);
+      } else if (draft.observedApplied && (!error.code || error.code === "BACKGROUND_UNAVAILABLE")) {
+        // Observe the whole applied state while the request is in flight so
+        // a lost reply followed by later edits retains the original recovery.
+        // An explicit stale rejection above can never grant this recovery.
+        finishImport(draft);
+      } else {
+        // Keep the exact operation and expected snapshot after ambiguous
+        // failures; the central writer makes this retry safe.
+        applyImportButton.textContent = draft.kind === "undo" ? "Retry undo" : "Retry import";
+        importError.textContent = error.message || "Changes could not be saved. Retry or cancel.";
+        importSaveStatus = { state: "error", message: `${draft.kind === "import" ? "Import" : "Undo"} was not confirmed. Retry or cancel in the preview.` };
+      }
+    } finally {
+      importBusy = false;
+      renderSaveStatus();
+      render();
+      if (!importDraft) (undoRecord ? undoImportButton : importButton).focus();
     }
   });
 
@@ -767,11 +1064,12 @@
       if (preferenceStorage) {
         try {
           const preferences = await preferenceStorage.get(ADVANCED_PREFERENCE_KEY);
-          advancedModeInput.checked = Boolean(preferences[ADVANCED_PREFERENCE_KEY]);
+          advancedModeInput.checked = new URLSearchParams(location.search).get("advanced") === "1" || Boolean(preferences[ADVANCED_PREFERENCE_KEY]);
         } catch {
           advancedModeInput.checked = false;
         }
       }
+      if (new URLSearchParams(location.search).get("advanced") === "1") advancedModeInput.checked = true;
       advancedPreferenceLoaded = true;
       renderReadabilityMode();
       render();

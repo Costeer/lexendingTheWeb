@@ -751,3 +751,20 @@ fieldset:disabled {
     overflow-wrap: anywhere;
   }
 }
+
+:root .site-strip-copy { min-width: 0; }
+:root .site-strip .site-message {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+:root .site-strip > .text-link { align-self: start; flex-shrink: 0; }
+:root .site-strip #use-inherited-site { margin-top: 8px; font-size: 12px; }
+:root .segments .custom-choice { grid-column: 1 / -1; border-left: 0; }
+:root .segments .custom-choice span { border-top: 1px solid var(--ui-border); }
+#adjust-custom-spacing { margin-top: 12px; font-size: 13px; }

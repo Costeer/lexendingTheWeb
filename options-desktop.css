@@ -534,3 +534,13 @@
     }
   }
 }
+
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  :root .settings-layout .basic-controls { grid-auto-rows: auto; }
+  :root .settings-layout .setting-control:has(.custom-choice:not([hidden])) {
+    height: 140px;
+    min-height: 140px;
+  }
+  :root .settings-layout .segment-group:has(.custom-choice:not([hidden])) { height: auto; }
+  :root .settings-layout .segment-group .custom-choice span { border-left: 0; }
+}

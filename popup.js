@@ -27,11 +27,17 @@
   const spacingFieldset = document.querySelector("#spacing-fieldset");
   const scopeInputs = [...document.querySelectorAll('input[name="scope"]')];
   const spacingInputs = [...document.querySelectorAll('input[name="spacing"]')];
+  const spacingCustom = document.querySelector("#spacing-custom");
+  const spacingCustomChoice = document.querySelector("#spacing-custom-choice");
+  const spacingCustomLabel = document.querySelector("#spacing-custom-label");
+  const adjustCustomSpacing = document.querySelector("#adjust-custom-spacing");
   const spacingPreviewText = document.querySelector("#spacing-preview-text");
   const quoteAuthor = document.querySelector("#quote-author");
   const siteStrip = document.querySelector("#site-strip");
   const siteStatusText = document.querySelector("#site-status-text");
   const siteMessage = document.querySelector("#site-message");
+  const siteSources = document.querySelector("#site-sources");
+  const useInheritedSite = document.querySelector("#use-inherited-site");
   const toggleSiteButton = document.querySelector("#toggle-site");
   const restrictedNote = document.querySelector("#restricted-note");
   const feedback = document.querySelector("#popup-feedback");
@@ -79,27 +85,40 @@
     enabledInput.checked = settings.enabled;
     enabledInput.setAttribute(
       "aria-label",
-      settings.enabled ? "Turn Lexend off" : "Turn Lexend on"
+      settings.enabled ? "Turn Lexend off everywhere" : "Turn Lexend on everywhere"
     );
     masterState.textContent = settings.enabled ? "On" : "Off";
     enabledInput.disabled = !preferences.loaded;
     toggleSiteButton.disabled = !preferences.loaded || site?.status !== "ready";
+    useInheritedSite.disabled = !preferences.loaded || site?.status !== "ready";
     scopeFieldset.disabled = !preferences.loaded || !settings.enabled;
     spacingFieldset.disabled = !preferences.loaded || !settings.enabled;
     scopeInputs.forEach((input) => {
       input.checked = input.value === settings.scope;
     });
     spacingInputs.forEach((input) => {
-      input.checked = Number(input.value) === settings.letterSpacing;
+      input.checked = !input.dataset.custom && Number(input.value) === settings.letterSpacing;
     });
+    const isCustom = !spacingInputs.some((input) => !input.dataset.custom && input.checked);
+    spacingCustom.checked = isCustom;
+    spacingCustom.value = String(settings.letterSpacing);
+    spacingCustomChoice.hidden = !isCustom;
+    spacingCustomLabel.textContent = `Custom · ${settings.letterSpacing}em`;
+    adjustCustomSpacing.hidden = !isCustom;
     spacingPreviewText.style.letterSpacing = `${settings.letterSpacing}em`;
   };
+
+  const ruleSource = (rule) => rule
+    ? `${rule.hostname} (${rule.includeSubdomains ? "including subdomains" : "exact host"})`
+    : "global setting";
 
   const renderSite = () => {
     const supported = Boolean(site?.supported);
     siteStrip.hidden = !supported;
     restrictedNote.hidden = !site?.restricted;
     retryPage.hidden = !supported || site.status === "ready";
+    siteSources.hidden = !supported || site.status !== "ready";
+    useInheritedSite.hidden = true;
     if (!supported) return;
 
     if (site.status !== "ready") {
@@ -111,6 +130,9 @@
     toggleSiteButton.hidden = false;
 
     const effective = settingsApi.resolveSite(settings, site.hostname);
+    siteSources.textContent = `Site preference: ${effective.siteEnabled ? "Enabled" : "Paused"} from ${effective.enabledRule ? ruleSource(effective.enabledRule) : "default site preference (no activation rule)"}. Scope: ${effective.scope === "all" ? "Body and headings" : "Body text"} from ${ruleSource(effective.scopeRule)}.${settings.enabled ? "" : " The global Off switch takes priority."}`;
+    useInheritedSite.hidden = !settingsApi.getDirectRule(settings, site.hostname);
+    useInheritedSite.setAttribute("aria-label", `Remove exact overrides for ${site.hostname} and use inherited settings`);
     const confirmed = site.state.active === effective.active && (!effective.active || site.state.scope === effective.scope);
     if (!settings.enabled && confirmed) {
       siteStatusText.textContent = "Off";
@@ -240,12 +262,34 @@
   });
 
   spacingInputs.forEach((input) => {
-    input.addEventListener("click", () => {
+    const selectSpacing = () => {
+      if (input.dataset.custom) return;
       const letterSpacing = Number(input.value);
-      if (settings.letterSpacing !== letterSpacing) {
-        save({ letterSpacing });
+      if (settings.letterSpacing !== letterSpacing) save({ letterSpacing });
+    };
+    input.addEventListener("click", selectSpacing);
+    input.addEventListener("change", selectSpacing);
+  });
+
+  adjustCustomSpacing.addEventListener("click", async () => {
+    try {
+      const path = "options.html?section=readability-panel&advanced=1";
+      if (tabs?.create && extension?.runtime?.getURL) {
+        await tabs.create({ url: extension.runtime.getURL(path) });
+      } else {
+        window.open(path, "_blank");
       }
-    });
+      window.close();
+    } catch {
+      showFeedback("Settings could not be opened.", true, 0);
+    }
+  });
+
+  useInheritedSite.addEventListener("click", async () => {
+    if (!site?.supported || site.status !== "ready") return;
+    if (await mutate({ type: "removeRule", hostname: site.hostname, includeSubdomains: false })) {
+      toggleSiteButton.focus();
+    }
   });
 
   toggleSiteButton.addEventListener("click", () => {

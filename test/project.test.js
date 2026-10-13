@@ -298,7 +298,7 @@ test("preset controls use equal fixed slots with one sliding selection layer", a
     assert.match(css, /transform var\(--motion-base\) var\(--motion-ease\)/);
   }
   assert.doesNotMatch(popupJs, /nearestSpacing/);
-  assert.match(popupJs, /input.checked = Number\(input.value\) === settings.letterSpacing;/);
+  assert.match(popupJs, /input.checked = !input.dataset.custom && Number\(input.value\) === settings.letterSpacing;/);
 });
 
 test("settings paper has a receipt edge on desktop and mobile, with an About footer outside", async () => {

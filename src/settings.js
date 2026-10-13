@@ -159,16 +159,6 @@
   };
 
   const settingsError = (code, message) => Object.assign(new Error(message), { code });
-  const settingsEqual = (left, right) => {
-    const a = normalizeSettings(left), b = normalizeSettings(right);
-    if (Object.keys(defaults).some((key) => key !== "siteRules" && a[key] !== b[key])
-        || a.siteRules.length !== b.siteRules.length) return false;
-    const rules = new Map(b.siteRules.map((rule) => [`${rule.hostname}\n${rule.includeSubdomains}`, rule]));
-    return a.siteRules.every((rule) => {
-      const other = rules.get(`${rule.hostname}\n${rule.includeSubdomains}`);
-      return other && rule.enabled === other.enabled && rule.scope === other.scope;
-    });
-  };
   const encodeSettings = (value) => {
     const settings = normalizeSettings(value);
     return { ...settings, siteRules: encodeRules(settings.siteRules) };
@@ -428,7 +418,6 @@
     toggleSite,
     updateSiteRule,
     settingsError,
-    settingsEqual,
     ruleStorageBytes,
     validateCapacity,
     validateImport,
