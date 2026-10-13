@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -435,12 +435,21 @@ test("small cross-origin announcements resize by measured demand and restore", a
   } finally {await browser.close();}
 });
 
-test("isolated extension frames use authenticated sizing and retain clipped embedding footprints",async()=>{
+test("isolated extension frames use authenticated sizing and retain clipped embedding footprints",async(t)=>{
  const temporary=await mkdtemp(join(tmpdir(),"lexend-isolated-frame-"));
  const extensionPath=join(temporary,"extension"),profile=join(temporary,"profile");
  for(const path of ["src","assets","shared.css","options.html","options.css","options.js","popup.html","popup.css","popup.js"])
   await cp(resolve(path),join(extensionPath,path),{recursive:true});
- await cp(resolve("manifests/manifest.chrome.json"),join(extensionPath,"manifest.json"));
+ const manifest=JSON.parse(await readFile(resolve("manifests/manifest.chrome.json"),"utf8"));
+ manifest.content_scripts.find(entry=>entry.world!=="MAIN").js.push("frame-request-probe.js");
+ await writeFile(join(extensionPath,"manifest.json"),JSON.stringify(manifest));
+ // Test-only observer in the installed isolated world: count actual qualifying
+ // background deliveries without exposing payloads or mutating page markup.
+ await writeFile(join(extensionPath,"frame-request-probe.js"),`chrome.runtime.onMessage.addListener((message,sender)=>{
+  if(sender.id===chrome.runtime.id && message.type==="LEXEND_APPLY_FRAME_REQUIREMENT"
+   && message.requirement?.requiredHeight>message.requirement?.viewportHeight)
+   document.dispatchEvent(new Event("lexend-test-qualified-frame-request"));
+ });`);
  const server=createServer((request,response)=>{
   response.setHeader("content-type","text/html");
   if(request.url==="/banner") response.end('<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>');
@@ -482,6 +491,76 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
   await page.waitForFunction(()=>document.querySelector("nav").style.getPropertyValue("top")==="");
   const removed=await page.evaluate(()=>({clipHeight:document.querySelector("#clip").style.getPropertyValue("height"),clipMaxHeight:document.querySelector("#clip").style.getPropertyValue("max-height"),navTop:getComputedStyle(document.querySelector("nav")).top}));
   assert.deepEqual(removed,{clipHeight:"",clipMaxHeight:"",navTop:"30px"},"removing an embed while enabled restores its wrapper and following navigation without a child null request");
+  // Frame resizing owns a separate restoration group: the iframe, clipping
+  // ancestors, and independently displaced fixed navigation. Entering editor
+  // ownership must release that group even while conversion remains enabled.
+  for (const editorTarget of ["iframe", "#clip", "nav", "designMode"]) {
+   await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
+   await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:"load"});
+   const authored=await page.evaluate((selector)=>{
+    const frame=document.querySelector("iframe"),clip=document.querySelector("#clip"),nav=document.querySelector("nav");
+    frame.style.setProperty("height","30px","important");
+    frame.style.setProperty("max-height","30px");
+    clip.style.setProperty("height","30px");
+    clip.style.setProperty("max-height","30px","important");
+    nav.style.setProperty("top","30px","important");
+    globalThis.__qualifiedFrameRequests=0;
+    document.addEventListener("lexend-test-qualified-frame-request",()=>__qualifiedFrameRequests++);
+    const original={body:document.body.outerHTML,frameStyle:frame.getAttribute("style"),clipStyle:clip.getAttribute("style")};
+    if(selector==="designMode")return original;
+    const clone=document.querySelector(selector).cloneNode(true);
+    clone.setAttribute("contenteditable","true");
+    // The independent action bar also receives a later authored override in
+    // the same task that enters editing. Restoration must preserve that value.
+    if(selector==="nav")clone.style.setProperty("top","33px","important");
+    return{...original,editor:clone.outerHTML};
+   },editorTarget);
+   await worker.evaluate(()=>chrome.storage.sync.set({enabled:true}));
+   await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30
+    && document.querySelector("#clip").clientHeight>30
+    && parseFloat(document.querySelector("nav").style.getPropertyValue("top"))>30,{},{timeout:5000});
+   const applied=await page.evaluate(()=>({
+    frameHeight:document.querySelector("iframe").clientHeight,
+    clipHeight:document.querySelector("#clip").clientHeight,
+    navTop:document.querySelector("nav").style.getPropertyValue("top"),
+    frameMax:document.querySelector("iframe").style.getPropertyValue("max-height"),
+    clipMax:document.querySelector("#clip").style.getPropertyValue("max-height")
+   }));
+   assert.equal(applied.frameMax,"none","a real authenticated child request applied the owned frame constraint");
+   assert.equal(applied.clipMax,"none","the same request repaired its clipping ancestor");
+   if(editorTarget==="designMode"){
+    const synchronous=await page.evaluate(()=>{document.designMode="on";return document.body.outerHTML;});
+    assert.equal(synchronous,authored.body,"designMode releases all frame and surrounding ownership before its setter returns");
+   }else{
+    await page.locator(editorTarget).evaluate(element=>{
+     if(element.tagName==="NAV")element.style.setProperty("top","33px","important");
+     element.setAttribute("contenteditable","true");
+    });
+    await page.waitForFunction(({selector,expected})=>document.querySelector(selector).outerHTML===expected,
+     {selector:editorTarget,expected:authored.editor});
+    assert.equal(await page.locator(editorTarget).evaluate(element=>element.outerHTML),authored.editor,
+     `${editorTarget} entering editor ownership restores author serialization`);
+   }
+   // Require a later real authenticated child request, rather than relying
+   // on a delay. The test-only isolated listener counts only qualifying sizing
+   // deliveries. An unprotected frame can resize again while its action bar is
+   // editing; neither that request nor a protected frame may reclaim editor DOM.
+   const requestsBefore=await page.evaluate(()=>__qualifiedFrameRequests);
+   if(editorTarget==="nav")await page.locator("iframe").evaluate(element=>element.style.setProperty("height","30px","important"));
+   const activeChild=page.frames().find(frame=>frame.url().endsWith("/banner"));
+   await activeChild.evaluate(()=>dispatchEvent(new Event("resize")));
+   await page.waitForFunction(before=>__qualifiedFrameRequests>before,requestsBefore,{timeout:5000});
+   if(editorTarget==="designMode")assert.equal(await page.evaluate(()=>document.body.outerHTML),authored.body);
+   else assert.equal(await page.locator(editorTarget).evaluate(element=>element.outerHTML),authored.editor);
+   assert.deepEqual(await page.locator("nav").evaluate(element=>({value:element.style.getPropertyValue("top"),priority:element.style.getPropertyPriority("top")})),
+    {value:editorTarget==="nav"?"33px":"30px",priority:"important"},
+    "independent navigation retains author values and priorities, including a later override");
+   if(editorTarget!=="nav"){
+    assert.equal(await page.locator("iframe").getAttribute("style"),authored.frameStyle,"frame style serialization returns to the author baseline");
+    assert.equal(await page.locator("#clip").getAttribute("style"),authored.clipStyle,"clipping ancestor style serialization returns to the author baseline");
+   }
+   t.diagnostic(JSON.stringify({editorTransition:editorTarget,applied,requestsBefore,requestsAfter:await page.evaluate(()=>__qualifiedFrameRequests),restoredEditor:editorTarget==="designMode"?authored.body:authored.editor}));
+  }
   await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
   await page.goto(`http://127.0.0.1:${server.address().port}/captions`,{waitUntil:"load"});
   const captionChild=page.frames().find(frame=>frame.url().endsWith("/caption"));

@@ -4,7 +4,7 @@
   // Adapt only constraints that become unsafe after typography changes. No site
   // identities or author class names are involved. Every write is reversible.
   const EPSILON = 2;
-  const PROTECTED = "pre,code,kbd,samp,math,svg,[data-lexend-ignore],[role='textbox'][aria-multiline='true'],[contenteditable='true']";
+  const protection = globalThis.LexendProtection;
   const heading = (element) => /^H[1-6]$/.test(element.tagName) || element.getAttribute("role") === "heading";
   const control = (element) => element.matches("button,input,select,textarea,a[href],[role='button']");
   const rect = (value) => ({ left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width, height: value.height });
@@ -102,10 +102,10 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
-      if (node.textContent.trim() && node.parentElement && !node.parentElement.closest(PROTECTED)) elements.add(node.parentElement);
+      if (node.textContent.trim() && node.parentElement && !protection.protected(node.parentElement)) elements.add(node.parentElement);
     }
     root.querySelectorAll?.("input,select,textarea,button,[role='button']").forEach((element) => {
-      if (!element.closest(PROTECTED)) elements.add(element);
+      if (!protection.protected(element)) elements.add(element);
     });
     return elements;
   };
@@ -134,6 +134,11 @@
     // them only within this synchronous pass, and discard every measurement
     // after any write: a child can change its siblings or a :has() ancestor.
     let measurements = null;
+    let editorOwnership = new WeakMap();
+    const editorOwned = (element) => {
+      if (!editorOwnership.has(element)) editorOwnership.set(element, protection.editorOwned(element));
+      return editorOwnership.get(element);
+    };
     const freshMeasurements = () => ({
       styles: new WeakMap(), pseudoStyles: new WeakMap(), paintStyles: new WeakMap(),
       snapshots: [new WeakMap(), new WeakMap()],
@@ -144,6 +149,7 @@
     const withMeasurements = (callback) => {
       const previous = measurements;
       measurements = freshMeasurements();
+      editorOwnership = new WeakMap();
       try { return callback(); }
       finally { measurements = previous; }
     };
@@ -188,12 +194,14 @@
       return measurements.paintStyles.get(element);
     };
     const snapshot = (element, allowViewportEscape = false) => {
+      if (editorOwned(element)) return null;
       if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox);
       const cache = measurements.snapshots[Number(allowViewportEscape)];
       if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox));
       return cache.get(element);
     };
     const write = (element, property, value, category) => {
+      if (editorOwned(element)) return;
       let properties = edits.get(element);
       if (!properties) {
         edits.set(element, properties = new Map());
@@ -236,6 +244,7 @@
       write(element, property, value, "bounded-panel");
     };
     const mark = (element, name, value) => {
+      if (editorOwned(element)) return;
       let values = attributes.get(element);
       if (!values) attributes.set(element, values = new Map());
       if (!values.has(name)) values.set(name, { value: element.getAttribute(name) });
@@ -298,6 +307,13 @@
         tableWrappers.delete(table);
       }
     };
+    const dispose = () => {
+      restore();
+      baseline.clear(); textElements.clear(); descendants.clear();
+      visualContainers = new WeakMap(); pseudoBaseline.clear(); maskedTickers.clear();
+      panelReservations.clear(); viewportScrollOwners.clear(); frameQualification = null;
+      measurements = null; editorOwnership = new WeakMap(); canvas = null;
+    };
     const captureBaseline = (roots = [document.documentElement], options) => {
       restore(options);
       baseline = new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
@@ -312,7 +328,7 @@
           // label. They still reserve space even with no painted direct text.
           root.querySelectorAll?.("button,[role='button'],input,select,textarea,a[href]").forEach((element) => candidates.add(element));
           for (const element of candidates) {
-            if (!(element instanceof HTMLElement) || element.closest(PROTECTED)) continue;
+            if (!(element instanceof HTMLElement) || protection.protected(element)) continue;
             const state = snapshot(element);
             if (!state) continue;
             textElements.add(element); baseline.set(element, state);
@@ -902,7 +918,7 @@
     };
     const repairContainers = () => {
       // Inner containers first. Their growth then informs outer constraints.
-      const containers = [...baseline.keys()].filter((element) => !element.closest(PROTECTED)).reverse();
+      const containers = [...baseline.keys()].filter((element) => !protection.protected(element)).reverse();
       for (const element of containers) {
         const before = baseline.get(element);
         const now = snapshot(element);
@@ -1550,7 +1566,7 @@
     };
     const capture = (roots, options) => withMeasurements(() => captureBaseline(roots, options));
     const repair = () => withMeasurements(repairLayout);
-    return Object.freeze({ capture, repair, restore, getFrameRequirement, refresh: (roots) => { capture(roots); repair(); } });
+    return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, refresh: (roots) => { capture(roots); repair(); } });
   };
 
   globalThis.LexendLayout = Object.freeze({ create });

@@ -42,7 +42,26 @@ made by the site. If a page still looks wrong, use **Pause here** in the popup.
 
 Layout measurements, element boxes, and generated-text styles are reused within
 each synchronous pass and invalidated after a repair changes the page.
-Protected code and editor subtrees inherit
-their original typography from the boundary without styling every token.
-Paused pages skip refreshes; theme changes and rules for other sites also
+Protected code subtrees inherit their original typography from the boundary
+without styling every token. Rich editing surfaces keep their authored DOM and
+typography: this includes empty, true and plaintext-only contenteditable values,
+inherited editors, nested read-only islands, recognized code editors and
+open-shadow descendants. A designMode document is also author-owned. The
+extension does not inject styles or markers inside these surfaces, and preserves
+selection, native editing and undo. An ancestor containing an editor keeps its
+own typography as well, so direct text on that mixed ancestor remains unchanged.
+
+State changes to class/style, data-state, common disclosure/accessibility state,
+and contenteditable are coalesced before a new measurement. Programmatic native
+disclosures trigger repair; arbitrary attributes and CSSOM edits do not have
+complete invalidation coverage. A synchronous author read immediately after
+turning already converted DOM into contenteditable can precede the mutation
+observer's restoration; wait for the observer-driven refresh before saving that
+new editing surface. Ordinary editor content starts and stays author-owned.
+
+Pausing restores owned changes and releases captured layout and shadow-root
+references; resuming discovers the current page afresh. Paused pages skip refreshes; theme changes and rules for other sites also
 avoid remeasuring the page.
+
+See [Runtime lifecycle contracts](runtime-lifecycle.md) for discovery boundaries,
+measurement ownership, and installed-browser verification.

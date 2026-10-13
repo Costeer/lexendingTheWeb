@@ -28,6 +28,9 @@
 
   // Names such as `with-icon` are often ordinary prose wrappers. Protect actual
   // semantics and computed symbol/code fonts rather than substring class names.
+  const protection = globalThis.LexendProtection;
+  let editingDocument = protection.editorDocument();
+  let knownEditorBoundaries = new WeakSet();
   const protectedSelector = [
     "script", "style", "template", "noscript", "pre", "code", "kbd", "samp",
     "math", "svg", "[data-lexend-ignore]", "[role='img']",
@@ -59,6 +62,7 @@
   let refreshRequired = false;
   const pendingAriaChanges = new Map();
   const pendingStyleChanges = new Map();
+  const pendingStateChanges = new Map();
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
@@ -76,6 +80,7 @@
   const FRAME_RUNTIME_REQUEST = "LEXEND_FRAME_REQUIREMENT";
   const FRAME_RUNTIME_APPLY = "LEXEND_APPLY_FRAME_REQUIREMENT";
   const writeFrameProperty = (state, element, name, value) => {
+    if (protection.editorOwned(element)) return;
     let properties = state.elements.get(element);
     if (!properties) state.elements.set(element, properties = { hadStyle: element.hasAttribute("style"), values: new Map() });
     let original = properties.values.get(name);
@@ -126,8 +131,16 @@
     // Route measured requirements through authenticated extension messaging.
     extension.runtime.sendMessage({ type: FRAME_RUNTIME_REQUEST, requirement }).catch(() => {});
   };
+  const frameTouchesEditor = (frame, state = resizedFrames.get(frame)) => {
+    if (protection.editorOwned(frame)) return true;
+    // A measured frame can own clipping ancestors and independent fixed action
+    // bars. Any of those entering an editor invalidates the whole repair group;
+    // restore with the same author-override checks used for pause/removal.
+    for (const element of state?.elements.keys() ?? []) if (protection.editorOwned(element)) return true;
+    return false;
+  };
   const applyFrameRequirement = (frame, requirement) => {
-    if (!isActive() || requirement === null) {
+    if (!isActive() || requirement === null || frameTouchesEditor(frame)) {
       observer.disconnect();
       try { restoreFrame(frame); } finally { if (!refreshing) observeRoots(); }
       return;
@@ -334,12 +347,7 @@
   const isActive = () => settingsLoaded && getEffectiveSettings().active;
   const composedParent = (element) => element.parentElement
     ?? (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
-  const hasProtectedAncestor = (element) => {
-    for (let current = element; current; current = composedParent(current)) {
-      if (current.matches(protectedSelector)) return true;
-    }
-    return false;
-  };
+  const hasProtectedAncestor = (element) => protection.protected(element);
   const isHeading = (element) => {
     for (let current = element; current; current = composedParent(current)) {
       if (/^H[1-6]$/.test(current.tagName) || current.getAttribute("role") === "heading") return true;
@@ -418,12 +426,14 @@
   const isTextControl = (element) => element.matches("textarea,select,option,button,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color'])");
   const allElements = function* (root) {
     const scope = root === document.documentElement ? document.body : root;
-    if (!scope || (root instanceof ShadowRoot && hasProtectedAncestor(root.host))) return;
+    if (!scope || protection.editorOwned(scope instanceof ShadowRoot ? scope.host : scope)
+        || (root instanceof ShadowRoot && hasProtectedAncestor(root.host))) return;
     // Freeze the typography at each semantic boundary. Its descendants then
     // inherit the original font naturally; thousands of editor tokens need no
     // overrides, pseudo measurements, or clone-recovery attributes of their own.
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT, {
       acceptNode: (element) => !element.style || ownStyleIds.includes(element.id)
+        || element.matches(protection.editorSelector)
         || element.matches("script,style,template,noscript") || element.parentElement?.matches(protectedSelector)
         ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     });
@@ -508,7 +518,7 @@
   };
   const retainOverwrittenTypography = (element) => {
     const state = managedElements.get(element);
-    if (!state || !element.isConnected || !isActive()) return;
+    if (!state || !element.isConnected || !isActive() || protection.editorOwned(element)) return;
     // The stylesheet handles repeated copies of the same author baseline.
     // A later, genuinely different declaration still gets immediate retention
     // while the scheduled pass measures its new typography.
@@ -566,7 +576,7 @@
       ...(root.matches?.("[data-lexend-original-typography]") ? [root] : []),
       ...root.querySelectorAll("[data-lexend-original-typography]")
     ].forEach((element) => {
-      if (managedElements.has(element)) return;
+      if (managedElements.has(element) || protection.editorOwned(element)) return;
       try {
         const original = JSON.parse(element.getAttribute("data-lexend-original-typography"));
         for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", "data-lexend-retained"]) element.removeAttribute(attribute);
@@ -736,13 +746,25 @@
   const measureTypography = (roots, newOnly = false) => {
     const effective = getEffectiveSettings();
     const measurements = [];
+    // Do not convert inherited typography above an editor either. A boundary
+    // style would serialize into editor HTML; preserving its ancestors avoids
+    // that write and leaves mixed ancestor-owned prose in the authored font.
+    const editorAncestors = new WeakSet();
+    for (const root of roots) {
+      const editors = [...root.querySelectorAll(protection.editorSelector)];
+      if (root.matches?.(protection.editorSelector)) editors.push(root);
+      for (const editor of editors) {
+        knownEditorBoundaries.add(editor);
+        for (let parent = composedParent(editor); parent; parent = composedParent(parent)) editorAncestors.add(parent);
+      }
+    }
     const styles = new WeakMap();
     const styleFor = (element) => {
       if (!styles.has(element)) styles.set(element, getComputedStyle(element));
       return styles.get(element);
     };
     for (const root of roots) for (const element of allElements(root)) {
-      if (newOnly && managedElements.has(element)) continue;
+      if (editorAncestors.has(element) || newOnly && managedElements.has(element)) continue;
       const style = styleFor(element);
       const family = newOnly ? authorFontFamilies.get(style.fontFamily) ?? style.fontFamily : style.fontFamily;
       const semanticProtection = hasProtectedAncestor(element);
@@ -885,6 +907,7 @@
     });
   };
   const installFontStyle = (root) => {
+    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
     // Font declarations stay enabled while measuring author typography.
     // Disabling/re-enabling @font-face repeatedly emits loadingdone events
     // even with cached files, which would perpetually schedule new baselines.
@@ -897,6 +920,7 @@
     }
   };
   const applyToRoot = (root) => {
+    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
     installFontStyle(root);
     let style = root.querySelector(`#${STYLE_ID}`);
     if (!style) {
@@ -911,21 +935,35 @@
     if (style.textContent !== css) style.textContent = css;
     styledRoots.add(root);
   };
+  // Classification can move an element across a protection boundary; author
+  // typography and geometry may affect ancestors/siblings through selectors.
+  // All retain the conservative capture fallback, but only this finite state
+  // vocabulary is observed. Work is coalesced by first-old/final value below.
+  const observedAttributeKinds = Object.freeze({
+    role: "classification", "aria-multiline": "classification", contenteditable: "classification", "data-lexend-ignore": "classification", "data-icon": "classification",
+    class: "typography", style: "typography", "data-state": "typography",
+    hidden: "geometry", "aria-hidden": "geometry", open: "geometry", "aria-expanded": "geometry", "aria-selected": "geometry", "aria-pressed": "geometry"
+  });
+  const observedAttributes = Object.keys(observedAttributeKinds);
   const observeRoots = () => {
+    if (!isActive() || protection.editorDocument()) return;
     observer.observe(document, { childList: true, subtree: true, characterData: true, characterDataOldValue: true,
-      attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+      attributes: true, attributeOldValue: true, attributeFilter: observedAttributes });
     styledRoots.forEach((root) => {
       if (root instanceof ShadowRoot) observer.observe(root, { childList: true, subtree: true,
-        characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+        characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: observedAttributes });
     });
   };
   const visitShadowRoots = (root) => {
-    root.querySelectorAll?.("*").forEach((element) => {
-      if (element.shadowRoot) {
-        applyToRoot(element.shadowRoot);
-        visitShadowRoots(element.shadowRoot);
-      }
+    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (element) => element.matches(protection.editorSelector) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     });
+    let element;
+    while ((element = walker.nextNode())) if (element.shadowRoot) {
+      applyToRoot(element.shadowRoot);
+      visitShadowRoots(element.shadowRoot);
+    }
   };
   const applyIncomingFonts = (branches, fontOnly = true) => {
     if (!isActive() || !document.documentElement || !branches.size) return;
@@ -934,6 +972,7 @@
       applyToRoot(document.documentElement);
       const roots = new Set(branches);
       for (const branch of branches) {
+        if (protection.editorOwned(branch)) continue;
         if (branch.shadowRoot) { applyToRoot(branch.shadowRoot); roots.add(branch.shadowRoot); }
         const previousRoots = new Set(styledRoots);
         visitShadowRoots(branch);
@@ -973,7 +1012,7 @@
     const rootStyle = document.documentElement.style;
     const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: document.documentElement.hasAttribute("style") };
     const body = document.body;
-    const primaryBodyScroller = body && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
+    const primaryBodyScroller = body && !protection.editorOwned(body) && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
       && body.clientHeight >= innerHeight * 0.8 && body.clientHeight <= innerHeight + 64
       && body.scrollHeight > body.clientHeight + 2;
     const bodyScroll = primaryBodyScroller ? { x: body.scrollLeft, y: body.scrollTop,
@@ -982,7 +1021,7 @@
     const nestedScrollers = new Map();
     for (const root of new Set([document.documentElement, ...styledRoots])) {
       root.querySelectorAll("*").forEach((element) => {
-        if (!element.style || element === body || element === document.documentElement
+        if (!element.style || element === body || element === document.documentElement || protection.editorOwned(element)
             || (!element.scrollLeft && !element.scrollTop)) return;
         nestedScrollers.set(element, { x: element.scrollLeft, y: element.scrollTop,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
@@ -991,7 +1030,7 @@
     }
     // Read every scroll offset before changing styles; interleaving these
     // writes with geometry reads forces layout repeatedly on dashboard pages.
-    rootStyle.setProperty("overflow-anchor", "none", "important");
+    if (!protection.editorOwned(document.documentElement)) rootStyle.setProperty("overflow-anchor", "none", "important");
     if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
     for (const element of nestedScrollers.keys()) element.style.setProperty("overflow-anchor", "none", "important");
     let refreshError = null;
@@ -1006,7 +1045,7 @@
       try {
         document.documentElement.getBoundingClientRect();
         const focusTarget = focusedElement?.isConnected ? focusedElement : focusedTable?.parentElement;
-        if (focusTarget && focusTarget !== document.body && focusTarget !== document.documentElement
+        if (focusTarget && !protection.editorOwned(focusTarget) && focusTarget !== document.body && focusTarget !== document.documentElement
             && (!focusedTable || focusTarget.matches("[data-lexend-layout-repair~='scroll-table']"))) {
           focusTarget.focus({ preventScroll: true });
         }
@@ -1025,13 +1064,15 @@
           else body.style.removeProperty("overflow-anchor");
           if (!bodyScroll.hadStyle && !body.getAttribute("style")) body.removeAttribute("style");
         }
-        if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
-        else rootStyle.removeProperty("overflow-anchor");
-        if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) document.documentElement.removeAttribute("style");
+        if (!protection.editorOwned(document.documentElement)) {
+          if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
+          else rootStyle.removeProperty("overflow-anchor");
+          if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) document.documentElement.removeAttribute("style");
+        }
         // An already focused action does not emit focusin again when its pane
         // grows. Recheck its repaired vertical viewport after restoring saved
         // offsets; ordinary page/table scrollers remain under native control.
-        if (!refreshError && isActive() && focusTarget?.isConnected) globalThis.LexendControls?.revealFocused?.(focusTarget);
+        if (!refreshError && isActive() && focusTarget?.isConnected && !protection.editorOwned(focusTarget)) globalThis.LexendControls?.revealFocused?.(focusTarget);
       } catch (error) { refreshError ??= error; }
       finally {
         refreshing = false;
@@ -1084,6 +1125,7 @@
     refreshRequired = false;
     pendingAriaChanges.clear();
     pendingStyleChanges.clear();
+    pendingStateChanges.clear();
     if (refreshing || !document.documentElement) return;
     const started = performance.now();
     cancelPendingRepair();
@@ -1094,7 +1136,10 @@
     retentionWrites = new WeakMap();
     let deferred = false;
     const error = withViewportPreserved(() => {
-      for (const frame of resizedFrames.keys()) {
+      for (const [frame, state] of resizedFrames) {
+        // Disposal precedes geometry reads: document editing and a protected
+        // member of this independent ownership group cannot retain old repairs.
+        if (!isActive() || frameTouchesEditor(frame, state)) { restoreFrame(frame); continue; }
         let hidden = !frame.isConnected || !frame.getClientRects().length;
         for (let current = frame; !hidden && current; current = current.parentElement) {
           const css = getComputedStyle(current);
@@ -1106,10 +1151,20 @@
         if (hidden) restoreFrame(frame);
       }
       layout?.restore({ preserveHidden });
-      if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
-      [...styledRoots].forEach((root) => { if (!root.isConnected) styledRoots.delete(root); });
+      knownEditorBoundaries = new WeakSet();
+      for (const root of styledRoots) {
+        if (root.isConnected && !protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) continue;
+        for (const id of ownStyleIds) root.querySelector(`#${id}`)?.remove();
+        styledRoots.delete(root);
+      }
+      if (!isActive() || protection.editorDocument()) {
+        layout?.dispose();
+        for (const root of styledRoots) for (const id of ownStyleIds) root.querySelector(`#${id}`)?.remove();
+        styledRoots.clear(); knownAutoContent.clear();
+        return;
+      }
       applyToRoot(document.documentElement);
       visitShadowRoots(document.documentElement);
       if (isActive()) {
@@ -1155,18 +1210,21 @@
     const changed = !refreshRequired && ([...pendingAriaChanges].some(([element, value]) =>
       element.isConnected && element.getAttribute("aria-hidden") !== value)
       || [...pendingStyleChanges].some(([element, value]) => element.isConnected
-        && authorStyleSignature(element, element.getAttribute("style")) !== value));
+        && authorStyleSignature(element, element.getAttribute("style")) !== value)
+      || [...pendingStateChanges].some(([element, names]) => element.isConnected
+        && [...names].some(([name, value]) => element.getAttribute(name) !== value)));
     if (refreshRequired || changed) { refresh(true); return; }
     refreshTimer = null;
     refreshUrgent = false;
     pendingAriaChanges.clear();
     pendingStyleChanges.clear();
+    pendingStateChanges.clear();
     // A reverted temporary style/accessibility change leaves the saved native
     // baseline valid. Finish its suspended repair without another conversion.
     repairSynchronously = false;
     pendingRepair?.();
   };
-  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null) => {
+  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null) => {
     urgent = urgent === true;
     if (refreshing || !settingsLoaded || !isActive()) return;
     if (pendingRepair !== null) {
@@ -1175,7 +1233,7 @@
       repairSynchronously = true;
       // Content/geometry changes invalidate the baseline outright. Temporary
       // author styles can settle back before the queued deadline instead.
-      if (!ariaChanges && !styleChanges) pendingRepair = null;
+      if (!ariaChanges && !styleChanges && !stateChanges) pendingRepair = null;
     }
     if (ariaChanges) {
       for (const mutation of ariaChanges) {
@@ -1187,7 +1245,12 @@
         if (!pendingStyleChanges.has(element)) pendingStyleChanges.set(element, value);
       }
     }
-    if (!ariaChanges && !styleChanges) refreshRequired = true;
+    if (stateChanges) for (const mutation of stateChanges) {
+      let names = pendingStateChanges.get(mutation.target);
+      if (!names) pendingStateChanges.set(mutation.target, names = new Map());
+      if (!names.has(mutation.attributeName)) names.set(mutation.attributeName, mutation.oldValue);
+    }
+    if (!ariaChanges && !styleChanges && !stateChanges) refreshRequired = true;
     // Parser mutations still receive their fonts immediately, but cannot
     // start native capture before the startup preload has settled or timed out.
     if (initializing) return;
@@ -1200,9 +1263,9 @@
     refreshUrgent = urgent;
     refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
   };
-  const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null) => {
+  const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null) => {
     revealedAutoContent = new WeakSet();
-    queueRefresh(urgent === true, ariaChanges, styleChanges);
+    queueRefresh(urgent === true, ariaChanges, styleChanges, stateChanges);
   };
 
   const pageState = () => ({
@@ -1331,7 +1394,7 @@
     // Classify each new element once, before the next paint, without waiting
     // for the full-page repair cooldown.
     for (const element of incoming) {
-      if (!element?.isConnected || ownStyleIds.includes(element.id)
+      if (!element?.isConnected || ownStyleIds.includes(element.id) || protection.editorOwned(element)
           || element.matches("script,style,template,noscript")) { incoming.delete(element); continue; }
       for (let parent = composedParent(element); parent; parent = composedParent(parent)) {
         if (incoming.has(parent)) { incoming.delete(element); break; }
@@ -1345,6 +1408,19 @@
       styleChanges.set(mutation.target, before);
       return true;
     });
+    const enteringEditor = needsRefresh.some((mutation) => {
+      if (mutation.type !== "attributes"
+          || !(observedAttributeKinds[mutation.attributeName] === "classification" || mutation.attributeName === "class")
+          || !protection.editorOwned(mutation.target)) return false;
+      // Syntax highlighting and selection classes inside an already known
+      // editor must retain the bounded scheduler; no content there needs to
+      // release previous typography ownership. A WeakSet keeps this check
+      // local to the target's ancestry rather than scanning editor tokens.
+      for (let current = mutation.target; current; current = composedParent(current)) {
+        if (knownEditorBoundaries.has(current) && current.matches(protection.editorSelector)) return false;
+      }
+      return true;
+    });
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
     if (changedStyles.size) {
@@ -1354,11 +1430,20 @@
     }
     applyIncomingFonts(incoming);
     if (!needsRefresh.length) return;
-    const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes"
-      && ["aria-hidden", "style"].includes(mutation.attributeName));
+    // Entering an editor boundary must release previous ownership at observer
+    // delivery, before the ordinary repair cooldown can leave serialized font
+    // markers in the newly editable subtree. This also removes owned shadow
+    // styles. Other classification/state changes retain the coalesced path.
+    if (enteringEditor) {
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      refresh();
+      return;
+    }
+    const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes");
     invalidateAutoContent(needsRefresh.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
       coalescible ? needsRefresh.filter(mutation => mutation.attributeName === "aria-hidden") : null,
-      coalescible ? styleChanges : null);
+      coalescible ? styleChanges : null,
+      coalescible ? needsRefresh.filter(mutation => !["style", "aria-hidden"].includes(mutation.attributeName)) : null);
   });
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
@@ -1386,20 +1471,49 @@
       }
       notifyState();
     });
+    document.addEventListener("lexend-design-mode", () => {
+      const editing = protection.editorDocument();
+      if (editing === editingDocument) return;
+      editingDocument = editing;
+      if (!settingsLoaded || !isActive()) return;
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      // The native setter bridge dispatches synchronously, so existing owned
+      // typography is restored before the page serializes its new editor.
+      refresh();
+    }, true);
+    // The page-world bridge is only a discovery hint, never authority. Ignore
+    // payloads and validate the actual open root; spoofed known/no-root hints
+    // do not trigger traversal, typography reads, or a repair.
+    document.addEventListener("lexend-open-shadow-root", (event) => {
+      if (!isActive()) return;
+      const host = event.composedPath()[0];
+      if (!(host instanceof Element) || host.ownerDocument !== document || !host.isConnected
+          || !host.shadowRoot || styledRoots.has(host.shadowRoot) || protection.editorOwned(host)) return;
+      applyIncomingFonts(new Set([host]));
+      queueRefresh();
+    }, true);
     window.addEventListener("resize", invalidateAutoContent, { passive: true });
     window.addEventListener("message", receiveFrameRequirement);
     document.addEventListener("focusin", (event) => {
+      if (!isActive() || protection.editorOwned(event.target)) return;
       queueRefresh();
       requestAnimationFrame(() => {
         if (isActive()) globalThis.LexendControls?.revealFocused?.(event.target);
       });
     }, true);
-    document.addEventListener("focusout", queueRefresh, true);
+    document.addEventListener("focusout", (event) => {
+      if (isActive() && !protection.editorOwned(event.target)) queueRefresh();
+    }, true);
+    document.addEventListener("toggle", (event) => {
+      if (!isActive() || !(event.target instanceof Element) || protection.editorOwned(event.target)) return;
+      // details.open is observed and coalesced; popovers have no open attribute.
+      if (event.target.matches("[popover]") && event.oldState !== event.newState) invalidateAutoContent();
+    }, true);
     const remeasureRevealedLabels = (event) => {
       if (event.type === "transitionend"
           && !/^(transform|translate|left|right|top|bottom|inset.*|width|height)$/.test(event.propertyName)) return;
       const target = event.target;
-      if (!(target instanceof Element)) return;
+      if (!isActive() || !(target instanceof Element) || protection.editorOwned(target)) return;
       // The mutation that starts a drawer/rail animation can be measured while
       // its labels are still outside the viewport. Reclassify once movement
       // finishes; ordinary font/color transitions do not schedule this work.
@@ -1412,8 +1526,9 @@
     document.addEventListener("animationend", remeasureRevealedLabels, true);
     document.addEventListener("contentvisibilityautostatechange", (event) => {
       if (!(event.target instanceof Element)) return;
+      if (!isActive()) return;
       knownAutoContent.set(event.target, event.skipped);
-      if (!isActive() || event.skipped !== false || revealedAutoContent.has(event.target)) return;
+      if (event.skipped !== false || revealedAutoContent.has(event.target)) return;
       // Offscreen automatic-containment subtrees have no usable geometry.
       // Capture their native layout once the browser paints them. Remember
       // the target until author content, settings or the viewport changes so
@@ -1522,7 +1637,7 @@
 
   start().finally(() => {
     initializing = false;
-    if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size) queueRefresh(true);
+    if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size || pendingStateChanges.size) queueRefresh(true);
     notifyState();
   });
 })();

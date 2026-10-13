@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { chromium } from "playwright";
 
-const source = await readFile(new URL("../src/adaptive-layout.js", import.meta.url), "utf8");
+const source = (await Promise.all(["adaptive-controls", "adaptive-layout"].map((name) => readFile(new URL(`../src/${name}.js`, import.meta.url), "utf8")))).join("\n");
 let browser;
 test.before(async () => { browser = await chromium.launch({ headless: true }); });
 test.after(async () => { await browser?.close(); });
