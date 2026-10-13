@@ -42,3 +42,32 @@ test('the writer validates site-mode changes and keeps unrelated settings',async
   await store.mutate({type:'setSiteLayout',hostname:'example.com',layoutMode:null});
   assert.equal(settings.siteRules.length,0);
 });
+
+test('rule updates serialize independent fields and never recreate deleted rules', async () => {
+  let settings = api.normalizeSettings({ siteRules: [
+    { hostname: 'example.com', includeSubdomains: true, enabled: false, scope: 'all', layoutMode: 'off' },
+    { hostname: 'example.com', includeSubdomains: false, layoutMode: 'fit' }
+  ] });
+  const store = LexendPreferences.createStore({ get: async () => settings, set: async patch => { settings = { ...settings, ...patch }; } });
+  const update = changes => ({ type: 'updateRule', hostname: 'example.com', includeSubdomains: true, changes });
+  await Promise.all([store.mutate(update({ layoutMode: 'gentle' })), store.mutate(update({ enabled: true }))]);
+  assert.deepEqual(api.getDirectRule(settings, 'example.com', true), {
+    hostname: 'example.com', includeSubdomains: true, enabled: true, scope: 'all', layoutMode: 'gentle'
+  });
+  assert.equal(api.getDirectRule(settings, 'example.com').layoutMode, 'fit');
+  await store.mutate(update({ layoutMode: null }));
+  assert.equal(api.getDirectRule(settings, 'example.com', true).scope, 'all');
+  for (const changes of [{}, { layoutMode: 'bad' }, { enabled: 'false' }, { scope: 'body' }, { layoutMode: undefined }]) {
+    await assert.rejects(store.mutate(update(changes)), { code: 'INVALID_OPERATION' });
+  }
+  await store.mutate({ type: 'removeRule', hostname: 'example.com', includeSubdomains: true });
+  await assert.rejects(store.mutate(update({ layoutMode: 'fit' })), { code: 'RULE_NOT_FOUND' });
+  assert.equal(settings.siteRules.length, 1);
+});
+
+test('creation rejects invalid or empty rule choices instead of silently dropping them', async () => {
+  const store = LexendPreferences.createStore({ get: async () => ({}), set: async () => assert.fail('invalid rules must not write') });
+  for (const choices of [{}, { enabled: null, layoutMode: null }, { layoutMode: 'bad' }, { enabled: 'paused', layoutMode: 'fit' }]) {
+    await assert.rejects(store.mutate({ type: 'addRule', rule: { hostname: 'example.com', ...choices } }), { code: 'INVALID_RULE' });
+  }
+});

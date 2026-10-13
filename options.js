@@ -35,6 +35,8 @@
   const hostnameInput = document.querySelector("#new-hostname");
   const hostnameError = document.querySelector("#hostname-error");
   const subdomainsInput = document.querySelector("#new-subdomains");
+  const newRuleEnabled = document.querySelector("#new-rule-enabled");
+  const newRuleLayout = document.querySelector("#new-rule-layout");
   const subdomainPreview = document.querySelector("#subdomain-preview");
   const ruleToolbar = document.querySelector("#rule-toolbar");
   const searchInput = document.querySelector("#rule-search");
@@ -105,10 +107,12 @@
   let renderedRulesKey;
   let pendingRuleDeletion = null;
   const ruleRowData = new WeakMap();
+  const pendingRuleChanges = new Map();
+  const ruleChangeKey = (rule, field) => JSON.stringify([rule.hostname, rule.includeSubdomains, field]);
   const quote = quotesApi.random();
   const mutationControls = [darkThemeInput, advancedModeInput, textScaleSlider,
     lineHeightSlider, letterSpacingSlider, layoutModeInput, resetReadabilityButton, hostnameInput,
-    subdomainsInput, exportButton, importButton, importFile,
+    subdomainsInput, newRuleEnabled, newRuleLayout, exportButton, importButton, importFile,
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
@@ -354,9 +358,14 @@
   const renderRules = () => {
     const query = searchInput.value.trim().toLowerCase();
     const key = JSON.stringify([
-      settings.siteRules, query, desktopSettingsLayout.matches, rulesExpanded
+      settings.siteRules, query, desktopSettingsLayout.matches, rulesExpanded, preferences.loaded,
+      [...pendingRuleChanges].map(([key, change]) => [key, change.value])
     ]);
     if (key === renderedRulesKey) return;
+    const focusedControl = document.activeElement?.closest(".rule-setting-select");
+    const focusedRow = focusedControl?.closest(".rule-row");
+    const focusedRule = focusedRow && ruleRowData.get(focusedRow)?.rule;
+    let restoreControl;
     cancelRuleDeletion();
     renderedRulesKey = key;
     const rules = settings.siteRules
@@ -385,12 +394,6 @@
       hostname.title = `Open ${rule.hostname}`;
       hostname.textContent = rule.hostname;
       domain.append(hostname);
-      if (rule.layoutMode) {
-        const layoutTag = document.createElement("span");
-        layoutTag.className = "rule-tag";
-        layoutTag.textContent = `Layout: ${settingsApi.layoutModes[rule.layoutMode].label}`;
-        domain.append(layoutTag);
-      }
       if (rule.includeSubdomains) {
         const tag = document.createElement("span");
         tag.className = "rule-tag";
@@ -403,8 +406,35 @@
       status.textContent = rule.enabled === null ? "Inherit" : (rule.enabled ? "Active" : "Paused");
 
       const button = makeDeleteButton(rule);
+      const controls = document.createElement("div");
+      controls.className = "rule-settings";
+      for (const [field, label, choices] of [
+        ["enabled", "Lexend", [["default", "Use default"], ["on", "On"], ["paused", "Paused"]]],
+        ["layoutMode", "Layout", [["default", "Use default"], ...Object.entries(settingsApi.layoutModes).map(([value, mode]) => [value, mode.label])]]
+      ]) {
+        const wrapper = document.createElement("label");
+        wrapper.className = "rule-control";
+        const caption = document.createElement("span");
+        caption.textContent = label;
+        const select = document.createElement("select");
+        select.className = "rule-setting-select";
+        select.dataset.field = field;
+        select.disabled = !preferences.loaded;
+        select.setAttribute("aria-label", `${label} for ${rule.hostname}${rule.includeSubdomains ? " and its subdomains" : ""}`);
+        for (const [value, text] of choices) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = text;
+          select.append(option);
+        }
+        select.value = pendingRuleChanges.get(ruleChangeKey(rule, field))?.value
+          ?? (field === "enabled" ? rule.enabled === null ? "default" : rule.enabled ? "on" : "paused" : rule.layoutMode ?? "default");
+        if (focusedRule && ruleChangeKey(rule, field) === ruleChangeKey(focusedRule, focusedControl.dataset.field)) restoreControl = select;
+        wrapper.append(caption, select);
+        controls.append(wrapper);
+      }
       ruleRowData.set(row, { domain, status, button, rule });
-      row.append(domain, status, button);
+      row.append(domain, status, button, controls);
       ruleList.append(row);
     });
 
@@ -417,6 +447,7 @@
     toggleRuleListLabel.textContent = rulesExpanded
       ? "Show fewer rules"
       : `Show all ${rules.length} rules`;
+    if (focusedRule) (restoreControl ?? hostnameInput).focus({ preventScroll: true });
   };
 
   const render = () => {
@@ -474,7 +505,8 @@
 
   const updateAddRuleState = () => {
     const hostname = normalizeHostnameInput(hostnameInput.value);
-    addRuleButton.disabled = !preferences.loaded || !settingsApi.validHostname(hostname);
+    addRuleButton.disabled = !preferences.loaded || !settingsApi.validHostname(hostname)
+      || (newRuleEnabled.value === "default" && newRuleLayout.value === "default");
   };
 
   advancedModeInput.addEventListener("change", async () => {
@@ -566,6 +598,7 @@
     updateSubdomainPreview();
     updateAddRuleState();
   });
+  [newRuleEnabled, newRuleLayout].forEach(control => control.addEventListener("change", updateAddRuleState));
 
   addRuleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -586,8 +619,13 @@
     const rule = {
       hostname,
       includeSubdomains,
-      enabled: false
+      enabled: newRuleEnabled.value === "default" ? null : newRuleEnabled.value === "on",
+      layoutMode: newRuleLayout.value === "default" ? null : newRuleLayout.value
     };
+    if (rule.enabled === null && rule.layoutMode === null) {
+      newRuleLayout.focus();
+      return;
+    }
     if (!await persist({ type: "addRule", rule })) {
       showHostnameError(saveStatusText.textContent);
       return;
@@ -595,6 +633,8 @@
 
     hostnameInput.value = "";
     subdomainsInput.checked = false;
+    newRuleEnabled.value = "default";
+    newRuleLayout.value = "default";
     updateSubdomainPreview();
     updateAddRuleState();
   });
@@ -603,6 +643,22 @@
 
   toggleRuleListButton.addEventListener("click", () => {
     rulesExpanded = !rulesExpanded;
+    renderRules();
+  });
+
+  ruleList.addEventListener("change", async (event) => {
+    if (!preferences.loaded) return;
+    const control = event.target.closest(".rule-setting-select");
+    const row = control?.closest(".rule-row");
+    const rule = row && ruleRowData.get(row)?.rule;
+    if (!rule) return;
+    const field = control.dataset.field;
+    const change = { value: control.value };
+    const key = ruleChangeKey(rule, field);
+    pendingRuleChanges.set(key, change);
+    const value = change.value === "default" ? null : field === "enabled" ? change.value === "on" : change.value;
+    await persist({ type: "updateRule", hostname: rule.hostname, includeSubdomains: rule.includeSubdomains, changes: { [field]: value } });
+    if (pendingRuleChanges.get(key) === change) pendingRuleChanges.delete(key);
     renderRules();
   });
 

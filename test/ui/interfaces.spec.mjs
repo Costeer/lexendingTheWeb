@@ -64,3 +64,34 @@ test("layout controls save the default and an independent site choice with keybo
   await page.locator('#site-layout-mode').selectOption('default');
   await expect(page.locator('#site-layout-mode')).toHaveValue('default');
 });
+
+test("site rules create and edit layouts, preserve pauses, and retain keyboard focus", async ({ page }) => {
+  await openInterface(page, "options.html?section=rules-panel");
+  await page.locator('#new-hostname').fill('a-layout.example.org');
+  await expect(page.locator('#add-rule-button')).toBeDisabled();
+  await page.locator('#new-subdomains').check();
+  await page.locator('#new-rule-layout').selectOption('gentle');
+  await page.locator('#add-rule-button').click();
+  const rule = page.locator('[data-hostname="a-layout.example.org"][data-subdomains="true"]');
+  const layout = rule.locator('[data-field="layoutMode"]');
+  const state = rule.locator('[data-field="enabled"]');
+  const saved = () => page.evaluate(async () => (await browser.storage.sync.get(null)).siteRules
+    .find(rule => rule.hostname === 'a-layout.example.org'));
+  await expect(layout).toHaveValue('gentle');
+  await expect.poll(saved).toMatchObject({ enabled: null, includeSubdomains: true, layoutMode: 'gentle' });
+  await expect(page.locator('#new-rule-layout')).toHaveValue('default');
+  await layout.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(saved).toMatchObject({ layoutMode: 'fit' });
+  await expect(layout).toBeFocused();
+  await state.selectOption('paused');
+  await expect.poll(saved).toMatchObject({ enabled: false, layoutMode: 'fit' });
+  await layout.selectOption('default');
+  await expect.poll(saved).toEqual({ hostname: 'a-layout.example.org', includeSubdomains: true, enabled: false, scope: null });
+  await expect(state).toHaveValue('paused');
+  await state.focus();
+  await state.selectOption('default');
+  await expect.poll(saved).toBeUndefined();
+  await expect(rule).toHaveCount(0);
+  await expect(page.locator('#new-hostname')).toBeFocused();
+});

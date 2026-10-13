@@ -25,6 +25,13 @@ that covers a domain and its subdomains. A rule for `example.com` covers only
 that hostname unless you select **Include subdomains**; with that option, it
 also covers addresses such as `news.example.com`.
 
+In **Site rules**, choose **Layout** when adding a rule or change it directly
+on an existing rule. **Lexend** separately controls whether that site is on,
+paused, or follows the default. Choose at least one non-default setting when
+adding a rule. Edits save automatically; **Use default** removes that override
+and follows matching parent rules, then global settings. A rule with no
+remaining overrides is removed.
+
 Settings sync through your browser when browser sync is enabled. Use the
 import and export controls in Settings to save or restore a JSON backup.
 

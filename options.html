@@ -364,10 +364,31 @@
                             <small id="subdomain-preview">*.example.com</small>
                         </span>
                     </label>
+                    <div class="new-rule-settings">
+                        <label class="rule-control" for="new-rule-enabled">
+                            <span>Lexend</span>
+                            <select id="new-rule-enabled" disabled>
+                                <option value="default">Use default</option>
+                                <option value="on">On</option>
+                                <option value="paused">Paused</option>
+                            </select>
+                        </label>
+                        <label class="rule-control" for="new-rule-layout">
+                            <span>Layout</span>
+                            <select id="new-rule-layout" disabled>
+                                <option value="default">Use default</option>
+                                <option value="off">Off</option>
+                                <option value="gentle">Gentle repair</option>
+                                <option value="fit">Fit text</option>
+                            </select>
+                        </label>
+                    </div>
+                    <p id="new-rule-help" class="helper rule-form-help">Choose a layout mode or set Lexend to On or Paused. Use default follows matching parent rules, then your global settings. Layout choices apply while Lexend is on.</p>
                     <button
                         id="add-rule-button"
                         class="primary-button"
                         type="submit"
+                        aria-describedby="new-rule-help"
                         disabled
                     >
                         Add rule
@@ -407,7 +428,7 @@
                 </p>
                 <div id="empty-rules" class="empty-state">
                     <h3>No site rules yet</h3>
-                    <p>Add a site above to pause Lexend on it.</p>
+                    <p>Add a site above to choose its layout or turn Lexend on or off for it.</p>
                 </div>
             </section>
 

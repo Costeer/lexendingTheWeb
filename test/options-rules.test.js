@@ -46,12 +46,14 @@ class Element {
   focus() { this.focused = true; }
 }
 
-async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings, allowErrors = false } = {}) {
+async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings, initialSettings = {}, beforeWrite, allowErrors = false } = {}) {
   const elements = new Map();
   const get = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new Element());
     return elements.get(selector);
   };
+  get("#new-rule-enabled").value = "default";
+  get("#new-rule-layout").value = "default";
   const panels = ["appearance-panel", "readability-panel", "rules-panel", "tools-panel"]
     .map((id) => Object.assign(new Element(), { id }));
   const navigation = panels.map((panel) => {
@@ -74,11 +76,12 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   const cache = new Map([["lexend-ui-theme", cachedTheme]]);
   let stored = { siteRules: Array.from({ length: count }, (_, index) => ({
     hostname: `site${index + 1}.example.com`, includeSubdomains: false, enabled: false
-  })) };
+  })), ...initialSettings };
   let changeListener;
   const storage = {
     async get() { return getSettings ? getSettings() : stored; },
     async set(patch) {
+      await beforeWrite?.(patch);
       stored = { ...stored, ...patch };
       writes.push(structuredClone(stored));
       changeListener?.(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
@@ -292,7 +295,7 @@ test("mobile lists of at most two rules do not need an expansion control", async
 
 test("deleting a previewed rule reveals the next rule and removes an unnecessary toggle", async () => {
   const page = await openSettings({ count: 3 });
-  const deleteButton = page.rows()[0].children.at(-1);
+  const deleteButton = page.rows()[0].children.find(child => child.className === "delete-rule");
   page.get("#rule-list").emit("click", { target: deleteButton });
   assert.equal(page.rows().length, 2);
   assert.equal(page.writes.length, 0);
@@ -303,7 +306,7 @@ test("deleting a previewed rule reveals the next rule and removes an unnecessary
   assert.deepEqual(page.rows().map((row) => row.dataset.hostname), ["site2.example.com", "site3.example.com"]);
   assert.equal(page.get("#toggle-rule-list").hidden, true);
   assert.equal(page.writes.at(-1).siteRules.length, 2);
-  assert.equal(page.rows()[0].children.at(-1).focused, true);
+  assert.equal(page.rows()[0].children.find(child => child.className === "delete-rule").focused, true);
 });
 
 test("cancel and Escape restore the original rule without persisting changes", async () => {
@@ -312,7 +315,7 @@ test("cancel and Escape restore the original rule without persisting changes", a
   const row = page.rows()[0];
   const originalDomain = row.children[0].children[0];
   const status = row.children[1];
-  const button = row.children.at(-1);
+  const button = row.children.find(child => child.className === "delete-rule");
   for (const cancelWithEscape of [false, true]) {
     list.emit("click", { target: button });
     assert.equal(button.dataset.action, "cancel");
@@ -330,7 +333,7 @@ test("cancel and Escape restore the original rule without persisting changes", a
     assert.equal(status.hidden, false);
     assert.equal(button.dataset.action, "delete");
     assert.equal(button.focused, true);
-    assert.equal(row.children.length, 3);
+    assert.equal(row.children.length, 4);
     assert.equal(page.rows()[0], row);
   }
   await tick();
@@ -343,7 +346,7 @@ test("confirmation messages use eleven stable domain-hashed variants across relo
     const prompts = new Map();
     let previousButton;
     for (const row of page.rows()) {
-      const button = row.children.at(-1);
+      const button = row.children.find(child => child.className === "delete-rule");
       page.get("#rule-list").emit("click", { target: button });
       if (previousButton) assert.equal(previousButton.dataset.action, "delete");
       prompts.set(row.dataset.hostname, row.children[0].children[0].textContent);
@@ -367,7 +370,7 @@ test("confirmation messages use eleven stable domain-hashed variants across relo
   filtered.get("#rule-search").value = "site42.example.com";
   filtered.get("#rule-search").emit("input");
   const row = filtered.rows()[0];
-  filtered.get("#rule-list").emit("click", { target: row.children.at(-1) });
+  filtered.get("#rule-list").emit("click", { target: row.children.find(child => child.className === "delete-rule") });
   assert.equal(row.children[0].children[0].textContent, first.get("site42.example.com"));
 });
 
@@ -378,9 +381,9 @@ test("confirmation distinguishes exact-host and subdomain rules and deletes only
   ] }) });
   const list = page.get("#rule-list");
   const [exact, subdomains] = page.rows();
-  list.emit("click", { target: exact.children.at(-1) });
+  list.emit("click", { target: exact.children.find(child => child.className === "delete-rule") });
   const prompt = exact.children[0].children[0].textContent;
-  list.emit("click", { target: subdomains.children.at(-1) });
+  list.emit("click", { target: subdomains.children.find(child => child.className === "delete-rule") });
   assert.equal(subdomains.children[0].children[0].textContent, prompt);
   const confirm = subdomains.children.find((child) => child.dataset.action === "confirm");
   assert.match(confirm.getAttribute("aria-label"), /example.com and its subdomains/);
@@ -394,14 +397,14 @@ test("confirmation distinguishes exact-host and subdomain rules and deletes only
 test("filtering or leaving Site rules dismisses a pending confirmation", async () => {
   const page = await openSettings({ desktop: true });
   const list = page.get("#rule-list");
-  list.emit("click", { target: page.rows()[0].children.at(-1) });
+  list.emit("click", { target: page.rows()[0].children.find(child => child.className === "delete-rule") });
   page.get("#rule-search").value = "site2";
   page.get("#rule-search").emit("input");
   const row = page.rows()[0];
-  assert.equal(row.children.at(-1).dataset.action, "delete");
-  list.emit("click", { target: row.children.at(-1) });
+  assert.equal(row.children.find(child => child.className === "delete-rule").dataset.action, "delete");
+  list.emit("click", { target: row.children.find(child => child.className === "delete-rule") });
   page.navigation.find((button) => button.dataset.settingsPanel === "appearance-panel").emit("click");
-  assert.equal(row.children.at(-1).dataset.action, "delete");
+  assert.equal(row.children.find(child => child.className === "delete-rule").dataset.action, "delete");
   assert.equal(page.writes.length, 0);
 });
 
@@ -418,4 +421,75 @@ test("readability and appearance changes preserve the existing site-rule rows", 
   page.rows().forEach((row, index) => assert.equal(row, rows[index]));
   assert.equal(page.writes.at(-1).theme, "dark");
   assert.equal(page.writes.at(-1).textScale, 110);
+});
+
+const ruleControl = (row, field) => row.children.find(child => child.className === "rule-settings")
+  .children.flatMap(label => label.children).find(child => child.dataset.field === field);
+
+test("creation saves a layout-only subdomain rule without pausing Lexend", async () => {
+  const page = await openSettings({ count: 0 });
+  page.get("#new-hostname").value = "example.com";
+  page.get("#new-hostname").emit("input");
+  assert.equal(page.get("#add-rule-button").disabled, true, "a rule needs at least one explicit choice");
+  page.get("#new-rule-layout").value = "gentle";
+  page.get("#new-rule-layout").emit("change");
+  page.get("#new-subdomains").checked = true;
+  assert.equal(page.get("#add-rule-button").disabled, false);
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  const saved = page.writes.at(-1);
+  assert.deepEqual(saved.siteRules, [{ hostname: "example.com", includeSubdomains: true, enabled: null, scope: null, layoutMode: "gentle" }]);
+  assert.equal(LexendSettings.resolveSite(saved, "child.example.com").active, true);
+  assert.equal(LexendSettings.resolveSite(saved, "child.example.com").layoutMode, "gentle");
+  assert.equal(page.get("#new-hostname").value, "");
+  assert.equal(page.get("#new-rule-layout").value, "default");
+  assert.equal(page.get("#add-rule-button").disabled, true);
+});
+
+test("editing a rule preserves its pause, scope, and separate exact-host variant", async () => {
+  const exact = { hostname: "example.com", includeSubdomains: false, enabled: true, scope: "body", layoutMode: "fit" };
+  const page = await openSettings({ initialSettings: { siteRules: [exact,
+    { hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all", layoutMode: "off" }
+  ] } });
+  const control = ruleControl(page.rows()[1], "layoutMode");
+  control.value = "gentle";
+  await page.get("#rule-list").emit("change", { target: control });
+  assert.deepEqual(page.writes.at(-1).siteRules[0], exact);
+  assert.deepEqual(page.writes.at(-1).siteRules[1], { hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all", layoutMode: "gentle" });
+  const inherited = ruleControl(page.rows()[1], "layoutMode");
+  inherited.value = "default";
+  await page.get("#rule-list").emit("change", { target: inherited });
+  assert.deepEqual(page.writes.at(-1).siteRules[1], { hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all" });
+});
+
+test("a failed layout edit restores the saved selection and can be retried", async () => {
+  let fail = true;
+  const page = await openSettings({ count: 1, allowErrors: true, beforeWrite() { if (fail) throw new Error("Write failed"); } });
+  const control = ruleControl(page.rows()[0], "layoutMode");
+  control.value = "fit";
+  await page.get("#rule-list").emit("change", { target: control });
+  assert.equal(page.writes.length, 0);
+  assert.equal(ruleControl(page.rows()[0], "layoutMode").value, "default");
+  assert.equal(page.get("#retry-save").hidden, false);
+  fail = false;
+  page.get("#retry-save").emit("click");
+  await tick();
+  assert.equal(ruleControl(page.rows()[0], "layoutMode").value, "fit");
+  assert.equal(page.writes.at(-1).siteRules[0].enabled, false);
+});
+
+test("rapid rule edits keep the newest selection while writes are pending", async () => {
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  const page = await openSettings({ count: 1, beforeWrite: () => held });
+  const first = ruleControl(page.rows()[0], "layoutMode");
+  first.value = "gentle";
+  const pending = page.get("#rule-list").emit("change", { target: first });
+  const next = ruleControl(page.rows()[0], "layoutMode");
+  next.value = "fit";
+  const latest = page.get("#rule-list").emit("change", { target: next });
+  assert.equal(ruleControl(page.rows()[0], "layoutMode").value, "fit");
+  release();
+  await Promise.all([pending, latest]);
+  assert.equal(ruleControl(page.rows()[0], "layoutMode").value, "fit");
+  assert.equal(page.writes.at(-1).siteRules[0].layoutMode, "fit");
 });

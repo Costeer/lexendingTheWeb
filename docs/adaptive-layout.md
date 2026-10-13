@@ -20,8 +20,13 @@ Choose **Layout on this site** in the toolbar popup:
 or heading preference. Change the global choice in **Settings → Readability →
 Default layout mode**. Site choices sync with your other preferences and are
 included in settings backups. An exact hostname choice wins over an inherited
-subdomain rule. Site rules lists show saved layout choices; deleting a rule
-also removes its pause and scope settings.
+subdomain rule. **Settings → Site rules** lets you choose the layout when
+creating a rule and change existing rules directly, including rules covering
+subdomains. The separate **Lexend** choice controls on/paused behavior; changing
+Layout preserves that choice and any saved heading preference. Choose at least
+one non-default setting when creating a rule. Edits save automatically, and a
+rule with no remaining overrides is removed. Deleting a rule also removes its
+pause and scope settings.
 
 ## Comparing on a real site
 

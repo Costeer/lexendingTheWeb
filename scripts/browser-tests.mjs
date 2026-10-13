@@ -255,14 +255,27 @@ try {
     assert((await measurements()).rem.family.includes("Lexend"));
   });
 
-  await check("rule form validation and keyboard deletion confirmation work in the rendered settings", async () => {
+  await check("rule creation and editing save layouts and preserve keyboard deletion", async () => {
     await driver.switchTo().window(optionsTab);
     await driver.findElement(By.css('[data-settings-panel="rules-panel"]')).click();
     const input = await driver.findElement(By.id("new-hostname"));
     assert.equal(await driver.findElement(By.id("add-rule-button")).isEnabled(), false);
     await input.sendKeys("added.example");
+    assert.equal(await driver.findElement(By.id("add-rule-button")).isEnabled(), false, "Default-only rules have nothing to save");
+    await driver.findElement(By.id("new-subdomains")).click();
+    await driver.findElement(By.id("new-rule-layout")).sendKeys(Key.END, Key.TAB);
     await driver.findElement(By.id("add-rule-button")).click();
     await wait("[...document.querySelectorAll('.rule-row')].some(row=>row.dataset.hostname === 'added.example')", "Rule is saved");
+    const addedRule = async () => (await saved()).siteRules.find(rule => rule.hostname === "added.example");
+    assert.deepEqual(await addedRule(), { hostname: "added.example", includeSubdomains: true, enabled: null, scope: null, layoutMode: "fit" });
+    await driver.findElement(By.css('[data-hostname="added.example"] [data-field="layoutMode"]')).sendKeys(Key.ARROW_UP);
+    await driver.wait(async () => (await addedRule()).layoutMode === "gentle", 5000, "Editing a subdomain rule saves its layout");
+    assert.equal(await script("document.activeElement.dataset.field"), "layoutMode", "Saving keeps keyboard focus on the layout choice");
+    await driver.findElement(By.css('[data-hostname="added.example"] [data-field="enabled"]')).sendKeys(Key.END);
+    await driver.wait(async () => (await addedRule()).enabled === false, 5000, "The rule can be paused separately");
+    await driver.findElement(By.css('[data-hostname="added.example"] [data-field="layoutMode"]')).sendKeys(Key.HOME);
+    await driver.wait(async () => (await addedRule()).layoutMode === undefined, 5000, "Use default removes only the layout override");
+    assert.equal((await addedRule()).enabled, false);
     let remove = await driver.findElement(By.css('[data-hostname="added.example"] .delete-rule'));
     await remove.click();
     await remove.sendKeys(Key.ESCAPE);

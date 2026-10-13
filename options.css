@@ -1710,3 +1710,39 @@ input::placeholder {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
+
+.new-rule-settings,
+.rule-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.rule-control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+}
+.rule-control select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.rule-control select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.rule-row.is-confirming-delete .rule-settings { display: none; }
+.rule-form-help { grid-column: 1 / -1; margin: 0; }
+:root .add-rule { grid-template-columns: minmax(0, 1fr); }
+@media (forced-colors: active) {
+  .rule-control select:focus-visible { outline-color: Highlight; }
+}

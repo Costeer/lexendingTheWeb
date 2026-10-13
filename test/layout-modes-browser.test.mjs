@@ -95,8 +95,13 @@ test("installed modes switch live, preserve site choices, and restore all owned 
     await options.locator('#layout-mode').selectOption('off');
     await assertEventually(async()=>await worker.evaluate(async()=> (await chrome.storage.sync.get('layoutMode')).layoutMode)==='off');
     await settled('fit'); // this site's explicit choice wins over the default
-    assert.match(await options.locator('#rule-list').textContent(),/Layout: Fit text/);
-    await patch({siteRules:[]});await settled('off');
+    await options.locator('[data-settings-panel="rules-panel"]').click();
+    const siteLayout = options.locator('[data-hostname="127.0.0.1"] [data-field="layoutMode"]');
+    assert.equal(await siteLayout.inputValue(), 'fit');
+    await siteLayout.selectOption('gentle');await settled('gentle');
+    await siteLayout.selectOption('fit');await settled('fit');
+    await siteLayout.selectOption('default');await settled('off');
+    assert.equal(await options.locator('[data-hostname="127.0.0.1"]').count(), 0);
   } finally {
     await context?.close();await new Promise(resolve=>server.close(resolve));await rm(temporary,{recursive:true,force:true});
   }
