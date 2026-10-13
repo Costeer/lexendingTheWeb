@@ -28,9 +28,11 @@ test.after(async () => { await browser?.close(); });
 // counts actual container invocations; it does not decide whether one is safe.
 const runtimeReading = async (kind) => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+  let releaseFonts;
+  const heldFonts = new Promise((resolve) => { releaseFonts = resolve; });
   try {
     await page.route("http://reuse.test/**", (route) => readFile(resolve(`.${new URL(route.request().url()).pathname}`))
-      .then((body) => route.fulfill({ body, contentType: "font/woff2" })));
+      .then(async (body) => { await heldFonts; return route.fulfill({ body, contentType: "font/woff2" }); }));
     await page.setContent(`<!doctype html><style>
       body{font:16px/20px Arial}article{width:340px;height:44px;overflow:hidden;margin-bottom:12px}
       p{margin:0}pre{font:14px/20px monospace}
@@ -76,9 +78,24 @@ const runtimeReading = async (kind) => {
         return previous;
       }, { values, grow });
       await page.waitForFunction((revision) => __state().healthy && !__state().pending && __state().refreshRevision > revision, previous.revision);
+      // Exercise a real late font completion in both variants. loadingdone can
+      // queue another capture/repair after the earlier settled-state check.
+      if (states.length === 0) {
+        assert.equal(await page.evaluate(() => document.fonts.check('19.2px "Lexend for the Web"', "Careful")), false);
+        releaseFonts();
+      }
       await page.evaluate(() => document.fonts.ready);
-      states.push(await page.evaluate(() => __view()));
-      passes.push(await page.evaluate((before) => __containerPasses - before, previous.passes));
+      // State and geometry must come from one task: neither font readiness nor
+      // a prior !pending observation proves a later geometry sample is settled.
+      const handle = await page.waitForFunction(({ revision, passes }) => {
+        const state = __state();
+        if (!state.healthy || state.pending || state.refreshRevision <= revision || document.fonts.status !== "loaded") return false;
+        return { view: __view(), passes: __containerPasses - passes };
+      }, previous);
+      const settled = await handle.jsonValue();
+      await handle.dispose();
+      states.push(settled.view);
+      passes.push(settled.passes);
     };
     await change({ enabled: true });
     await change({ textScale: 150 });
@@ -94,7 +111,7 @@ const runtimeReading = async (kind) => {
     assert.equal(paused, expectedPaused, "pause restores exact author markup and inline priorities");
     await change({ enabled: true, textScale: 130 });
     return { states, passes };
-  } finally { await page.close(); }
+  } finally { releaseFonts(); await page.close(); }
 };
 
 test("no-write reuse preserves full-runtime geometry, typography, growth and exact pause restoration", async (t) => {
@@ -106,6 +123,9 @@ test("no-write reuse preserves full-runtime geometry, typography, growth and exa
   }
   assert.equal(candidate.passes[3], 0, "pause does not repair the page");
   assert.match(candidate.states[0][1].font, /Lexend/);
+  for (const card of candidate.states[0].filter((state) => state.html.startsWith("<article"))) {
+    assert.ok(card.scroll <= card.height + 1, "initial loaded-font text is repaired before it is compared");
+  }
   assert.ok(candidate.states[1][0].box.height > candidate.states[0][0].box.height);
   t.diagnostic(JSON.stringify({ candidatePasses: candidate.passes, forcedFullPasses: full.passes }));
 });
