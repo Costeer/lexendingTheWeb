@@ -103,10 +103,8 @@
   renderSettingsNavigation();
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
-  let failedOperation = null;
   let loadFailed = false;
   let advancedPreferenceLoaded = false;
-  let saveRevision = 0;
   let toastTimer;
   let readabilityAnimationToken = 0;
   let renderedRulesKey;
@@ -119,9 +117,13 @@
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
-    onChange(value) {
+    onChange(value, _loaded, readError) {
       settings = value;
       render();
+      if (readError) {
+        loadFailed = true;
+        setSaveState("error", `Settings could not be read. ${readError.message}`);
+      }
     }
   });
 
@@ -459,28 +461,38 @@
     updateAddRuleState();
   };
 
+  const renderSaveRecovery = ({ pending, failures }) => {
+    if (preferences.readError) {
+      loadFailed = true;
+      setSaveState("error", `Settings could not be read. ${preferences.readError.message}`);
+      return;
+    }
+    if (failures.length) {
+      const labels = { theme: "appearance", textScale: "text size", lineHeight: "line height",
+        letterSpacing: "letter spacing", enabled: "on/off setting", scope: "scope", siteRules: "site rules" };
+      const fields = [...new Set(failures.flatMap((failure) => failure.keys)
+        .map((key) => labels[key] ?? "site rule"))].join(", ");
+      setSaveState("error", `Not saved: ${fields}. ${failures[0].error.message || "Try again."}`);
+    } else if (pending) setSaveState("saving", "Saving…");
+    else setSaveState("saved", "All changes saved");
+  };
+  const recovery = globalThis.LexendSaveRecovery.createTracker({
+    mutate: (operation) => preferences.mutate(operation),
+    getSettings: () => settings,
+    getConfirmedSettings: () => preferences.confirmedSettings,
+    onChange: renderSaveRecovery
+  });
+
   const persist = async (operation) => {
     if (!preferences.loaded) {
       render();
       return false;
     }
-    const revision = ++saveRevision;
-    failedOperation = null;
-    setSaveState("saving", "Saving…");
-
     try {
-      await preferences.mutate(operation);
-      if (revision === saveRevision) {
-        failedOperation = null;
-        setSaveState("saved", "All changes saved");
-      }
+      await recovery.mutate(operation);
       return true;
     } catch (error) {
       console.error("Lexend for the Web could not save settings.", error);
-      if (revision === saveRevision) {
-        failedOperation = operation;
-        setSaveState("error", error.message || "Changes could not be saved");
-      }
       return false;
     }
   };
@@ -587,7 +599,7 @@
 
   retrySaveButton.addEventListener("click", () => {
     if (loadFailed) loadSettings();
-    else if (failedOperation) persist(failedOperation);
+    else return recovery.retry();
   });
 
   hostnameInput.addEventListener("input", () => {
@@ -698,7 +710,8 @@
       if (file.size > 256 * 1024) throw new Error("Settings file is too large");
       const payload = JSON.parse(await file.text());
       const imported = settingsApi.validateImport(payload);
-      if (await persist({ type: "replace", settings: imported })) showToast("Settings imported");
+      if (!window.confirm("Replace all your current settings and site rules with this file? This cannot be undone. Export your current settings first if you want a backup.")) return;
+      if (await persist({ type: "replace", settings: imported, expected: settingsApi.normalizeSettings(settings) })) showToast("Settings imported");
       else importError.textContent = saveStatusText.textContent;
     } catch (error) {
       importError.textContent = error.code ? error.message : "Choose a valid Lexend settings file.";
@@ -748,7 +761,6 @@
   const loadSettings = async () => {
     loadFailed = false;
     advancedPreferenceLoaded = false;
-    failedOperation = null;
     setSaveState("loading", "Loading settings…");
     try {
       await preferences.load();
@@ -763,7 +775,7 @@
       advancedPreferenceLoaded = true;
       renderReadabilityMode();
       render();
-      if (saveRevision === 0) setSaveState("saved", "All changes saved");
+      renderSaveRecovery(recovery.state);
     } catch (error) {
       loadFailed = true;
       console.error("Lexend for the Web could not load settings.", error);

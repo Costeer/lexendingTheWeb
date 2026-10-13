@@ -1,0 +1,127 @@
+(() => {
+  "use strict";
+
+  // Keep failures attached to the intent that failed, not to the most recent
+  // request. A newer edit supersedes only the fields/rule it actually changes.
+  const createTracker = ({ mutate, getSettings, getConfirmedSettings = getSettings, onChange = () => {} }) => {
+    const api = globalThis.LexendSettings;
+    const entries = new Set();
+    const fields = ["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
+    const ruleKey = (operation) => {
+      const rule = operation.rule ?? operation;
+      const normalized = api.normalizeSettings({ siteRules: [{ ...rule, enabled: false }] }).siteRules[0];
+      return `rule:${normalized?.hostname ?? rule.hostname}:${Boolean(rule.includeSubdomains)}`;
+    };
+    const keysFor = (operation) => {
+      if (operation.type === "patch") return Object.keys(operation.changes);
+      if (operation.type === "replace") return fields;
+      if (operation.type === "toggleSite") return [...(getSettings().enabled ? [] : ["enabled"]), ruleKey(operation)];
+      return [ruleKey(operation)];
+    };
+    const overlaps = (a, b) => a === b
+      || a === "siteRules" && b.startsWith("rule:")
+      || b === "siteRules" && a.startsWith("rule:");
+    const state = () => ({
+      pending: [...entries].filter((entry) => entry.keys.size && entry.pending).length,
+      failures: [...entries].filter((entry) => entry.keys.size && entry.error)
+        .map((entry) => ({ keys: [...entry.keys], error: entry.error }))
+    });
+    const emit = () => onChange(state());
+    const supersedeKeys = (keys) => {
+      for (const entry of entries) {
+        for (const key of entry.keys) {
+          if ([...keys].some((newKey) => overlaps(key, newKey))) entry.keys.delete(key);
+        }
+        // Toggle and rule operations cannot be split into independent writes.
+        if (!["patch", "replace"].includes(entry.operation.type)
+            && entry.keys.size !== entry.keyCount) entry.keys.clear();
+        if (!entry.keys.size && !entry.pending) entries.delete(entry);
+      }
+    };
+    const run = async (operation, retainedKeys = keysFor(operation), baseline = api.normalizeSettings(getConfirmedSettings()), previousTarget) => {
+      const keys = new Set(retainedKeys);
+      supersedeKeys(keys);
+      const entry = { operation, keys, keyCount: keys.size, baseline, pending: true, error: null };
+      if (operation.type === "toggleSite") {
+        const settings = getSettings();
+        entry.target = previousTarget ?? (settings.enabled ? !api.resolveSite(settings, operation.hostname).siteEnabled : true);
+      }
+      entries.add(entry);
+      emit();
+      try {
+        const result = await mutate(operation);
+        entries.delete(entry);
+        return result;
+      } catch (error) {
+        entry.error = error;
+        throw error;
+      } finally {
+        entry.pending = false;
+        if (!entry.keys.size) entries.delete(entry);
+        emit();
+      }
+    };
+    const ruleIntentFulfilled = (entry, settings) => {
+      const operation = entry.operation;
+      if (operation.type === "addRule") {
+        const current = api.getDirectRule(settings, operation.rule.hostname, operation.rule.includeSubdomains);
+        const desired = api.normalizeSettings({ siteRules: [operation.rule] }).siteRules[0];
+        return current && desired && JSON.stringify(current) === JSON.stringify(desired);
+      }
+      if (operation.type === "removeRule") return !api.getDirectRule(settings, operation.hostname, operation.includeSubdomains);
+      return operation.type === "toggleSite" && settings.enabled
+        && api.resolveSite(settings, operation.hostname).siteEnabled === entry.target;
+    };
+    return {
+      mutate: run,
+      // Dedicated import/undo flows own their exact operations and retry
+      // snapshots. Accepted intent retires overlapping generic retries without
+      // enrolling a new operation or performing a write here.
+      supersede(fieldNames) {
+        if (!Array.isArray(fieldNames)) throw api.settingsError("INVALID_OPERATION", "Invalid settings fields to supersede.");
+        const keys = new Set(fieldNames);
+        if ([...keys].some((key) => !fields.includes(key))) {
+          throw api.settingsError("INVALID_OPERATION", "Invalid settings fields to supersede.");
+        }
+        if (!keys.size) return;
+        supersedeKeys(keys);
+        emit();
+      },
+      get state() { return state(); },
+      async retry() {
+        const failed = [...entries].filter((entry) => entry.error && entry.keys.size);
+        for (const entry of failed) {
+          // Recheck after every await: another edit may have superseded part of
+          // this intent while an earlier retry was waiting for its write.
+          if (!entries.has(entry) || !entry.keys.size) continue;
+          let operation = entry.operation;
+          const confirmed = api.normalizeSettings(getConfirmedSettings());
+          if (["patch", "replace"].includes(operation.type)) {
+            const desired = operation.changes ?? operation.settings;
+            for (const key of entry.keys) {
+              if (api.settingsEqual(confirmed, { ...confirmed, [key]: desired[key] })) entry.keys.delete(key);
+            }
+            const changes = Object.fromEntries(Object.entries(desired).filter(([key]) => entry.keys.has(key)));
+            const expected = Object.fromEntries([...entry.keys].map((key) => [key, entry.baseline[key]]));
+            if (operation.type === "patch") operation = { type: "patch", changes, expected };
+            else operation = { type: "replace", settings: { ...confirmed, ...changes }, expected: { ...confirmed, ...expected } };
+          } else if (ruleIntentFulfilled(entry, confirmed)) {
+            // A write with a lost response or another page already fulfilled
+            // the requested state. Replaying a toggle would reverse it.
+            entry.keys.clear();
+          } else {
+            operation = { ...operation, expected: { siteRules: entry.baseline.siteRules,
+              ...(operation.type === "toggleSite" ? { enabled: entry.baseline.enabled } : {}) } };
+          }
+          if (!entry.keys.size) { entries.delete(entry); emit(); continue; }
+          // Writer-side guards compare the original confirmed values inside
+          // the serialized queue. Never rebase unresolved fields onto newer
+          // remote values: a conflict stays visible for review/reapplication.
+          try { await run(operation, [...entry.keys], entry.baseline, entry.target); }
+          catch { /* Keep each unresolved failure visible. */ }
+        }
+      }
+    };
+  };
+  globalThis.LexendSaveRecovery = Object.freeze({ createTracker });
+})();

@@ -25,11 +25,12 @@
     tabRevisions.set(tabId, revision);
     return revision;
   };
+  const isConfirmedActive = (state) => Boolean(state?.ready && state.healthy && !state.pending && state.active);
   const refreshTab = async (tabId) => {
     const revision = advanceTab(tabId);
     try {
       const state = await extension.tabs.sendMessage(tabId, { type: "LEXEND_GET_STATE" }, { frameId: 0 });
-      if (tabRevisions.get(tabId) === revision) await setTabState(tabId, Boolean(state?.ready && state.active));
+      if (tabRevisions.get(tabId) === revision) await setTabState(tabId, isConfirmedActive(state));
     } catch {
       if (tabRevisions.get(tabId) === revision) await setTabState(tabId, false);
     }
@@ -175,7 +176,7 @@
     }
     if (message?.type === "LEXEND_STATE" && sender.frameId === 0) {
       advanceTab(sender.tab?.id);
-      setTabState(sender.tab?.id, Boolean(message.active));
+      setTabState(sender.tab?.id, isConfirmedActive(message));
     }
   });
 
@@ -195,7 +196,7 @@
   });
 
   extension.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "sync" && (changes.enabled || changes.siteRules)) {
+    if (areaName === "sync" && (changes.enabled || changes.siteRules || changes.disabledSites)) {
       updateAllTabs().catch(() => {});
     }
   });

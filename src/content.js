@@ -10,9 +10,21 @@
   const ownStyleIds = [STYLE_ID, FONT_STYLE_ID, TRANSITION_STYLE_ID];
   const styledRoots = new Set();
   let settings = settingsApi.normalizeSettings();
-  let settingsRevision = 0;
+  let settingsReadGeneration = 0;
+  let restoringChanges = null;
   let initializing = true;
   let settingsLoaded = false;
+  let settingsLoadError = null;
+  let rawSettings = {};
+  let startupChanges = {};
+  const mergeStorageChanges = (raw, changes) => {
+    const next = { ...raw };
+    for (const [key, change] of Object.entries(changes)) {
+      if (change.newValue === undefined) delete next[key];
+      else next[key] = change.newValue;
+    }
+    return next;
+  };
 
   // Names such as `with-icon` are often ordinary prose wrappers. Protect actual
   // semantics and computed symbol/code fonts rather than substring class names.
@@ -319,7 +331,7 @@
     }
     return effectiveCache.value;
   };
-  const isActive = () => getEffectiveSettings().active;
+  const isActive = () => settingsLoaded && getEffectiveSettings().active;
   const composedParent = (element) => element.parentElement
     ?? (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
   const hasProtectedAncestor = (element) => {
@@ -1064,6 +1076,7 @@
     // the site four times that duration to handle input and paint before the
     // next automatic pass. Incoming text receives its font independently.
     budgetRefresh(duration);
+    notifyState();
   };
   const refresh = (preserveHidden = false) => {
     refreshTimer = null;
@@ -1192,13 +1205,24 @@
     queueRefresh(urgent === true, ariaChanges, styleChanges);
   };
 
+  const pageState = () => ({
+    ready: settingsLoaded && settingsLoadError === null,
+    pending: initializing || refreshing || refreshTimer !== null || pendingRepair !== null,
+    refreshRevision,
+    healthy: settingsLoaded && settingsLoadError === null && lastRefreshError === null,
+    error: settingsLoadError ?? lastRefreshError,
+    active: isActive(),
+    hostname: getEffectiveHostname(),
+    scope: getEffectiveSettings().scope
+  });
+  let lastNotifiedState;
   const notifyState = () => {
     if (window.top !== window) return;
-
-    extension.runtime.sendMessage({
-      type: "LEXEND_STATE",
-      active: isActive()
-    }).catch(() => {});
+    const state = pageState();
+    const key = [state.ready, state.pending, state.healthy, state.error, state.active].join(";");
+    if (key === lastNotifiedState) return;
+    lastNotifiedState = key;
+    extension.runtime.sendMessage({ type: "LEXEND_STATE", ...state }).catch(() => {});
   };
 
   const applySettings = (nextSettings, deferLayout = false) => {
@@ -1209,7 +1233,10 @@
     const effective = getEffectiveSettings();
     if (refreshRevision > 0 && lastRefreshError === null && previous.active === effective.active
         && (!effective.active || previous.scope === effective.scope
-          && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) return;
+          && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) {
+      notifyState();
+      return;
+    }
     revealedAutoContent = new WeakSet();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -1336,16 +1363,26 @@
   const start = async () => {
     layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
     window.addEventListener("pageshow", async (event) => {
-      if (!event.persisted) return;
+      if (!event.persisted || initializing) return;
       // Cached documents may miss storage events while frozen. Read current
       // preferences before reusing their typography, without letting a stale
       // read replace a newer storage event or overlapping restoration.
-      const revision = ++settingsRevision;
+      const generation = ++settingsReadGeneration;
+      restoringChanges = {};
       try {
         const saved = await extension.storage.sync.get(null);
-        if (revision === settingsRevision) applySettings(saved);
+        if (generation === settingsReadGeneration) {
+          const reconciled = mergeStorageChanges(saved, restoringChanges);
+          const confirmed = settingsApi.decodeSettings(reconciled);
+          rawSettings = reconciled;
+          startupChanges = {};
+          settingsLoadError = null;
+          applySettings(confirmed);
+        }
       } catch (error) {
         console.warn("Lexend for the Web could not reload settings after navigation.", error);
+      } finally {
+        if (generation === settingsReadGeneration) restoringChanges = null;
       }
       notifyState();
     });
@@ -1414,15 +1451,22 @@
       // fonts change that baseline too and require a fresh capture.
       if (newMetrics && (authorMetrics || !initializing && pendingRepair === null)) invalidateAutoContent(true);
     });
-    let initialSettings;
-    const revision = settingsRevision;
-    try { initialSettings = await extension.storage.sync.get(null); }
-    catch (error) {
-      console.warn("Lexend for the Web could not load settings; using defaults.", error);
-      initialSettings = settingsApi.defaults;
+    let confirmed;
+    try {
+      const snapshot = await extension.storage.sync.get(null);
+      const reconciled = mergeStorageChanges(snapshot, startupChanges);
+      confirmed = settingsApi.decodeSettings(reconciled);
+      rawSettings = reconciled;
+      startupChanges = {};
+      settingsLoadError = null;
+    } catch (error) {
+      // An incomplete event stream cannot stand in for a saved snapshot. Stay
+      // passive until a successful reload establishes the user's preferences.
+      settingsLoadError = "SETTINGS_LOAD_FAILED";
+      console.warn("Lexend for the Web could not load settings; reload the page to retry.", error);
+      notifyState();
+      return;
     }
-    if (revision !== settingsRevision) return;
-    const confirmed = settingsApi.normalizeSettings(initialSettings);
     // Apply fonts and startup sizing before any full-page layout work. The
     // first capture waits for the bounded preload and a scheduled task.
     applySettings(confirmed, true);
@@ -1446,14 +1490,23 @@
 
   extension.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") return;
-    settingsRevision++;
+    if (restoringChanges) Object.assign(restoringChanges, changes);
 
-    const nextSettings = { ...settings };
-    Object.entries(changes).forEach(([key, change]) => {
-      if (change.newValue === undefined) delete nextSettings[key];
-      else nextSettings[key] = change.newValue;
-    });
-    applySettings(nextSettings);
+    if (!settingsLoaded) {
+      Object.assign(startupChanges, changes);
+      return;
+    }
+    rawSettings = mergeStorageChanges(rawSettings, changes);
+    try {
+      const confirmed = settingsApi.decodeSettings(rawSettings);
+      settingsLoadError = null;
+      applySettings(confirmed);
+    } catch (error) {
+      // Preserve confirmed preferences if a sync event is malformed/incomplete.
+      settingsLoadError = "SETTINGS_LOAD_FAILED";
+      console.warn("Lexend for the Web could not read updated settings.", error);
+      notifyState();
+    }
   });
 
   extension.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -1463,21 +1516,13 @@
       return undefined;
     }
     if (message?.type !== "LEXEND_GET_STATE") return undefined;
-    sendResponse({
-      ready: true,
-      pending: initializing || refreshing || refreshTimer !== null || pendingRepair !== null,
-      refreshRevision,
-      healthy: lastRefreshError === null,
-      error: lastRefreshError,
-      active: isActive(),
-      hostname: getEffectiveHostname(),
-      scope: getEffectiveSettings().scope
-    });
+    sendResponse(pageState());
     return undefined;
   });
 
   start().finally(() => {
     initializing = false;
     if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size) queueRefresh(true);
+    notifyState();
   });
 })();

@@ -4,6 +4,7 @@ import { runInNewContext } from "node:vm";
 import test from "node:test";
 import "../src/settings.js";
 import "../src/preferences.js";
+import "../src/save-recovery.js";
 
 const source = await readFile(new URL("../options.js", import.meta.url), "utf8");
 const themeSource = await readFile(new URL("../src/ui-theme.js", import.meta.url), "utf8");
@@ -46,7 +47,7 @@ class Element {
   focus() { this.focused = true; }
 }
 
-async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings, allowErrors = false } = {}) {
+async function openSettings({ count = 6, desktop = false, cachedTheme = "light", getSettings, allowErrors = false, sendOperation, confirm = () => true } = {}) {
   const elements = new Map();
   const get = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new Element());
@@ -81,7 +82,7 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
     async get() { return getSettings ? getSettings() : stored; },
     async set(patch) {
       stored = { ...stored, ...patch };
-      writes.push(structuredClone(stored));
+      writes.push(globalThis.LexendSettings.decodeSettings(stored));
       changeListener?.(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
     },
     async remove() {}
@@ -104,10 +105,13 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
     },
     LexendSettings: globalThis.LexendSettings,
     LexendPreferences: globalThis.LexendPreferences,
+    LexendSaveRecovery: globalThis.LexendSaveRecovery,
+    window: { confirm },
+    setTimeout: () => 0, clearTimeout() {},
     LexendQuotes: { random: () => ({ text: "Preview", author: "Author", lang: "en", url: "https://example.com" }) },
     browser: {
       runtime: { async sendMessage({ operation }) {
-        try { return { ok: true, settings: await store.mutate(operation) }; }
+        try { return { ok: true, settings: await (sendOperation ? sendOperation(operation, store) : store.mutate(operation)) }; }
         catch (error) { return { ok: false, code: error.code, message: error.message }; }
       } },
       storage: { sync: storage, onChanged: { addListener(listener) { changeListener = listener; } } }
@@ -457,4 +461,70 @@ test("readability and appearance changes preserve the existing site-rule rows", 
   page.rows().forEach((row, index) => assert.equal(row, rows[index]));
   assert.equal(page.writes.at(-1).theme, "dark");
   assert.equal(page.writes.at(-1).textScale, 110);
+});
+
+
+test("failed theme remains visible after a successful size save and Retry restores only theme", async () => {
+  let failed = false;
+  const page = await openSettings({ allowErrors: true, sendOperation: async (operation, store) => {
+    if (!failed) { failed = true; throw new Error("Theme write rejected"); }
+    return store.mutate(operation);
+  } });
+  page.get("#dark-theme").checked = true;
+  page.get("#dark-theme").emit("change");
+  page.get("#text-scale").value = "120";
+  page.get("#text-scale").emit("change");
+  await tick();
+  assert.equal(page.get("#dark-theme").checked, false);
+  assert.match(page.get("#save-status-text").textContent, /Not saved: appearance/);
+  assert.equal(page.get("#retry-save").hidden, false);
+  await page.get("#retry-save").emit("click");
+  assert.equal(page.get("#dark-theme").checked, true);
+  assert.equal(page.get("#text-scale").value, "120");
+  assert.equal(page.get("#save-status-text").textContent, "All changes saved");
+});
+
+test("import replacement is disclosed and cancelling leaves settings untouched", async () => {
+  const prompts = [];
+  const page = await openSettings({ confirm: (message) => { prompts.push(message); return false; } });
+  page.get("#import-file").files = [{ size: 200, text: async () => JSON.stringify({ schemaVersion: 2,
+    settings: globalThis.LexendSettings.normalizeSettings({ theme: "dark" }) }) }];
+  await page.get("#import-file").emit("change");
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /Replace all your current settings and site rules/);
+  assert.equal(page.writes.length, 0);
+  assert.equal(page.rows().length, 2);
+  assert.equal(page.get("#dark-theme").checked, false);
+});
+
+test("invalid partial imports never reach confirmation or the writer", async () => {
+  let prompts = 0;
+  const page = await openSettings({ confirm: () => { prompts++; return true; } });
+  for (const settings of [{}, { theme: "dark" }]) {
+    page.get("#import-file").files = [{ size: 100, text: async () => JSON.stringify({ schemaVersion: 2, settings }) }];
+    await page.get("#import-file").emit("change");
+    assert.match(page.get("#import-error").textContent, /missing|complete/i);
+  }
+  assert.equal(prompts, 0);
+  assert.equal(page.writes.length, 0);
+});
+
+test("supported legacy import also requires confirmation", async () => {
+  let prompts = 0;
+  const page = await openSettings({ confirm: () => { prompts++; return true; } });
+  page.get("#import-file").files = [{ size: 100, text: async () => JSON.stringify({ schemaVersion: 1,
+    settings: { disabledSites: ["legacy.example"], enabled: false } }) }];
+  await page.get("#import-file").emit("change");
+  assert.equal(prompts, 1);
+  assert.equal(page.writes.length, 1);
+  assert.equal(page.writes[0].enabled, false);
+  assert.deepEqual(page.writes[0].siteRules.map((rule) => rule.hostname), ["legacy.example"]);
+});
+
+test("corrupt synchronized settings expose read recovery instead of a saved status", async () => {
+  const page = await openSettings();
+  page.change({ siteRules: { newValue: "@unknown\nexample.com" } });
+  assert.equal(page.get("#dark-theme").disabled, true);
+  assert.equal(page.get("#retry-save").hidden, false);
+  assert.match(page.get("#save-status-text").textContent, /could not be read/);
 });
