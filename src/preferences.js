@@ -34,22 +34,67 @@
     }
   };
 
+  const validateExpected = (settings, operation) => {
+    if (operation?.expected === undefined || !["patch", "replace", "addRule", "removeRule", "toggleSite"].includes(operation.type)) return;
+    if (!operation.expected || typeof operation.expected !== "object" || Array.isArray(operation.expected)) {
+      throw api.settingsError("INVALID_OPERATION", "Invalid expected settings snapshot.");
+    }
+    // Run guards only against the latest storage read in the writer queue;
+    // optimistic overlays in the client must not compare speculative state.
+    if (operation.type === "patch") {
+      if (!operation.changes || typeof operation.changes !== "object" || Array.isArray(operation.changes)) {
+        throw api.settingsError("INVALID_OPERATION", "Invalid settings change.");
+      }
+      const keys = Object.keys(operation.changes);
+      if (keys.some((key) => !Object.hasOwn(operation.expected, key))) {
+        throw api.settingsError("INVALID_OPERATION", "Invalid expected settings snapshot.");
+      }
+      const expected = api.normalizeSettings(operation.expected);
+      if (keys.some((key) => settings[key] !== expected[key])) {
+        throw api.settingsError("STALE_SETTINGS", "These preferences changed before the retry could be saved. Review the current values and apply your change again.");
+      }
+    } else if (operation.type === "replace") {
+      if (!api.settingsEqual(settings, operation.expected)) {
+        throw api.settingsError("STALE_IMPORT", "Settings changed before this replacement could be saved. Review your settings and import the file again.");
+      }
+    } else {
+      if (!Array.isArray(operation.expected.siteRules)
+          || (operation.type === "toggleSite" && !Object.hasOwn(operation.expected, "enabled"))) {
+        throw api.settingsError("INVALID_OPERATION", "Invalid expected settings snapshot.");
+      }
+      const expected = api.normalizeSettings(operation.expected);
+      if (!api.settingsEqual({ siteRules: settings.siteRules }, { siteRules: expected.siteRules })
+          || (operation.type === "toggleSite" && settings.enabled !== expected.enabled)) {
+        throw api.settingsError("STALE_SETTINGS", "Site rules changed before the retry could be saved. Review the current values and apply your change again.");
+      }
+    }
+  };
+
   const createStore = (storage) => {
     let queue = Promise.resolve();
     return {
       mutate(operation) {
         const write = async () => {
           const raw = await storage.get(null);
-          const next = applyOperation(api.normalizeSettings(raw), operation);
-          // A preference-only edit must not drop existing oversized legacy rules.
-          // Rule mutations and imports validate their own capacity above.
-          const patch = Object.fromEntries(Object.entries(next).filter(([key, value]) => (
+          const current = api.decodeSettings(raw);
+          validateExpected(current, operation);
+          const next = applyOperation(current, operation);
+          const encoded = api.encodeSettings(next);
+          // Existing oversized data must remain readable and must not prevent
+          // unrelated edits. Authentic supported legacy lists always fit the
+          // compact encoding; preserve other oversized lists without migration.
+          const rulesFit = api.ruleStorageBytes(next) <= 8192;
+          if (!rulesFit) {
+            if (operation.type !== "patch") api.validateCapacity(next);
+            delete encoded.siteRules;
+          }
+          const patch = Object.fromEntries(Object.entries(encoded).filter(([key, value]) => (
             JSON.stringify(value) !== JSON.stringify(raw[key])
           )));
           if (Object.keys(patch).length) await storage.set(patch);
           // Once the canonical keys are stored, old keys are harmless. Cleanup
           // failure must not make a successful write look like a failed mutation.
-          try { await storage.remove?.(legacyKeys); } catch {}
+          try { await storage.remove?.(rulesFit ? legacyKeys : legacyKeys.filter((key) => key !== "disabledSites")); } catch {}
           return next;
         };
         const result = queue.then(write, write);
@@ -61,8 +106,10 @@
 
   const createClient = (extension, { theme = "light", onChange = () => {} } = {}) => {
     let confirmed = api.normalizeSettings({ theme });
+    let confirmedRaw = { theme };
     let loaded = false;
     let loading = false;
+    let readError = null;
     let generation = 0;
     let eventRevision = 0;
     let startupChanges = {};
@@ -129,7 +176,7 @@
     const current = () => pending.reduce((value, entry) => (
       entry.operation.type === "patch" ? applyOperation(value, entry.operation) : value
     ), confirmed);
-    const emit = () => onChange(current(), loaded);
+    const emit = () => onChange(current(), loaded, readError);
     extension?.storage?.onChanged?.addListener((changes, areaName) => {
       if (areaName !== "sync") return;
       eventRevision++;
@@ -137,21 +184,34 @@
         Object.assign(startupChanges, changes);
         return;
       }
-      const next = { ...confirmed };
+      const next = { ...confirmedRaw };
       Object.entries(changes).forEach(([key, change]) => {
         if (change.newValue === undefined) delete next[key];
         else next[key] = change.newValue;
       });
-      confirmed = api.normalizeSettings(next);
+      try {
+        confirmed = api.decodeSettings(next);
+        confirmedRaw = next;
+        readError = null;
+      } catch (error) {
+        // Keep the last readable settings, but block writes until a successful
+        // reload reconciles the persisted state instead of overwriting it.
+        confirmedRaw = next;
+        loaded = false;
+        readError = error;
+      }
       emit();
     });
     return {
       get loaded() { return loaded; },
+      get readError() { return readError; },
       get settings() { return current(); },
+      get confirmedSettings() { return api.normalizeSettings(confirmed); },
       async load() {
         const revision = ++generation;
         loading = true;
         loaded = false;
+        readError = null;
         startupChanges = {};
         emit();
         try {
@@ -162,13 +222,15 @@
             if (change.newValue === undefined) delete next[key];
             else next[key] = change.newValue;
           });
-          confirmed = api.normalizeSettings(next);
+          confirmed = api.decodeSettings(next);
+          confirmedRaw = next;
           loaded = true;
           loading = false;
+          readError = null;
           emit();
           return current();
         } catch (error) {
-          if (revision === generation) { loading = false; emit(); }
+          if (revision === generation) { loading = false; readError = error; emit(); }
           throw error;
         }
       },
@@ -184,7 +246,10 @@
           if (!response) throw unavailable();
           if (!response?.ok) throw api.settingsError(response?.code ?? "SAVE_FAILED", response?.message ?? "Changes could not be saved.");
           // Do not overwrite a newer storage event with an older response.
-          if (revision === eventRevision) confirmed = api.normalizeSettings(response.settings);
+          if (revision === eventRevision) {
+            confirmed = api.normalizeSettings(response.settings);
+            confirmedRaw = { ...confirmedRaw, ...api.encodeSettings(confirmed) };
+          }
           return response.settings;
         } finally {
           pending.splice(pending.indexOf(entry), 1);

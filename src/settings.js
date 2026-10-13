@@ -10,7 +10,8 @@
     lineHeight: 0,
     letterSpacing: 0
   });
-  const MAX_SITE_RULE_BYTES = 7000;
+  const MAX_SITE_RULE_BYTES = 8192;
+  const ruleStoragePrefix = "@1\n";
   const legacySpacingValues = Object.freeze({
     default: 0,
     wide: 0.04,
@@ -87,10 +88,43 @@
     };
   };
 
+  // One atomic storage item avoids exposing an incomplete set of rule shards.
+  // Exact pauses need only a hostname: their serialized bytes are smaller than
+  // the corresponding legacy disabledSites item, including the storage key.
+  const encodeRules = (rules) => ruleStoragePrefix + rules.map((rule) => {
+    const flags = Number(rule.includeSubdomains) * 9
+      + (rule.enabled === false ? 0 : rule.enabled === true ? 1 : 2) * 3
+      + (rule.scope === "body" ? 1 : rule.scope === "all" ? 2 : 0);
+    return rule.hostname + (flags ? `\t${flags}` : "");
+  }).join("\n");
+
+  const decodeRules = (value) => {
+    if (typeof value !== "string") return value;
+    const invalid = () => { throw settingsError("INVALID_STORAGE", "Saved site rules could not be read. No settings were changed. Reload the extension and try again, or use the extension version that saved these settings."); };
+    if (!value.startsWith(ruleStoragePrefix)) return invalid();
+    const body = value.slice(ruleStoragePrefix.length);
+    if (!body) return [];
+    const keys = new Set();
+    return body.split("\n").map((line) => {
+      const fields = line.split("\t");
+      const [hostname, encodedFlags] = fields;
+      if (fields.length > 2 || (fields.length === 2 && !/^(?:[0-9]|1[0-7])$/.test(encodedFlags))) return invalid();
+      const flags = encodedFlags === undefined ? 0 : Number(encodedFlags);
+      const enabled = [false, true, null][Math.floor(flags % 9 / 3)];
+      const scope = [null, "body", "all"][flags % 3];
+      const includeSubdomains = flags >= 9;
+      const key = `${hostname}\n${includeSubdomains}`;
+      if (!validHostname(hostname) || hostname !== normalizeHostname(hostname)
+          || (enabled === null && scope === null) || keys.has(key)) return invalid();
+      keys.add(key);
+      return { hostname, includeSubdomains, enabled, scope };
+    });
+  };
+
   const normalizeSettings = (value = {}) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) value = {};
     const sourceRules = Object.prototype.hasOwnProperty.call(value, "siteRules")
-      ? value.siteRules
+      ? decodeRules(value.siteRules)
       : (Array.isArray(value.disabledSites)
         ? value.disabledSites.map((hostname) => ({ hostname, enabled: false }))
         : []);
@@ -122,10 +156,27 @@
   };
 
   const settingsError = (code, message) => Object.assign(new Error(message), { code });
+  const settingsEqual = (left, right) => {
+    const a = normalizeSettings(left), b = normalizeSettings(right);
+    if (Object.keys(defaults).some((key) => key !== "siteRules" && a[key] !== b[key])
+        || a.siteRules.length !== b.siteRules.length) return false;
+    const rules = new Map(b.siteRules.map((rule) => [`${rule.hostname}\n${rule.includeSubdomains}`, rule]));
+    return a.siteRules.every((rule) => {
+      const other = rules.get(`${rule.hostname}\n${rule.includeSubdomains}`);
+      return other && rule.enabled === other.enabled && rule.scope === other.scope;
+    });
+  };
+  const encodeSettings = (value) => {
+    const settings = normalizeSettings(value);
+    return { ...settings, siteRules: encodeRules(settings.siteRules) };
+  };
+  const ruleStorageBytes = (value) => new TextEncoder().encode(
+    "siteRules" + JSON.stringify(encodeRules(normalizeSettings(value).siteRules))
+  ).length;
   const validateCapacity = (value) => {
     const settings = normalizeSettings(value);
     if (settings.siteRules.length > 250
-        || new TextEncoder().encode(JSON.stringify(settings.siteRules)).length > MAX_SITE_RULE_BYTES) {
+        || ruleStorageBytes(settings) > MAX_SITE_RULE_BYTES) {
       throw settingsError("RULE_CAPACITY", "There isn't room for these site rules. Remove some rules before adding or importing more.");
     }
     return settings;
@@ -135,6 +186,18 @@
     const value = payload?.settings;
     if (![1, 2].includes(payload?.schemaVersion) || !value || typeof value !== "object" || Array.isArray(value)) {
       throw settingsError("INVALID_IMPORT", "Choose a valid Lexend settings file.");
+    }
+    if (payload.schemaVersion === 2 && Object.keys(defaults).some((key) => !Object.hasOwn(value, key))) {
+      throw settingsError("INVALID_IMPORT", "This settings backup is incomplete. Nothing was imported.");
+    }
+    if (payload.schemaVersion === 2 && !Array.isArray(value.siteRules)) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains an invalid site rule list. Nothing was imported.");
+    }
+    if (payload.schemaVersion === 1 && ![...Object.keys(defaults), "disabledSites", "spacing"].some((key) => Object.hasOwn(value, key))) {
+      throw settingsError("INVALID_IMPORT", "This legacy settings backup is empty. Nothing was imported.");
+    }
+    if (value.spacing !== undefined && !Object.hasOwn(legacySpacingValues, value.spacing)) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains an invalid spacing value. Nothing was imported.");
     }
     if (value.siteRules !== undefined && (!Array.isArray(value.siteRules)
         || value.siteRules.some((rule) => !normalizeRule(rule)
@@ -155,7 +218,7 @@
       ["lineHeight", (v) => typeof v === "number" && (v === 0 || (v >= 1 && v <= 2.4))],
       ["letterSpacing", (v) => typeof v === "number" && v >= 0 && v <= 0.2]
     ]) {
-      if (value[key] !== undefined && !valid(value[key])) {
+      if ((payload.schemaVersion === 2 || value[key] !== undefined) && !valid(value[key])) {
         throw settingsError("INVALID_IMPORT", `The settings file contains an invalid ${key} value. Nothing was imported.`);
       }
     }
@@ -259,6 +322,8 @@
 
   globalThis.LexendSettings = Object.freeze({
     defaults,
+    decodeSettings: normalizeSettings,
+    encodeSettings,
     getDirectRule,
     normalizeSettings,
     removeSiteRule,
@@ -266,6 +331,8 @@
     setSiteRule,
     toggleSite,
     settingsError,
+    settingsEqual,
+    ruleStorageBytes,
     validateCapacity,
     validateImport,
     validHostname

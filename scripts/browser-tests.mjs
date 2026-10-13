@@ -63,7 +63,9 @@ const patch = (changes) => extensionCall(async (changes) => {
   if (!result.ok) throw new Error(result.message);
   return result.settings;
 }, changes);
-const saved = () => extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
+const saved = () => extensionCall(async () => LexendSettings.decodeSettings(
+  await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null)
+));
 const measurements = () => script(() => Object.fromEntries(["rem", "nested", "fixed", "ignored-text", "code", "svg-text", "layout"].map((id) => {
   const style = getComputedStyle(document.getElementById(id));
   return [id, { size: parseFloat(style.fontSize), family: style.fontFamily, padding: parseFloat(style.paddingTop) }];
@@ -134,7 +136,7 @@ try {
         second.mutate({ type: "addRule", rule: { hostname: "remove.example", enabled: false } })
       ]);
       await second.mutate({ type: "removeRule", hostname: "remove.example" });
-      return api.storage.sync.get(null);
+      return LexendSettings.decodeSettings(await api.storage.sync.get(null));
     });
     assert.equal(result.textScale, 110);
     assert.equal(result.theme, "dark");
@@ -239,7 +241,7 @@ try {
 
   await check("oversized imports explicitly fail and preserve existing rules", async () => {
     const invalid = join(profile, "oversized.json");
-    const payload = { schemaVersion: 2, settings: { siteRules: Array.from({ length: 250 }, (_, i) => ({ hostname: `site${i}.example.com`, enabled: false })) } };
+    const payload = { schemaVersion: 2, settings: { ...(await saved()), siteRules: Array.from({ length: 251 }, (_, i) => ({ hostname: `site${i}.example.com`, enabled: false })) } };
     await writeFile(invalid, JSON.stringify(payload));
     await driver.findElement(By.css('[data-settings-panel="tools-panel"]')).click();
     await driver.findElement(By.id("import-file")).sendKeys(invalid);
@@ -415,6 +417,89 @@ try {
     assert(result.viewportWidth >= 360 && result.viewportWidth < 380, "Toolbar width stays intrinsic, not collapsed or full-page");
     assert.equal(result.spacing, .08);
     assert.equal(result.feedback, "");
+  });
+
+  await check("legacy pauses migrate losslessly within installed storage quotas and remain editable", async () => {
+    const original = await extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
+    const evidence = { browserName, browserVersion: (await driver.getCapabilities()).get("browserVersion"), cases: [] };
+    try {
+      for (const count of [120, 250]) {
+        const result = await extensionCall(async (count) => {
+          const api = globalThis.browser ?? globalThis.chrome;
+          const disabledSites = Array.from({ length: count }, (_, index) => `site${index}.example.com`);
+          await api.storage.sync.clear();
+          await api.storage.sync.set({ enabled: false, scope: "all", textScale: 130, disabledSites });
+          const legacy = await api.storage.sync.get(null);
+          const expanded = LexendSettings.decodeSettings(legacy);
+          // Positive control: the browser itself must reject the old expanded
+          // representation. This proves the fixture reaches the real item quota.
+          let expandedWriteError;
+          try { await api.storage.sync.set({ siteRules: expanded.siteRules }); }
+          catch (error) { expandedWriteError = String(error); }
+          if (!expandedWriteError) throw new Error("Expanded legacy rules unexpectedly fit the installed browser quota");
+          const first = LexendPreferences.createClient(api);
+          const second = LexendPreferences.createClient(api);
+          await Promise.all([first.load(), second.load()]);
+          await Promise.all([
+            first.mutate({ type: "patch", changes: { theme: "dark" } }),
+            second.mutate({ type: "patch", changes: { lineHeight: 1.73 } })
+          ]);
+          const afterPatch = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+          await first.mutate({ type: "removeRule", hostname: disabledSites[60], includeSubdomains: false });
+          const raw = await api.storage.sync.get(null);
+          const afterDelete = LexendSettings.decodeSettings(raw);
+          const restartedClient = LexendPreferences.createClient(api);
+          await restartedClient.load();
+          return {
+            count, expandedWriteError,
+            itemQuota: api.storage.sync.QUOTA_BYTES_PER_ITEM,
+            legacyValueBytes: new TextEncoder().encode(JSON.stringify(disabledSites)).length,
+            expandedValueBytes: new TextEncoder().encode(JSON.stringify(expanded.siteRules)).length,
+            persistedRuleItemBytes: new TextEncoder().encode("siteRules" + JSON.stringify(raw.siteRules)).length,
+            remainingLegacy: Object.hasOwn(raw, "disabledSites"),
+            afterPatch, afterDelete, restarted: restartedClient.settings
+          };
+        }, count);
+        assert.match(result.expandedWriteError, /quota/i);
+        assert.equal(result.afterPatch.siteRules.length, count, "An unrelated preference write preserves every legacy pause");
+        assert.equal(result.afterPatch.theme, "dark");
+        assert.equal(result.afterPatch.lineHeight, 1.73);
+        assert.equal(result.afterPatch.enabled, false);
+        assert.equal(result.afterPatch.scope, "all");
+        assert.equal(result.afterPatch.textScale, 130);
+        assert.deepEqual(result.afterDelete.siteRules.map((rule) => rule.hostname),
+          Array.from({ length: count }, (_, index) => `site${index}.example.com`).filter((_, index) => index !== 60));
+        assert(result.afterDelete.siteRules.every((rule) => rule.enabled === false && rule.includeSubdomains === false && rule.scope === null));
+        assert.deepEqual(result.restarted, result.afterDelete);
+        assert.equal(result.remainingLegacy, false, "Legacy keys are cleaned only after durable canonical settings");
+        assert(result.persistedRuleItemBytes <= (result.itemQuota ?? 8192));
+        evidence.cases.push(result);
+      }
+      if (browserName === "chrome") {
+        const before = await saved();
+        await driver.sendDevToolsCommand("ServiceWorker.enable", {});
+        await driver.sendDevToolsCommand("ServiceWorker.stopAllWorkers", {});
+        await patch({ theme: "light" });
+        assert.deepEqual((await saved()).siteRules, before.siteRules, "A restarted worker decodes every migrated pause");
+        await driver.quit();
+        driver = await createDriver();
+        await driver.manage().setTimeouts({ script: 20000 });
+        await navigateExtension(`${origin}options.html`);
+        await wait("!document.querySelector('#dark-theme').disabled", "Migrated settings initialize after a full browser restart");
+        assert.deepEqual(await saved(), { ...before, theme: "light" });
+        await patch({ theme: "dark" });
+        assert.deepEqual(await saved(), before, "All migrated rules remain editable after restart");
+        evidence.workerRestart = true;
+        evidence.browserRestart = true;
+      }
+      await writeFile(join(artifactDirectory, "legacy-quota.json"), JSON.stringify(evidence, null, 2));
+    } finally {
+      await extensionCall(async (original) => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.storage.sync.clear();
+        await api.storage.sync.set(original);
+      }, original);
+    }
   });
 
   if (browserName === "chrome") await check("browser restart preserves custom preferences, site pauses and a working writer", async () => {
