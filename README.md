@@ -20,12 +20,7 @@ of the popup to turn Lexend off everywhere. You can also pause or resume the
 current site with `Ctrl+Shift+L` (`Command+Shift+L` on macOS).
 
 Open **Settings** with the gear button to adjust text size, line height, and
-letter spacing. The preview offers **Reading**, **Compare**, and **Glyphs** views.
-Compare puts a system font at default settings beside Lexend with your settings;
-Glyphs shows similar letterforms, numbers, accents, and three font weights.
-Use **Try your own text** to preview a sample without saving or sending it.
-
-You can also search and edit saved site rules, or add a rule
+letter spacing. You can also search and edit saved site rules, or add a rule
 that covers a domain and its subdomains. A rule for `example.com` covers only
 that hostname unless you select **Include subdomains**; with that option, it
 also covers addresses such as `news.example.com`.

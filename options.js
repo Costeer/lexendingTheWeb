@@ -6,7 +6,7 @@
   const quotesApi = globalThis.LexendQuotes;
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
-  const PREVIEW_DEFAULT_LINE_HEIGHT = 1.65;
+  const PREVIEW_DEFAULT_LINE_HEIGHT = 1.25;
   const darkThemeInput = document.querySelector("#dark-theme");
   const appearanceState = document.querySelector("#appearance-state");
   const advancedModeInput = document.querySelector("#advanced-mode");
@@ -26,15 +26,6 @@
   const letterSpacingOutput = document.querySelector("#letter-spacing-output");
   const previewCopy = document.querySelector("#preview-copy");
   const previewAuthor = document.querySelector("#preview-author");
-  const previewAttribution = document.querySelector("#preview-attribution");
-  const previewReading = document.querySelector("#preview-reading");
-  const previewOriginal = document.querySelector("#preview-original");
-  const previewOriginalCopy = document.querySelector("#preview-original-copy");
-  const previewGlyphs = document.querySelector("#preview-glyphs");
-  const previewText = document.querySelector("#preview-text");
-  const previewModeInputs = [...document.querySelectorAll('input[name="previewMode"]')];
-  const previewSpecimens = [...document.querySelectorAll(".preview-specimen")];
-  let previewMode = "reading";
   const resetReadabilityButton = document.querySelector("#reset-readability");
   const saveStatus = document.querySelector("#save-status");
   const saveStatusText = document.querySelector("#save-status-text");
@@ -176,50 +167,18 @@
     .replace(/\.?0+$/, "");
 
   const renderQuote = () => {
-    const custom = previewText.value.trim();
-    const text = custom || `“${quote.text}”`;
-    for (const copy of [previewCopy, previewOriginalCopy]) {
-      copy.textContent = text;
-      // An empty language tag lets a custom multilingual sample stand on its
-      // own instead of inheriting the randomly chosen quote's language.
-      copy.lang = custom ? "" : quote.lang;
-    }
-    previewAttribution.hidden = Boolean(custom) || previewMode === "glyphs";
+    previewCopy.textContent = `“${quote.text}”`;
+    previewCopy.lang = quote.lang;
     previewAuthor.textContent = quote.author;
     previewAuthor.href = quote.url;
   };
 
   const renderPreview = (readability = settings) => {
-    const baseSize = desktopSettingsLayout.matches ? 18 : 16;
-    for (const copy of [previewCopy, ...previewSpecimens]) {
-      copy.style.fontSize = `${baseSize * readability.textScale / 100}px`;
-      copy.style.lineHeight = readability.lineHeight || PREVIEW_DEFAULT_LINE_HEIGHT;
-      copy.style.letterSpacing = /\p{Script=Arabic}/u.test(copy.textContent) ? "0em" : `${readability.letterSpacing}em`;
-    }
-    previewOriginalCopy.style.fontSize = `${baseSize}px`;
+    const baseSize = desktopSettingsLayout.matches ? 17 : 14;
+    previewCopy.style.fontSize = `${baseSize * readability.textScale / 100}px`;
+    previewCopy.style.lineHeight = readability.lineHeight || PREVIEW_DEFAULT_LINE_HEIGHT;
+    previewCopy.style.letterSpacing = `${readability.letterSpacing}em`;
   };
-
-  const renderPreviewMode = () => {
-    previewReading.hidden = previewMode === "glyphs";
-    previewGlyphs.hidden = previewMode !== "glyphs";
-    previewOriginal.hidden = previewMode !== "compare";
-    previewReading.classList.toggle("is-comparing", previewMode === "compare");
-    renderQuote();
-  };
-
-  previewModeInputs.forEach((input) => input.addEventListener("change", () => {
-    if (!input.checked) return;
-    previewMode = input.value;
-    renderPreviewMode();
-  }));
-  previewText.addEventListener("input", () => {
-    if (previewMode === "glyphs") {
-      previewMode = "reading";
-      previewModeInputs.forEach((input) => { input.checked = input.value === previewMode; });
-    }
-    renderPreviewMode();
-    renderPreview();
-  });
 
   const renderReadabilityMode = (animate = false) => {
     const showAdvanced = advancedModeInput.checked;

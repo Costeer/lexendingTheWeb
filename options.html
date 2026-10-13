@@ -312,36 +312,11 @@
                             Reset to default
                         </button>
                     </div>
-                    <fieldset class="preview-modes">
-                        <legend class="visually-hidden">Preview style</legend>
-                        <div class="segment-group">
-                            <label><input type="radio" name="previewMode" value="reading" checked /><span>Reading</span></label>
-                            <label><input type="radio" name="previewMode" value="compare" /><span>Compare</span></label>
-                            <label><input type="radio" name="previewMode" value="glyphs" /><span>Glyphs</span></label>
-                        </div>
-                    </fieldset>
-                    <div id="preview-reading" class="preview-reading">
-                        <figure id="preview-original" class="preview-original" hidden>
-                            <figcaption class="preview-font-label">System font <span>Default settings</span></figcaption>
-                            <blockquote id="preview-original-copy" dir="auto"></blockquote>
-                        </figure>
-                        <figure class="preview-quote-frame">
-                            <figcaption class="preview-font-label">Lexend <span>Your settings</span></figcaption>
-                            <blockquote id="preview-copy" lang="de" dir="auto" tabindex="0">
-                                “Zu sagen, was ist, bleibt die revolutionärste Tat.”
-                            </blockquote>
-                        </figure>
-                    </div>
-                    <div id="preview-glyphs" class="preview-glyphs" hidden>
-                        <p class="preview-font-label">A closer look <span>Letterforms &amp; weights</span></p>
-                        <div class="glyph-pairs" aria-label="Similar letterforms">
-                            <span>Il1</span><span>O0Q</span><span>rn m</span><span>bd pq</span>
-                        </div>
-                        <div class="glyph-weight"><span>Regular · 400</span><p class="preview-specimen" lang="en">The quick brown fox jumps over the lazy dog.</p></div>
-                        <div class="glyph-weight"><span>Semibold · 600</span><p class="preview-specimen">0123456789 &amp; @ # % ? !</p></div>
-                        <div class="glyph-weight"><span>Bold · 800</span><p class="preview-specimen" lang="vi">À É Ö ß Ł · Tiếng Việt</p></div>
-                    </div>
-                    <p id="preview-attribution" class="preview-attribution">
+                    <figure class="preview-quote-frame">
+                        <blockquote id="preview-copy" lang="de" tabindex="0">
+                            “Zu sagen, was ist, bleibt die revolutionärste Tat.”
+                        </blockquote>
+                        <figcaption class="preview-attribution">
                             —
                             <a
                                 id="preview-author"
@@ -350,13 +325,8 @@
                                 rel="noopener noreferrer"
                                 >Rosa Luxemburg</a
                             >
-                    </p>
-                    <details class="preview-custom">
-                        <summary>Try your own text</summary>
-                        <label for="preview-text">Reading sample</label>
-                        <textarea id="preview-text" rows="3" maxlength="2000" dir="auto" placeholder="Type or paste something you like to read…" aria-describedby="preview-text-hint"></textarea>
-                        <p id="preview-text-hint" class="helper">Only used in this preview. Clear it to return to the quote.</p>
-                    </details>
+                        </figcaption>
+                    </figure>
                 </div>
             </section>
 
