@@ -510,6 +510,226 @@ test("failed theme remains visible after a successful size save and Retry restor
   assert.equal(page.get("#save-status-text").textContent, "All changes saved");
 });
 
+test("successful Retry clears only its failed-add field error and preserves the submitted subdomain intent", async () => {
+  let failAdd = true;
+  const page = await openSettings({ count: 0, sendOperation(operation, store) {
+    if (operation.type === "addRule" && failAdd) throw new Error("Rule quota exceeded");
+    return store.mutate(operation);
+  } });
+  page.get("#new-hostname").value = "retry.example";
+  page.get("#new-subdomains").checked = true;
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  assert.equal(page.get("#hostname-error").textContent, "Not saved: site rule. Rule quota exceeded");
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), "true");
+  failAdd = false;
+  await page.get("#retry-save").emit("click");
+  assert.equal(page.get("#hostname-error").textContent, "");
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), undefined);
+  assert.equal(page.get("#save-status-text").textContent, "All changes saved");
+  assert.deepEqual(page.stored().siteRules, [{ hostname: "retry.example", includeSubdomains: true,
+    enabled: false, scope: null }]);
+  assert.equal(page.get("#new-hostname").value, "retry.example", "Retry retires feedback without resetting a form draft");
+  assert.equal(page.get("#new-subdomains").checked, true);
+});
+
+test("a rejected add Retry retains its field error and an unrelated successful save cannot clear it", async () => {
+  const page = await openSettings({ count: 0, sendOperation(operation, store) {
+    if (operation.type === "addRule") throw new Error("Rule quota exceeded");
+    return store.mutate(operation);
+  } });
+  page.get("#new-hostname").value = "retry.example";
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  const error = page.get("#hostname-error").textContent;
+  page.get("#dark-theme").checked = true;
+  page.get("#dark-theme").emit("change");
+  await tick();
+  assert.equal(page.stored().theme, "dark");
+  assert.equal(page.get("#hostname-error").textContent, error);
+  await page.get("#retry-save").emit("click");
+  assert.equal(page.get("#hostname-error").textContent, error);
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), "true");
+  assert.equal(page.stored().siteRules.length, 0);
+  assert.equal(page.get("#retry-save").hidden, false);
+});
+
+test("recovered add feedback clears while an unrelated failed theme retains its own Retry", async () => {
+  let failAdd = true;
+  const page = await openSettings({ count: 0, sendOperation(operation, store) {
+    if (operation.type === "patch") throw new Error("Theme unavailable");
+    if (failAdd) throw new Error("Rule quota exceeded");
+    return store.mutate(operation);
+  } });
+  page.get("#dark-theme").checked = true;
+  page.get("#dark-theme").emit("change");
+  await tick();
+  page.get("#new-hostname").value = "retry.example";
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  assert.equal(page.get("#hostname-error").textContent, "Not saved: site rule. Rule quota exceeded",
+    "the add field reports its own error rather than another intent's shared status");
+  failAdd = false;
+  await page.get("#retry-save").emit("click");
+  assert.equal(page.get("#hostname-error").textContent, "");
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), undefined);
+  assert.equal(page.stored().siteRules[0].hostname, "retry.example");
+  assert.equal(page.stored().theme, "light");
+  assert.match(page.get("#save-status-text").textContent, /Not saved: appearance.*Theme unavailable/);
+  assert.equal(page.get("#retry-save").hidden, false);
+});
+
+for (const newerDraft of ["valid", "invalid", "duplicate", "subdomains"]) {
+  test(`a delayed successful Retry preserves a newer ${newerDraft} draft and its validation`, async () => {
+    let failAdd = true;
+    let releaseRetry;
+    const page = await openSettings({ count: 1, sendOperation: async (operation, store) => {
+      if (operation.type === "addRule") {
+        if (failAdd) throw new Error("Rule quota exceeded");
+        await new Promise((resolve) => { releaseRetry = resolve; });
+      }
+      return store.mutate(operation);
+    } });
+    page.get("#new-hostname").value = "retry.example";
+    await page.get("#add-rule").emit("submit", { preventDefault() {} });
+    failAdd = false;
+    const retry = page.get("#retry-save").emit("click");
+    await tick();
+    if (newerDraft === "subdomains") {
+      page.get("#new-subdomains").checked = true;
+      page.get("#new-subdomains").emit("change");
+    } else {
+      page.get("#new-hostname").value = newerDraft === "valid" ? "new-draft.example"
+        : newerDraft === "duplicate" ? "site1.example.com" : "invalid hostname";
+      page.get("#new-hostname").emit("input");
+      page.get("#new-subdomains").checked = newerDraft === "valid";
+      if (newerDraft !== "valid") await page.get("#add-rule").emit("submit", { preventDefault() {} });
+    }
+    const value = page.get("#new-hostname").value;
+    const error = page.get("#hostname-error").textContent;
+    const invalid = page.get("#new-hostname").getAttribute("aria-invalid");
+    const subdomains = page.get("#new-subdomains").checked;
+    releaseRetry();
+    await retry;
+    assert.equal(page.get("#new-hostname").value, value);
+    assert.equal(page.get("#new-subdomains").checked, subdomains);
+    assert.equal(page.get("#hostname-error").textContent, error);
+    assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), invalid);
+    assert.equal(page.stored().siteRules.find((rule) => rule.hostname === "retry.example").includeSubdomains, false,
+      "the original retry preserves its submitted mode rather than adopting a later checkbox draft");
+    assert.equal(page.get("#save-status-text").textContent, "All changes saved");
+  });
+}
+
+test("an older delayed Retry cannot clear the field error from a newer failed add", async () => {
+  let oldAttempts = 0;
+  let releaseRetry;
+  const page = await openSettings({ count: 0, sendOperation: async (operation, store) => {
+    if (operation.rule.hostname === "old.example" && ++oldAttempts > 1) {
+      await new Promise((resolve) => { releaseRetry = resolve; });
+      return store.mutate(operation);
+    }
+    throw new Error(`${operation.rule.hostname} unavailable`);
+  } });
+  page.get("#new-hostname").value = "old.example";
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  const retry = page.get("#retry-save").emit("click");
+  await tick();
+  page.get("#new-hostname").value = "new.example";
+  page.get("#new-hostname").emit("input");
+  page.get("#new-subdomains").checked = true;
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  releaseRetry();
+  await retry;
+  assert.equal(page.get("#hostname-error").textContent, "Not saved: site rule. new.example unavailable");
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), "true");
+  assert.equal(page.get("#new-hostname").value, "new.example");
+  assert.equal(page.get("#new-subdomains").checked, true);
+  assert.deepEqual(page.stored().siteRules.map((rule) => rule.hostname), ["old.example"]);
+});
+
+for (const oldSaveSucceeds of [false, true]) {
+  test(`a late ${oldSaveSucceeds ? "successful" : "failed"} add cannot replace a newer invalid draft`, async () => {
+    let settleAdd;
+    const page = await openSettings({ count: 0, sendOperation: async (operation, store) => {
+      await new Promise((resolve, reject) => { settleAdd = oldSaveSucceeds ? resolve : () => reject(new Error("Late quota error")); });
+      return store.mutate(operation);
+    } });
+    page.get("#new-hostname").value = "old.example";
+    const add = page.get("#add-rule").emit("submit", { preventDefault() {} });
+    await tick();
+    page.get("#new-hostname").value = "invalid hostname";
+    page.get("#new-hostname").emit("input");
+    page.get("#new-subdomains").checked = true;
+    await page.get("#add-rule").emit("submit", { preventDefault() {} });
+    settleAdd();
+    await add;
+    assert.equal(page.get("#hostname-error").textContent, "Enter just the domain, like example.com");
+    assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), "true");
+    assert.equal(page.get("#new-hostname").value, "invalid hostname");
+    assert.equal(page.get("#new-subdomains").checked, true);
+    assert.equal(page.stored().siteRules.length, Number(oldSaveSucceeds));
+  });
+}
+
+test("Retry retires a failed-add field error when its write committed before a lost response", async () => {
+  let responses = 0;
+  const page = await openSettings({ count: 0, afterWrite: () => {
+    responses++;
+    return { ok: false, message: "Writer reply lost" };
+  } });
+  page.get("#new-hostname").value = "committed.example";
+  await page.get("#add-rule").emit("submit", { preventDefault() {} });
+  assert.match(page.get("#hostname-error").textContent, /Writer reply lost/);
+  assert.equal(page.stored().siteRules[0].hostname, "committed.example");
+  await page.get("#retry-save").emit("click");
+  assert.equal(responses, 1, "confirmed fulfillment retires the failed operation without replaying it");
+  assert.equal(page.get("#hostname-error").textContent, "");
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), undefined);
+  assert.equal(page.get("#save-status-text").textContent, "All changes saved");
+});
+
+test("a late add failure superseded by an applied import cannot attach a saved status as a field error", async () => {
+  let rejectAdd;
+  const page = await openSettings({ count: 0, beforeOperation(operation) {
+    if (operation.type === "addRule") return new Promise((_, reject) => { rejectAdd = reject; });
+  } });
+  page.get("#new-hostname").value = "old.example";
+  const add = page.get("#add-rule").emit("submit", { preventDefault() {} });
+  await tick();
+  await page.import(globalThis.LexendSettings.normalizeSettings({ theme: "dark" }));
+  await page.get("#apply-import").emit("click");
+  const importMessage = page.get("#save-status-text").textContent;
+  rejectAdd(new Error("Superseded add failed"));
+  await add;
+  assert.equal(page.get("#hostname-error").textContent, "");
+  assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), undefined);
+  assert.equal(page.get("#new-hostname").value, "old.example");
+  assert.equal(page.get("#save-status-text").textContent, importMessage);
+  assert.equal(page.stored().theme, "dark");
+  assert.equal(page.stored().siteRules.length, 0);
+});
+
+for (const changedOverride of [{ enabled: true }, { scope: "all" }, { includeSubdomains: true }]) {
+  test(`a retired add failure does not clear field feedback for a different confirmed ${Object.keys(changedOverride)[0]} intent`, async () => {
+    let operations = 0;
+    const page = await openSettings({ count: 0, sendOperation(operation, store) {
+      operations++;
+      if (operation.type === "addRule") throw new Error("Rule quota exceeded");
+      return store.mutate(operation);
+    } });
+    page.get("#new-hostname").value = "retry.example";
+    await page.get("#add-rule").emit("submit", { preventDefault() {} });
+    const error = page.get("#hostname-error").textContent;
+    await page.import(globalThis.LexendSettings.normalizeSettings({ siteRules: [
+      { hostname: "retry.example", includeSubdomains: false, enabled: false, ...changedOverride }
+    ] }));
+    await page.get("#apply-import").emit("click");
+    assert.equal(page.get("#retry-save").hidden, true, "import retired the ordinary failed add");
+    await page.get("#retry-save").emit("click");
+    assert.equal(operations, 2, "retired add intent is never replayed");
+    assert.equal(page.get("#hostname-error").textContent, error);
+    assert.equal(page.get("#new-hostname").getAttribute("aria-invalid"), "true");
+  });
+}
+
 test("import replacement is disclosed and cancelling leaves settings untouched", async () => {
   const page = await openSettings();
   page.get("#import-file").files = [{ size: 200, text: async () => JSON.stringify({ schemaVersion: 2,

@@ -651,7 +651,11 @@
 
   const save = (changes) => persist({ type: "patch", changes });
 
+  let hostnameDraftVersion = 0;
+  let failedAddFeedback = null;
   const clearHostnameError = () => {
+    hostnameDraftVersion++;
+    failedAddFeedback = null;
     hostnameError.textContent = "";
     hostnameInput.removeAttribute("aria-invalid");
   };
@@ -660,6 +664,24 @@
     hostnameError.textContent = message;
     hostnameInput.setAttribute("aria-invalid", "true");
     hostnameInput.focus();
+  };
+
+  const failureForAddedRule = (rule) => recovery.state.failures.find((failure) => (
+    failure.keys.includes(`rule:${rule.hostname}:${Boolean(rule.includeSubdomains)}`)
+  ));
+
+  const clearRecoveredAddError = (feedback) => {
+    if (!feedback || failedAddFeedback !== feedback
+        || hostnameDraftVersion !== feedback.version
+        || hostnameInput.value !== feedback.value
+        || subdomainsInput.checked !== feedback.rule.includeSubdomains
+        || failureForAddedRule(feedback.rule)) return;
+    const confirmed = settingsApi.getDirectRule(preferences.confirmedSettings,
+      feedback.rule.hostname, feedback.rule.includeSubdomains);
+    const desired = settingsApi.normalizeSettings({ siteRules: [feedback.rule] }).siteRules[0];
+    // Another save or a retired retry is insufficient: the complete add intent
+    // must be confirmed, including its independent activation/scope overrides.
+    if (confirmed && JSON.stringify(confirmed) === JSON.stringify(desired)) clearHostnameError();
   };
 
   const updateSubdomainPreview = () => {
@@ -758,16 +780,25 @@
     });
   });
 
-  retrySaveButton.addEventListener("click", () => {
+  retrySaveButton.addEventListener("click", async () => {
     if (importBusy) return;
     if (loadFailed) loadSettings();
-    else return recovery.retry();
+    else {
+      const feedback = failedAddFeedback;
+      await recovery.retry();
+      clearRecoveredAddError(feedback);
+    }
   });
 
   hostnameInput.addEventListener("input", () => {
     clearHostnameError();
     updateSubdomainPreview();
     updateAddRuleState();
+  });
+
+  subdomainsInput.addEventListener("change", () => {
+    if (failedAddFeedback) clearHostnameError();
+    else hostnameDraftVersion++;
   });
 
   addRuleForm.addEventListener("submit", async (event) => {
@@ -791,8 +822,16 @@
       includeSubdomains,
       enabled: false
     };
-    if (!await persist({ type: "addRule", rule })) {
-      showHostnameError(saveStatusText.textContent);
+    const draft = { version: hostnameDraftVersion, value: hostnameInput.value, rule };
+    const saved = await persist({ type: "addRule", rule });
+    // A late reply owns neither a newer form draft nor a newer validation error.
+    if (hostnameDraftVersion !== draft.version || hostnameInput.value !== draft.value
+        || subdomainsInput.checked !== includeSubdomains) return;
+    if (!saved) {
+      const failure = failureForAddedRule(rule);
+      if (!failure) return;
+      failedAddFeedback = draft;
+      showHostnameError(`Not saved: site rule. ${failure.error.message || "Try again."}`);
       return;
     }
 
