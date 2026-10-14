@@ -18,6 +18,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { browserName, browserVersion, output } = parseBrowserArguments(process.argv.slice(2));
 const fixture = await readFile(join(root, "scripts/fixtures/compatibility.html"), "utf8");
 const historyFixture = await readFile(join(root, "scripts/fixtures/history.html"), "utf8");
+const oldRuleFixtureBytes = await readFile(join(root, "scripts/fixtures/rule-format-v0.5.0.json"));
+const oldRuleFixture = JSON.parse(oldRuleFixtureBytes);
+assert.equal(oldRuleFixture.revision, "f2670e24aa210b80f6baedfcf09d22a5dd91e640");
+const historicalRuleHashes = {
+  "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
+  "src/preferences.js": "c75df627491bf9ef18e78e7e0276e2ea807cd2da9ed74f4732784f783ff1cb65"
+};
+assert.deepEqual(Object.keys(oldRuleFixture.files).sort(), Object.keys(historicalRuleHashes).sort());
+const oldRuleSources = Object.fromEntries(Object.entries(oldRuleFixture.files).map(([path, file]) => {
+  assert.equal(file.sha256, historicalRuleHashes[path], `Historical rule fixture identity differs: ${path}`);
+  assert.equal(createHash("sha256").update(file.source).digest("hex"), historicalRuleHashes[path], `Historical rule fixture differs: ${path}`);
+  return [path, file.source];
+}));
+// Compile in Node, then send the function body as ordinary WebDriver script.
+// The installed extension page does not need unsafe-eval permission.
+const historicalRuleFactory = new Function("globalThis", oldRuleSources["src/settings.js"] + "\n"
+  + oldRuleSources["src/preferences.js"]
+  + "\nreturn { settings: globalThis.LexendSettings, preferences: globalThis.LexendPreferences };").toString();
 const frameFixture = '<!doctype html><style>html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}</style><p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
 const server = createServer((request, response) => {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -86,6 +104,10 @@ const extensionCall = async (fn, ...args) => {
   if (result.error) throw new Error(result.error);
   return result.value;
 };
+const historicalRuleCall = (fn, ...args) => extensionCall(`async (...args) => {
+  const old = (${historicalRuleFactory})({});
+  return (${fn.toString()})(old, ...args);
+}`, ...args);
 const patch = (changes) => extensionCall(async (changes) => {
   const api = globalThis.browser ?? globalThis.chrome;
   const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: { type: "patch", changes } });
@@ -145,7 +167,7 @@ try {
     path: archive, retainedPath: retainedArchive, sha256: createHash("sha256").update(archiveBytes).digest("hex"), manifest,
     buildIdentity: files["build-identity.json"] ? JSON.parse(Buffer.from(files["build-identity.json"]).toString("utf8")) : null
   };
-  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/firefox-installation.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html"].map(async (path) =>
+  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/firefox-installation.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html", "scripts/fixtures/rule-format-v0.5.0.json"].map(async (path) =>
     [path, createHash("sha256").update(await readFile(join(root, path))).digest("hex")])));
   report.environment.selenium = JSON.parse(await readFile(join(root, "node_modules/selenium-webdriver/package.json"), "utf8")).version;
   if (browserName === "chrome") {
@@ -641,12 +663,15 @@ try {
     assert.equal(result.feedback, "");
   });
 
-  await check("legacy pauses migrate losslessly within installed storage quotas and remain editable", async () => {
+  await check("legacy pauses remain older-readable within installed storage quotas and editable", async () => {
     const original = await extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
-    const evidence = { browserName, browserVersion: (await driver.getCapabilities()).get("browserVersion"), cases: [] };
+    const evidence = { browserName, browserVersion: (await driver.getCapabilities()).get("browserVersion"),
+      historicalRevision: oldRuleFixture.revision,
+      historicalFixtureSha256: createHash("sha256").update(oldRuleFixtureBytes).digest("hex"),
+      historicalSourceHashes: Object.fromEntries(Object.entries(oldRuleFixture.files).map(([path, file]) => [path, file.sha256])), cases: [] };
     try {
       for (const count of [120, 250]) {
-        const result = await extensionCall(async (count) => {
+        const result = await historicalRuleCall(async (old, count) => {
           const api = globalThis.browser ?? globalThis.chrome;
           const disabledSites = Array.from({ length: count }, (_, index) => `site${index}.example.com`);
           await api.storage.sync.clear();
@@ -670,6 +695,16 @@ try {
           await first.mutate({ type: "removeRule", hostname: disabledSites[60], includeSubdomains: false });
           const raw = await api.storage.sync.get(null);
           const afterDelete = LexendSettings.decodeSettings(raw);
+          const oldDecoded = old.settings.normalizeSettings(raw);
+          const beforeRejectedEdit = JSON.stringify(raw);
+          let oldExpandedWriteError;
+          try { await old.preferences.createStore(api.storage.sync).mutate({ type: "patch", changes: { theme: "light" } }); }
+          catch (error) { oldExpandedWriteError = String(error); }
+          const oldRejectedWritePreservedRaw = JSON.stringify(await api.storage.sync.get(null)) === beforeRejectedEdit;
+          let unsafeEditError;
+          try { await first.mutate({ type: "updateRule", hostname: disabledSites[0], includeSubdomains: false, changes: { scope: "all" } }); }
+          catch (error) { unsafeEditError = { code: error.code, message: error.message }; }
+          const rawAfterRejectedEdit = await api.storage.sync.get(null);
           const restartedClient = LexendPreferences.createClient(api);
           await restartedClient.load();
           return {
@@ -677,8 +712,11 @@ try {
             itemQuota: api.storage.sync.QUOTA_BYTES_PER_ITEM,
             legacyValueBytes: new TextEncoder().encode(JSON.stringify(disabledSites)).length,
             expandedValueBytes: new TextEncoder().encode(JSON.stringify(expanded.siteRules)).length,
-            persistedRuleItemBytes: new TextEncoder().encode("siteRules" + JSON.stringify(raw.siteRules)).length,
+            persistedRuleItemBytes: new TextEncoder().encode("disabledSites" + JSON.stringify(raw.disabledSites)).length,
             remainingLegacy: Object.hasOwn(raw, "disabledSites"),
+            hasCanonicalRuleKey: Object.hasOwn(raw, "siteRules"), oldDecoded,
+            oldExpandedWriteError, oldRejectedWritePreservedRaw,
+            unsafeEditError, unsafeEditPreservedRaw: JSON.stringify(rawAfterRejectedEdit) === beforeRejectedEdit,
             afterPatch, afterDelete, restarted: restartedClient.settings
           };
         }, count);
@@ -693,7 +731,13 @@ try {
           Array.from({ length: count }, (_, index) => `site${index}.example.com`).filter((_, index) => index !== 60));
         assert(result.afterDelete.siteRules.every((rule) => rule.enabled === false && rule.includeSubdomains === false && rule.scope === null));
         assert.deepEqual(result.restarted, result.afterDelete);
-        assert.equal(result.remainingLegacy, false, "Legacy keys are cleaned only after durable canonical settings");
+        assert.equal(result.remainingLegacy, true, "Large exact pause lists retain their older-readable representation");
+        assert.equal(result.hasCanonicalRuleKey, false, "No compact or oversized canonical key hides the legacy pauses");
+        assert.deepEqual(result.oldDecoded, result.afterDelete, "The actual published reader retains all rules and preferences");
+        assert.match(result.oldExpandedWriteError, /quota/i, "The old writer's oversized expansion remains an explicit quota failure");
+        assert.equal(result.oldRejectedWritePreservedRaw, true, "An old rejected expansion preserves every stored value");
+        assert.equal(result.unsafeEditError?.code, "RULE_CAPACITY", "An unrepresentable rich edit fails before writing");
+        assert.equal(result.unsafeEditPreservedRaw, true, "The rejected rich edit preserves the exact stored configuration");
         assert(result.persistedRuleItemBytes <= (result.itemQuota ?? 8192));
         evidence.cases.push(result);
       }
@@ -717,6 +761,56 @@ try {
       await writeFile(join(artifactDirectory, "legacy-quota.json"), JSON.stringify(evidence, null, 2));
     } finally {
       await extensionCall(async (original) => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.storage.sync.clear();
+        await api.storage.sync.set(original);
+      }, original);
+    }
+  });
+
+  await check("published old writer preserves compatible rules and the compact loss control remains observable", async () => {
+    const original = await extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
+    try {
+      const result = await historicalRuleCall(async old => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.storage.sync.clear();
+        const initial = LexendSettings.normalizeSettings({ siteRules: [
+          { hostname: "paused.example", enabled: false },
+          { hostname: "scope.example", includeSubdomains: true, scope: "all" }
+        ] });
+        await api.storage.sync.set(initial);
+        const client = LexendPreferences.createClient(api);
+        await client.load();
+        await client.mutate({ type: "patch", changes: { textScale: 127 } });
+        const compatibleRaw = await api.storage.sync.get(null);
+        const compatible = LexendSettings.decodeSettings(compatibleRaw);
+        const oldRead = old.settings.normalizeSettings(compatibleRaw);
+        await old.preferences.createStore(api.storage.sync).mutate({ type: "patch", changes: { theme: "dark" } });
+        const afterOld = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+        await client.mutate({ type: "removeRule", hostname: "scope.example", includeSubdomains: true });
+        const afterCurrent = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+        // Exact old production bytes must still expose the historical defect.
+        await api.storage.sync.set(LexendSettings.encodeSettings(initial));
+        const oldCompactRead = old.settings.normalizeSettings(await api.storage.sync.get(null));
+        await old.preferences.createStore(api.storage.sync).mutate({ type: "patch", changes: { theme: "dark" } });
+        const afterUnsafeOldWrite = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+        return { compatibleArray: Array.isArray(compatibleRaw.siteRules), compatible, oldRead, afterOld, afterCurrent,
+          oldCompactRuleCount: oldCompactRead.siteRules.length,
+          oldCompactResumesPausedSite: old.settings.resolveSite(oldCompactRead, "paused.example").active,
+          lostRuleCount: afterUnsafeOldWrite.siteRules.length };
+      });
+      assert.equal(result.compatibleArray, true, "An unrelated new save retains an older-readable array");
+      assert.deepEqual(result.oldRead, result.compatible);
+      assert.deepEqual(result.afterOld, { ...result.compatible, theme: "dark" });
+      assert.equal(result.afterCurrent.theme, "dark");
+      assert.deepEqual(result.afterCurrent.siteRules, [result.compatible.siteRules[0]]);
+      assert.equal(result.oldCompactRuleCount, 0);
+      assert.equal(result.oldCompactResumesPausedSite, true);
+      assert.equal(result.lostRuleCount, 0, "The control actually demonstrates old-writer loss, rather than assuming compatibility");
+      return { ...result, historicalRevision: oldRuleFixture.revision,
+        historicalFixtureSha256: createHash("sha256").update(oldRuleFixtureBytes).digest("hex") };
+    } finally {
+      await extensionCall(async original => {
         const api = globalThis.browser ?? globalThis.chrome;
         await api.storage.sync.clear();
         await api.storage.sync.set(original);

@@ -4,14 +4,14 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
 
-const prepare = async (context, saved = { enabled: true, scope: "all", textScale: 120 }, fontResponse) => {
+const prepare = async (context, saved = { enabled: true, scope: "all", textScale: 120 }, fontResponse, { startupDeadline = null } = {}) => {
   const page = await context.newPage();
   await page.route("http://startup.test/**", fontResponse ?? (async (route) => {
     await route.fulfill({ body: await readFile(resolve(`.${new URL(route.request().url()).pathname}`)), contentType: "font/woff2" });
   }));
   await page.setContent('<!doctype html><style>body{font:20px/30px Arial}p{margin:0}</style><p id="text">Read without waiting for a second font swap.</p><strong>Bold reading text</strong><code>Native code</code>');
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.evaluate((saved) => {
+  await page.evaluate(({ saved, startupDeadline }) => {
     const changes = [], messages = [];
     globalThis.saved = saved;
     globalThis.chrome = {
@@ -30,8 +30,48 @@ const prepare = async (context, saved = { enabled: true, scope: "all", textScale
     const create = LexendLayout.create;
     globalThis.fontReadyAtCapture = [];
     globalThis.preloadedReadingWeights = new Set();
+    globalThis.startupDeadlineEvents = [];
+    const requestedReadingWeights = new Set();
+    if (startupDeadline) {
+      const setTimer = globalThis.setTimeout.bind(globalThis);
+      const clearTimer = globalThis.clearTimeout.bind(globalThis);
+      const controlledTimer = {};
+      let deadlineTimer, claimed = false;
+      globalThis.setTimeout = (callback, delay, ...args) => {
+        // Claim only the startup deadline requested immediately after both
+        // real reading-font loads. Other timers retain their native behavior.
+        if (claimed || delay !== 50 || fontReadyAtCapture.length
+            || !requestedReadingWeights.has(400) || !requestedReadingWeights.has(700)) {
+          return setTimer(callback, delay, ...args);
+        }
+        claimed = true;
+        startupDeadlineEvents.push({ kind: "requested", delay, controlled: startupDeadline === "controlled" });
+        if (startupDeadline === "controlled") {
+          // Select the successful-load branch without assuming host delivery
+          // completes in 50 ms. This timer cannot resolve the preload race;
+          // the actual font promises must settle before runtime clears it.
+          deadlineTimer = controlledTimer;
+        } else {
+          deadlineTimer = setTimer((...callbackArgs) => {
+            startupDeadlineEvents.push({ kind: "fired" });
+            return callback(...callbackArgs);
+          }, delay, ...args);
+        }
+        return deadlineTimer;
+      };
+      globalThis.clearTimeout = timer => {
+        if (claimed && timer === deadlineTimer) {
+          startupDeadlineEvents.push({ kind: "cleared", loadedWeights: [...preloadedReadingWeights].sort((a, b) => a - b) });
+          globalThis.setTimeout = setTimer;
+          globalThis.clearTimeout = clearTimer;
+          if (timer === controlledTimer) return;
+        }
+        return clearTimer(timer);
+      };
+    }
     const load = document.fonts.load.bind(document.fonts);
     document.fonts.load = async (font, ...args) => {
+      if (font.includes('"Lexend for the Web"')) requestedReadingWeights.add(parseInt(font, 10));
       const faces = await load(font, ...args);
       if (faces.some(face => face.family.replace(/["']/g, "") === "Lexend for the Web" && face.status === "loaded")) {
         preloadedReadingWeights.add(parseInt(font, 10));
@@ -49,6 +89,7 @@ const prepare = async (context, saved = { enabled: true, scope: "all", textScale
         // Native capture temporarily disables conversion CSS. Chromium can
         // recreate unloaded FontFace wrappers for already decoded sources at
         // that boundary; record the real preload's completion instead.
+        if (startupDeadline) startupDeadlineEvents.push({ kind: "capture" });
         fontReadyAtCapture.push(preloadedReadingWeights.has(400) && preloadedReadingWeights.has(700));
         return layout.capture(...args);
       }, repair: (...args) => {
@@ -56,7 +97,7 @@ const prepare = async (context, saved = { enabled: true, scope: "all", textScale
         return layout.repair(...args);
       } };
     } };
-  }, saved);
+  }, { saved, startupDeadline });
   // Real content scripts run without adding a page <script> or load event.
   await page.evaluate(source => (0, eval)(source), await readFile(resolve("src/content.js"), "utf8"));
   return page;
@@ -74,14 +115,19 @@ const createContext = browser => browser.newContext().then(async context => {
   return context;
 });
 
-test("cold startup loads regular and bold reading metrics before one layout repair", async () => {
+test("successful startup preload supplies regular and bold reading metrics before one layout repair", async () => {
   const context = await createContext(browser);
   try {
-    const page = await prepare(context);
+    const page = await prepare(context, undefined, undefined, { startupDeadline: "controlled" });
     await page.waitForFunction(() => state()?.healthy && !state().pending && state().refreshRevision > 0);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(150);
     assert.deepEqual(await page.evaluate(() => fontReadyAtCapture), [true], "loaded bundled faces do not trigger a redundant full-page repair");
+    assert.deepEqual(await page.evaluate(() => startupDeadlineEvents), [
+      { kind: "requested", delay: 50, controlled: true },
+      { kind: "cleared", loadedWeights: [400, 700] },
+      { kind: "capture" }
+    ], "successful preload clears the requested startup deadline before first capture");
     assert.equal(await page.evaluate(() => state().refreshRevision), 1);
     assert.deepEqual(await page.evaluate(() => repairFrames), [true], "converted text gets a rendering frame before the heavy layout repair");
     assert.equal(await page.locator("#text").evaluate(element => getComputedStyle(element).fontSize), "24px");
@@ -97,8 +143,15 @@ test("a slow font cannot delay fallback conversion or resume a paused page", asy
     const page = await prepare(context, undefined, async route => {
       await held;
       await route.fulfill({ body: await readFile(resolve(`.${new URL(route.request().url()).pathname}`)), contentType: "font/woff2" });
-    });
+    }, { startupDeadline: "native" });
     await page.waitForFunction(() => state()?.healthy && !state().pending && state().refreshRevision > 0);
+    assert.deepEqual(await page.evaluate(() => fontReadyAtCapture), [false], "the native deadline permits capture while font delivery remains blocked");
+    assert.deepEqual(await page.evaluate(() => startupDeadlineEvents), [
+      { kind: "requested", delay: 50, controlled: false },
+      { kind: "fired" },
+      { kind: "cleared", loadedWeights: [] },
+      { kind: "capture" }
+    ], "fallback keeps the actual 50 ms timer and clears it before capture");
     assert.equal(await page.locator("#text").evaluate(element => getComputedStyle(element).fontSize), "24px", "conversion proceeds while font delivery is still blocked");
     await page.evaluate(() => update({ enabled: false }));
     release();

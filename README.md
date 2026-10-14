@@ -73,6 +73,10 @@ npm run check
 npm run build
 ```
 
+`npm test` runs at most four test files concurrently because several launch
+real browsers. The empirical performance command runs separately on an idle
+machine.
+
 Browser-ready files are written to `dist/chrome` and `dist/firefox`.
 The build prints their absolute paths. If you are working in a separate Git
 worktree, use the folders printed by that worktree's build. Another checkout's
@@ -203,13 +207,15 @@ including keyboard and screen-reader checks and installed Firefox Android popup
 and settings flows. Desktop narrow-window and axe results do not establish those
 manual/device checks.
 
-The next public release is blocked by historical performance-baseline failure
-and compact-rule compatibility with older installations. Review the
+The next public release remains blocked by historical performance-baseline
+failure and incomplete release qualification. Default rule writes preserve
+older-readable storage; profiles already using compact rules still require
+compatible extension versions on participating installations. Review the
 [baseline decision proposal](docs/release-baseline-policy.md) and
 [saved-rule upgrade and rollback plan](docs/rule-format-rollout.md) before
 changing release qualification or enabling a public migration. These documents
-describe required decisions and work; they do not change the current gate or
-implement a compatibility writer.
+describe the implemented write policy, its limits and remaining decisions.
+The baseline proposal does not change the current release gate.
 
 ## For website authors
 

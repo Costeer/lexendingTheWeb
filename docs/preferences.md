@@ -9,26 +9,48 @@ submits operations to `LexendPreferences`, rather than writing whole snapshots.
 ## Stored representation
 
 `LexendSettings.decodeSettings(raw)` reads legacy, object-array and compact
-storage representations into the public model. `encodeSettings(settings)`
-produces the compact representation for synchronized storage. Compact site
-rules are versioned strings under the existing `siteRules` key; exact disabled
-hosts need only a hostname. The codec is internal: exports and mutation responses
-continue to contain normalized rule objects. Readers retain raw snapshots when
-merging storage changes, including deleted keys, and decode after reconciliation.
+storage representations into the public model. The writer uses
+`encodeSettingsForStorage(settings, raw)` to preserve the profile's representation:
 
-A mutation commits all changed canonical fields in one `storage.sync.set`. Legacy
-keys are cleaned up only after that write succeeds. An interrupted cleanup leaves
-harmless legacy data behind; canonical settings take precedence on restart. A
+- Fresh and object-array profiles write older-readable arrays under `siteRules`.
+- Legacy `disabledSites` profiles retain that key while every rule is an exact
+  pause. This keeps authentic large legacy lists editable without expanding them.
+- Profiles already storing compact `@1` rules retain compact encoding. No current
+  operation opts an unmigrated profile into compact storage.
+
+Scalar edits and normalized rule no-ops preserve existing rule bytes. A richer
+edit to legacy pauses uses an object array only if the selected item fits quota;
+otherwise it fails before any write. `encodeSettings(settings)` remains the
+explicit compact codec for existing compact data and test fixtures. Exports and
+mutation responses always contain normalized rule objects. Readers retain raw
+snapshots when merging storage changes, including deleted keys. If a successful
+mutation has no observed storage event, the client rereads actual storage rather
+than inferring its keys or cleanup from the normalized reply. A failed reread
+does not turn the committed save into a failure, but blocks further writes until
+a readable reload succeeds.
+
+A mutation commits all changed fields in one `storage.sync.set`. When a legacy
+rule list changes to an object array, `siteRules` commits before `disabledSites`
+is cleaned up. Interrupted cleanup leaves harmless legacy data behind; canonical
+settings take precedence on restart. There is no reverse key transition. A
 failed write retains the previous configuration. The writer never truncates rules
 or asks the user to erase all settings as recovery. Rule capacity measures the
-persisted item, including its key, and retains the supported 250-rule ceiling.
+selected persisted item, including its key, and retains the supported 250-rule
+ceiling. Compatible arrays have lower effective capacity than compact strings;
+not every 250-rule configuration fits an unmigrated profile. Reads and unrelated
+edits preserve existing oversized data; a changed item that remains over quota
+is rejected rather than relying on the browser to truncate or accept it.
 Malformed or unknown compact formats fail closed instead of becoming an empty
 rule list. Until a readable snapshot loads, all mutations, including replacement
 imports, remain blocked. Reloading or using a compatible extension version can
 recover a version mismatch; this does not repair arbitrary corrupted storage.
 
-Older extension versions cannot decode compact rules. Mixed-version browser sync
-is unsupported: update extensions on synced devices before changing preferences.
+Older extension versions cannot decode existing compact rules. The default write
+policy avoids introducing that exposure, but does not repair compact data already
+replaced by an old writer. Supported old readers can read the compatible formats;
+their mutation/import capacity remains smaller, and large legacy lists can still
+exceed an old writer's expanded-array quota. Update extensions on synced devices
+before changing preferences.
 Browser sync retains its normal per-key conflict behavior; the writer serializes
 clients within an installation, not simultaneous edits across devices.
 
@@ -65,12 +87,15 @@ optimistic pending values, so retry baselines reflect confirmed preferences.
 ## Validation boundaries
 
 Unit/browser fixtures exercise startup event ordering, write failure and retry
-supersession, import rejection/cancellation, interrupted migration and restart.
-The packaged installed-browser suite seeds authentic lists of 120 and 250 legacy
-pauses, proves that the old expanded form exceeds the real storage item quota,
-and verifies unrelated concurrent edits and individual deletion. Chromium also
-restarts its worker and browser with the migrated list. This does not simulate
-every cross-device browser-sync ordering.
+supersession, import rejection/cancellation, interrupted representation changes,
+raw response rereads and restart. Exact published reader/writer source is retained
+with pinned hashes for positive compatible-array and negative compact-loss
+controls. The packaged suite seeds authentic 120- and 250-pause legacy lists,
+requires a real browser quota rejection for their expanded form, and checks
+legacy retention, concurrent scalar edits, deletion and unsafe rich-edit rejection.
+Chromium also checks worker and browser restart. These controls do not simulate
+every offline profile or cross-device browser-sync ordering; qualification results
+must retain the tested source/package identities.
 
 Retry guards are deliberately conservative. If an earlier queued edit commits
 after a later attempt captured its baseline, or another page changes the same

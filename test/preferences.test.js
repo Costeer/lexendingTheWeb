@@ -1,11 +1,21 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import "../src/settings.js";
 import "../src/preferences.js";
 
 const api = globalThis.LexendSettings;
 const preferences = globalThis.LexendPreferences;
-const fixture = (initial = {}, { quota = false } = {}) => {
+const oldFixture = JSON.parse(await readFile(new URL("../scripts/fixtures/rule-format-v0.5.0.json", import.meta.url), "utf8"));
+const oldSources = [oldFixture.files["src/settings.js"].source, oldFixture.files["src/preferences.js"].source];
+const oldApi = (() => {
+  const context = { URL, TextEncoder };
+  oldSources.forEach((source) => runInNewContext(source, context));
+  return { settings: context.LexendSettings, preferences: context.LexendPreferences };
+})();
+const fixture = (initial = {}, { quota = false, silentWrites = false } = {}) => {
   let saved = structuredClone(initial);
   let failRead = false;
   let failWrite = false;
@@ -22,7 +32,7 @@ const fixture = (initial = {}, { quota = false } = {}) => {
       const changes = Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { oldValue: saved[key], newValue }]));
       saved = { ...saved, ...structuredClone(patch) };
       writes.push(structuredClone(patch));
-      listeners.forEach((listener) => listener(changes, "sync"));
+      if (!silentWrites) listeners.forEach((listener) => listener(changes, "sync"));
     },
     async remove(keys) {
       if (failCleanup) throw new Error("Cleanup interrupted");
@@ -31,7 +41,7 @@ const fixture = (initial = {}, { quota = false } = {}) => {
         if (Object.hasOwn(saved, key)) changes[key] = { oldValue: saved[key] };
         delete saved[key];
       }
-      if (Object.keys(changes).length) listeners.forEach((listener) => listener(changes, "sync"));
+      if (!silentWrites && Object.keys(changes).length) listeners.forEach((listener) => listener(changes, "sync"));
     }
   };
   const store = preferences.createStore(storage);
@@ -47,6 +57,249 @@ const fixture = (initial = {}, { quota = false } = {}) => {
     failCleanup(value) { failCleanup = value; },
     emit(changes) { listeners.forEach((listener) => listener(changes, "sync")); } };
 };
+
+test("old-reader controls retain the exact published and audit-baseline source identities", () => {
+  assert.equal(oldFixture.revision, "f2670e24aa210b80f6baedfcf09d22a5dd91e640");
+  for (const [path, expected] of [
+    ["src/settings.js", "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b"],
+    ["src/preferences.js", "c75df627491bf9ef18e78e7e0276e2ea807cd2da9ed74f4732784f783ff1cb65"]
+  ]) {
+    assert.equal(oldFixture.files[path].sha256, expected);
+    assert.equal(createHash("sha256").update(oldFixture.files[path].source).digest("hex"), expected);
+  }
+});
+
+test("default rule writes remain readable by the actual old reader and survive its unrelated writes", async () => {
+  const rules = api.normalizeSettings({ siteRules: [
+    { hostname: "paused.example", includeSubdomains: true, enabled: false, scope: "all" },
+    { hostname: "live.paused.example", enabled: true, scope: "body" },
+    { hostname: "scoped.example", enabled: null, scope: "all" }
+  ] }).siteRules;
+  const f = fixture({}, { quota: true });
+  await f.store.mutate({ type: "replace", settings: { ...api.defaults, siteRules: rules } });
+  assert.ok(Array.isArray(f.saved().siteRules));
+  assert.deepEqual(JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), api.decodeSettings(f.saved()));
+  await oldApi.preferences.createStore(f.storage).mutate({ type: "patch", changes: { theme: "dark" } });
+  assert.deepEqual(api.decodeSettings(f.saved()).siteRules, rules);
+  await oldApi.preferences.createStore(f.storage).mutate({ type: "addRule", rule: { hostname: "added.example", enabled: false } });
+  assert.deepEqual(api.decodeSettings(f.saved()).siteRules.slice(0, 3), rules);
+  await f.store.mutate({ type: "patch", changes: { textScale: 127 } });
+  assert.ok(Array.isArray(f.saved().siteRules));
+  assert.equal(api.getDirectRule(f.saved(), "added.example").enabled, false);
+});
+
+test("actual old compact reader and writer demonstrate the unsafe encoding negative control", async () => {
+  const f = fixture(api.encodeSettings({ siteRules: [{ hostname: "paused.example", enabled: false }] }));
+  assert.equal(api.decodeSettings(f.saved()).siteRules.length, 1);
+  assert.equal(oldApi.settings.normalizeSettings(f.saved()).siteRules.length, 0);
+  await oldApi.preferences.createStore(f.storage).mutate({ type: "patch", changes: { theme: "dark" } });
+  assert.deepEqual(f.saved().siteRules, []);
+  assert.equal(api.decodeSettings(f.saved()).siteRules.length, 0, "the real old writer destroys compact rules after an unrelated edit");
+});
+
+test("scalar and rule no-ops retain raw array and legacy representations byte for byte", async () => {
+  for (const initial of [
+    { ...api.normalizeSettings({}), siteRules: [{ hostname: "saved.example", enabled: false }] },
+    { disabledSites: [" Saved.Example. "], spacing: "wide" }
+  ]) {
+    const f = fixture(initial, { quota: true });
+    const key = Object.hasOwn(initial, "siteRules") ? "siteRules" : "disabledSites";
+    await f.store.mutate({ type: "patch", changes: { theme: "light" } });
+    await f.store.mutate({ type: "removeRule", hostname: "absent.example" });
+    await f.store.mutate({ type: "replace", settings: api.decodeSettings(f.saved()) });
+    assert.deepEqual(f.saved()[key], initial[key]);
+    assert.ok(f.writes.every((patch) => !Object.hasOwn(patch, "siteRules") && !Object.hasOwn(patch, "disabledSites")));
+    if (key === "disabledSites") assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
+  }
+});
+
+test("large legacy pause edits stay compatible and rich changes reject before any write or cleanup", async () => {
+  const disabledSites = Array.from({ length: 250 }, (_, i) => `s${i}.legacy.example`);
+  const f = fixture({ disabledSites, enabled: false, spacing: "wide" }, { quota: true });
+  const initial = structuredClone(f.saved());
+  for (const operation of [
+    { type: "updateRule", hostname: disabledSites[0], includeSubdomains: false, changes: { scope: "all" } },
+    { type: "replace", settings: api.normalizeSettings({ ...initial, siteRules: api.decodeSettings(initial).siteRules.map((rule, i) =>
+      i === 0 ? { ...rule, includeSubdomains: true } : rule) }) }
+  ]) {
+    await assert.rejects(f.store.mutate(operation), { code: "RULE_CAPACITY" });
+    assert.deepEqual(f.saved(), initial);
+    assert.equal(f.writes.length, 0);
+  }
+  await f.store.mutate({ type: "toggleSite", hostname: disabledSites[0] });
+  assert.equal(f.saved().enabled, true);
+  assert.equal(f.saved().disabledSites.length, 249);
+  assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), api.decodeSettings(f.saved()));
+  await f.store.mutate({ type: "replace", settings: api.normalizeSettings({ disabledSites, theme: "dark" }) });
+  assert.deepEqual(f.saved().disabledSites, disabledSites);
+});
+
+test("fresh profiles reject compact-only import capacity without altering their previous configuration", async () => {
+  const initial = api.normalizeSettings({ theme: "dark", siteRules: [{ hostname: "saved.example", enabled: false }] });
+  const f = fixture(initial, { quota: true });
+  const imported = api.normalizeSettings({ siteRules: Array.from({ length: 250 }, (_, i) =>
+    ({ hostname: `s${i}.example`, enabled: false, scope: "all", includeSubdomains: true })) });
+  assert.ok(api.ruleStorageBytes(imported) < 8192);
+  assert.ok(api.storedRuleBytes(api.encodeSettingsForStorage(imported, initial)) > 8192);
+  await assert.rejects(f.store.mutate({ type: "replace", settings: imported }), { code: "RULE_CAPACITY" });
+  assert.deepEqual(f.saved(), initial);
+  assert.equal(f.writes.length, 0);
+});
+
+test("existing compact profiles retain lossless full-capacity writes without forced expansion", async () => {
+  const initial = api.normalizeSettings({ siteRules: Array.from({ length: 250 }, (_, i) =>
+    ({ hostname: `s${i}.example`, enabled: false, includeSubdomains: true, scope: "all" })) });
+  const f = fixture(api.encodeSettings(initial), { quota: true });
+  await f.store.mutate({ type: "updateRule", hostname: "s0.example", includeSubdomains: true, changes: { scope: "body" } });
+  await f.store.mutate({ type: "replace", settings: { ...initial, textScale: 127 } });
+  assert.match(f.saved().siteRules, /^@1\n/);
+  assert.deepEqual(api.decodeSettings(f.saved()), { ...initial, textScale: 127 });
+});
+
+test("successful responses without storage events retain legacy authority for later pause updates", async () => {
+  const f = fixture({ disabledSites: ["before.example"], spacing: "wide" }, { silentWrites: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  await client.mutate({ type: "patch", changes: { theme: "dark" } });
+  f.emit({ disabledSites: { newValue: ["after.example"] } });
+  assert.deepEqual(client.settings.siteRules.map((rule) => rule.hostname), ["after.example"]);
+  assert.equal(client.settings.theme, "dark");
+  assert.equal(client.settings.letterSpacing, .04);
+});
+
+test("a no-event success rereads actual legacy cleanup and retains fallback only when cleanup failed", async () => {
+  for (const cleanupFailed of [false, true]) {
+    const f = fixture({ disabledSites: ["before.example"] }, { silentWrites: true });
+    f.failCleanup(cleanupFailed);
+    const client = preferences.createClient(f.extension);
+    await client.load();
+    await client.mutate({ type: "updateRule", hostname: "before.example", includeSubdomains: false,
+      changes: { includeSubdomains: true } });
+    assert.ok(Array.isArray(f.saved().siteRules));
+    f.emit({ siteRules: { oldValue: f.saved().siteRules } });
+    assert.deepEqual(client.settings.siteRules.map((rule) => rule.hostname), cleanupFailed ? ["before.example"] : []);
+  }
+});
+
+test("a storage event during a response reread wins over the older raw read", async () => {
+  const f = fixture({ disabledSites: ["before.example"] }, { silentWrites: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  let finishRead;
+  f.storage.get = () => new Promise((resolve) => { finishRead = resolve; });
+  f.extension.runtime.sendMessage = async () => ({ ok: true, settings: api.normalizeSettings({ disabledSites: ["before.example"], theme: "dark" }) });
+  const save = client.mutate({ type: "patch", changes: { theme: "dark" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  f.emit({ theme: { newValue: "dark" }, disabledSites: { newValue: ["newer.example"] } });
+  finishRead({ disabledSites: ["before.example"], theme: "light" });
+  await save;
+  assert.deepEqual(client.settings.siteRules.map((rule) => rule.hostname), ["newer.example"]);
+  assert.equal(client.settings.theme, "dark");
+});
+
+test("failed response rereads preserve the committed save and block writes until storage is readable", async () => {
+  const f = fixture({ disabledSites: ["before.example"] }, { silentWrites: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  const send = f.extension.runtime.sendMessage;
+  f.extension.runtime.sendMessage = async (message) => {
+    const response = await send(message);
+    f.failRead(true);
+    return response;
+  };
+  const result = await client.mutate({ type: "patch", changes: { theme: "dark" } });
+  assert.equal(result.theme, "dark");
+  assert.equal(f.saved().theme, "dark");
+  assert.equal(client.settings.theme, "dark");
+  assert.equal(client.loaded, false);
+  assert.match(client.readError.message, /Read failed/);
+  await assert.rejects(client.mutate({ type: "patch", changes: { textScale: 120 } }), { code: "NOT_LOADED" });
+  f.failRead(false);
+  await client.load();
+  assert.equal(client.loaded, true);
+  assert.equal(client.readError, null);
+  assert.equal(client.settings.theme, "dark");
+});
+
+test("a newer explicit load wins over an older successful response reread", async () => {
+  const f = fixture({ disabledSites: ["before.example"] }, { silentWrites: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  let finishRead;
+  f.storage.get = () => new Promise((resolve) => { finishRead = resolve; });
+  f.extension.runtime.sendMessage = async () => ({ ok: true, settings: api.normalizeSettings({ disabledSites: ["before.example"], theme: "dark" }) });
+  const save = client.mutate({ type: "patch", changes: { theme: "dark" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  const finishOlderRead = finishRead;
+  f.storage.get = async () => ({ disabledSites: ["loaded.example"], theme: "light" });
+  await client.load();
+  finishOlderRead({ disabledSites: ["before.example"], theme: "dark" });
+  await save;
+  assert.deepEqual(client.settings.siteRules.map((rule) => rule.hostname), ["loaded.example"]);
+  assert.equal(client.settings.theme, "light");
+  assert.equal(client.loaded, true);
+});
+
+test("a newer successful response reread wins when an older raw reread is delayed", async () => {
+  const f = fixture({ disabledSites: ["before.example"], theme: "light", textScale: 100 }, { silentWrites: true });
+  const client = preferences.createClient(f.extension);
+  await client.load();
+  const get = f.storage.get;
+  let finishOlderRead;
+  let reads = 0;
+  f.storage.get = async () => {
+    const snapshot = await get();
+    if (++reads === 2) return new Promise((resolve) => { finishOlderRead = () => resolve(snapshot); });
+    return snapshot;
+  };
+  const first = client.mutate({ type: "patch", changes: { theme: "dark" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(typeof finishOlderRead, "function", "hold the first response reread after its real save");
+  await client.mutate({ type: "patch", changes: { textScale: 127 } });
+  finishOlderRead();
+  await first;
+  assert.equal(client.settings.theme, "dark");
+  assert.equal(client.settings.textScale, 127);
+  assert.deepEqual(client.confirmedSettings, api.decodeSettings(f.saved()));
+});
+
+test("compatible arrays enforce the exact selected-item byte boundary before a write", async () => {
+  const rules = [];
+  while (true) {
+    const candidate = { hostname: `s${rules.length}.e`, enabled: false };
+    if (api.storedRuleBytes(api.encodeSettingsForStorage({ siteRules: [...rules, candidate] })) > 8192) break;
+    rules.push(candidate);
+  }
+  const remaining = 8192 - api.storedRuleBytes(api.encodeSettingsForStorage({ siteRules: rules }));
+  const hostname = (length) => {
+    const body = length - 3;
+    return "s0." + (body <= 63 ? "a".repeat(body) : "a".repeat(60) + "." + "b".repeat(body - 61));
+  };
+  rules[0].hostname = hostname(rules[0].hostname.length + remaining);
+  const full = api.normalizeSettings({ siteRules: rules });
+  assert.equal(api.storedRuleBytes(api.encodeSettingsForStorage(full)), 8192);
+  const f = fixture({ siteRules: [] }, { quota: true });
+  await f.store.mutate({ type: "replace", settings: full });
+  const snapshot = structuredClone(f.saved());
+  const larger = structuredClone(full);
+  larger.siteRules[0].hostname = hostname(full.siteRules[0].hostname.length + 1);
+  assert.equal(api.storedRuleBytes(api.encodeSettingsForStorage(larger, snapshot)), 8193);
+  await assert.rejects(f.store.mutate({ type: "replace", settings: larger }), { code: "RULE_CAPACITY" });
+  assert.deepEqual(f.saved(), snapshot);
+  assert.equal(f.writes.length, 1);
+});
+
+test("unsafe reductions of an existing oversized array reject while unrelated edits preserve its raw bytes", async () => {
+  const siteRules = Array.from({ length: 250 }, (_, i) => ({ hostname: `s${i}.example`, enabled: false }));
+  const f = fixture({ siteRules }, { quota: true });
+  await f.store.mutate({ type: "patch", changes: { theme: "dark" } });
+  const snapshot = structuredClone(f.saved());
+  assert.deepEqual(snapshot.siteRules, siteRules);
+  await assert.rejects(f.store.mutate({ type: "removeRule", hostname: "s0.example" }), { code: "RULE_CAPACITY" });
+  assert.deepEqual(f.saved(), snapshot);
+  assert.ok(f.writes.every((patch) => !Object.hasOwn(patch, "siteRules")));
+});
 
 test("failed initialization and attempted early mutations never write defaults", async () => {
   const f = fixture({ enabled: false, theme: "dark", siteRules: [{ hostname: "saved.example", enabled: false }] });
@@ -128,10 +381,10 @@ test("change listeners distinguish optimistic intent from confirmed storage and 
 
 test("an over-capacity pause and import fail without changing any saved settings", async () => {
   const oversized = Array.from({ length: 250 }, (_, index) => ({ hostname: `site${index}.example.com`, enabled: false }));
-  const f = fixture({ siteRules: oversized });
+  const f = fixture(api.encodeSettings({ siteRules: oversized }));
   await assert.rejects(f.store.mutate({ type: "toggleSite", hostname: "new.example.com" }), { code: "RULE_CAPACITY" });
   await assert.rejects(f.store.mutate({ type: "replace", settings: { ...api.defaults, siteRules: [...oversized, { hostname: "new.example.com", enabled: false }] } }), { code: "RULE_CAPACITY" });
-  assert.deepEqual(f.saved().siteRules, oversized);
+  assert.deepEqual(api.decodeSettings(f.saved()).siteRules, api.normalizeSettings({ siteRules: oversized }).siteRules);
   assert.equal(f.writes.length, 0);
   await f.store.mutate({ type: "removeRule", hostname: "site1.example.com" });
   assert.equal(api.decodeSettings(f.saved()).siteRules.length, 249, "oversized legacy lists can still be reduced");
@@ -149,15 +402,16 @@ test("import validation rejects invalid and duplicate rules rather than dropping
   assert.equal(imported.letterSpacing, 0.04);
 });
 
-test("preference edits migrate legacy keys without losing their rules", async () => {
+test("preference edits normalize scalar legacy keys without converting their rule representation", async () => {
   const f = fixture({ disabledSites: ["legacy.example"], spacing: "wide" });
   await f.store.mutate({ type: "patch", changes: { theme: "dark" } });
   assert.equal(api.decodeSettings(f.saved()).siteRules[0].hostname, "legacy.example");
   assert.equal(f.saved().letterSpacing, 0.04);
-  assert.equal(f.saved().disabledSites, undefined);
+  assert.deepEqual(f.saved().disabledSites, ["legacy.example"]);
+  assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
 });
 
-test("authentic 120 and 250 legacy pauses migrate and remain editable under the per-item quota", async () => {
+test("authentic 120 and 250 legacy pauses remain compatible and editable under the per-item quota", async () => {
   for (const count of [120, 250]) {
     const disabledSites = Array.from({ length: count }, (_, i) => `site${i}.legacy.example`);
     const initial = { disabledSites, enabled: false, scope: "all", spacing: "wider", textScale: 130 };
@@ -175,9 +429,10 @@ test("authentic 120 and 250 legacy pauses migrate and remain editable under the 
     const saved = api.decodeSettings(f.saved());
     assert.deepEqual(saved.siteRules.map((rule) => rule.hostname), disabledSites.filter((_, i) => i !== 1));
     assert.deepEqual({ ...saved, siteRules: [] }, { ...api.normalizeSettings(initial), siteRules: [], theme: "dark", lineHeight: 1.7 });
-    assert.equal(f.saved().disabledSites, undefined);
-    assert.equal(typeof f.saved().siteRules, "string");
-    assert.ok(Buffer.byteLength("siteRules" + JSON.stringify(f.saved().siteRules)) <= 8192);
+    assert.deepEqual(f.saved().disabledSites, disabledSites.filter((_, i) => i !== 1));
+    assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
+    assert.ok(Buffer.byteLength("disabledSites" + JSON.stringify(f.saved().disabledSites)) <= 8192);
+    assert.deepEqual(JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), saved);
     const restarted = preferences.createClient(f.extension);
     await restarted.load();
     assert.deepEqual(restarted.settings, saved);
@@ -194,15 +449,17 @@ test("migration failure before commit and interruption before cleanup preserve t
   assert.deepEqual(f.saved(), initial);
   f.failWrite(false);
   f.failCleanup(true);
-  await preferences.createStore(f.storage).mutate({ type: "removeRule", hostname: "one.example" });
+  await preferences.createStore(f.storage).mutate({ type: "updateRule", hostname: "one.example", includeSubdomains: false,
+    changes: { includeSubdomains: true, scope: "all" } });
   assert.deepEqual(f.saved().disabledSites, initial.disabledSites, "legacy source survives interrupted cleanup");
-  assert.deepEqual(api.decodeSettings(f.saved()).siteRules.map((rule) => rule.hostname), ["two.example"],
+  assert.deepEqual(api.decodeSettings(f.saved()).siteRules.map((rule) => rule.hostname), ["one.example", "two.example"],
     "committed canonical data wins over stale legacy data on restart");
   f.failCleanup(false);
   await preferences.createStore(f.storage).mutate({ type: "patch", changes: { textScale: 130 } });
   assert.equal(f.saved().disabledSites, undefined);
   assert.equal(api.decodeSettings(f.saved()).letterSpacing, .04);
-  assert.deepEqual(api.decodeSettings(f.saved()).siteRules.map((rule) => rule.hostname), ["two.example"]);
+  assert.equal(api.getDirectRule(api.decodeSettings(f.saved()), "one.example", true).scope, "all");
+  assert.deepEqual(api.decodeSettings(f.saved()).siteRules.map((rule) => rule.hostname), ["one.example", "two.example"]);
 });
 
 test("persisted decoding preserves every rule variant and fails closed for corruption", async () => {
@@ -266,7 +523,7 @@ test("capacity checks the encoded item including key bytes at the actual quota b
   rules.push({ hostname: hostname(32, remaining), enabled: false });
   assert.equal(api.ruleStorageBytes({ siteRules: rules }), 8192);
   const full = { ...api.defaults, siteRules: rules };
-  const f = fixture({}, { quota: true });
+  const f = fixture(api.encodeSettings({}), { quota: true });
   await f.store.mutate({ type: "replace", settings: full });
   const saved = structuredClone(f.saved());
   const larger = structuredClone(full);

@@ -163,6 +163,30 @@
     const settings = normalizeSettings(value);
     return { ...settings, siteRules: encodeRules(settings.siteRules) };
   };
+  // Compact encoding is retained for profiles that already use it. Default
+  // writes remain readable by older versions, without expanding large legacy
+  // pause lists or switching the authoritative rule key during a scalar edit.
+  const encodeSettingsForStorage = (value, raw = {}) => {
+    const settings = normalizeSettings(value);
+    const previous = normalizeSettings(raw);
+    const { siteRules, ...preferences } = settings;
+    const hasRules = Object.hasOwn(raw, "siteRules");
+    const legacy = !hasRules && Array.isArray(raw.disabledSites);
+    if (settingsEqual({ siteRules: previous.siteRules }, { siteRules })) {
+      if (hasRules) return { ...preferences, siteRules: raw.siteRules };
+      if (legacy) return { ...preferences, disabledSites: raw.disabledSites };
+    }
+    if (hasRules && typeof raw.siteRules === "string") return encodeSettings(settings);
+    if (legacy && siteRules.every((rule) => !rule.includeSubdomains
+        && rule.enabled === false && rule.scope === null)) {
+      return { ...preferences, disabledSites: siteRules.map((rule) => rule.hostname) };
+    }
+    return settings;
+  };
+  const storedRuleBytes = (encoded) => {
+    const key = Object.hasOwn(encoded, "siteRules") ? "siteRules" : "disabledSites";
+    return new TextEncoder().encode(key + JSON.stringify(encoded[key])).length;
+  };
   const ruleStorageBytes = (value) => new TextEncoder().encode(
     "siteRules" + JSON.stringify(encodeRules(normalizeSettings(value).siteRules))
   ).length;
@@ -407,6 +431,7 @@
     defaults,
     decodeSettings: normalizeSettings,
     encodeSettings,
+    encodeSettingsForStorage,
     getDirectRule,
     normalizeSettings,
     previewImport,
@@ -418,6 +443,7 @@
     toggleSite,
     updateSiteRule,
     settingsError,
+    storedRuleBytes,
     ruleStorageBytes,
     validateCapacity,
     validateImport,

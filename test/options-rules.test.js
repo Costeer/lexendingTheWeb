@@ -49,7 +49,7 @@ class Element {
   focus() { this.focused = true; }
 }
 
-async function openSettings({ count = 6, desktop = false, cachedTheme = "light", initial, getSettings, failWrite, beforeOperation, afterWrite, allowErrors = false, sendOperation, confirm = () => true } = {}) {
+async function openSettings({ count = 6, desktop = false, cachedTheme = "light", initial, getSettings, failWrite, silentWrites = false, beforeOperation, afterWrite, allowErrors = false, sendOperation, confirm = () => true } = {}) {
   const elements = new Map();
   const get = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new Element());
@@ -87,12 +87,12 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   })) };
   let changeListener;
   const storage = {
-    async get() { return getSettings ? getSettings() : stored; },
+    async get() { return getSettings ? getSettings(stored) : stored; },
     async set(patch) {
       if (failWrite?.()) throw new Error("Storage unavailable");
       stored = { ...stored, ...patch };
       writes.push(globalThis.LexendSettings.decodeSettings(stored));
-      changeListener?.(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
+      if (!silentWrites) changeListener?.(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
     },
     async remove() {}
   };
@@ -216,6 +216,33 @@ test("preview modes and custom samples stay local while the comparison baseline 
   assert.equal(page.get("#preview-copy").style.fontSize, "22.4px");
   assert.equal(page.get("#preview-original-copy").style.fontSize, "16px");
   assert.equal(page.writes.length, 0, "changing the specimen never writes synchronized preferences");
+});
+
+test("a committed save with failed raw reread blocks controls and Retry reloads without replaying the save", async () => {
+  let unreadable = false;
+  const page = await openSettings({ initial: globalThis.LexendSettings.normalizeSettings({}), silentWrites: true,
+    getSettings: async (stored) => {
+      if (unreadable) throw new Error("Post-save read failed");
+      return stored;
+    },
+    afterWrite: () => { unreadable = true; }
+  });
+  page.get("#dark-theme").checked = true;
+  page.get("#dark-theme").emit("change");
+  await tick();
+  assert.equal(page.stored().theme, "dark", "the real write committed despite the later read failure");
+  assert.equal(page.writes.length, 1);
+  assert.equal(page.get("#dark-theme").checked, true);
+  assert.equal(page.get("#dark-theme").disabled, true);
+  assert.match(page.get("#save-status-text").textContent, /Settings could not be read.*Post-save read failed/);
+  assert.equal(page.get("#retry-save").hidden, false);
+  unreadable = false;
+  await page.get("#retry-save").emit("click");
+  await tick();
+  assert.equal(page.get("#dark-theme").checked, true);
+  assert.equal(page.get("#dark-theme").disabled, false);
+  assert.equal(page.get("#retry-save").hidden, true);
+  assert.equal(page.writes.length, 1, "Retry reads the committed state without replaying its successful operation");
 });
 
 test("failed settings reads keep controls disabled and Retry reads without writing defaults", async () => {
@@ -1332,10 +1359,10 @@ test("import retaining a paused rule retires failed removal so generic Retry can
   assert.equal(api.resolveSite(page.stored(), "paused.example").active, false);
 });
 
-test("250 legacy pauses survive rule editing, complete import and guarded Undo in compact storage", async () => {
+test("250 existing compact pauses survive rule editing, complete import and guarded Undo", async () => {
   const api = globalThis.LexendSettings;
   const disabledSites = Array.from({ length: 250 }, (_, index) => `legacy${index}.example.com`);
-  const page = await openSettings({ desktop: true, initial: { disabledSites } });
+  const page = await openSettings({ desktop: true, initial: api.encodeSettings({ disabledSites }) });
   let editor = editorFor(page.rows()[0]);
   editor.fields.scope.value = "all";
   editor.fields.includeSubdomains.value = "true";
@@ -1355,4 +1382,27 @@ test("250 legacy pauses survive rule editing, complete import and guarded Undo i
   assert.deepEqual(page.stored(), edited);
   assert.match(page.rawStored().siteRules, /^@1\n/);
   assert.equal(page.rows().length, 250);
+});
+
+test("large unmigrated legacy lists reject an unsafe rich edit and import without losing pauses", async () => {
+  const api = globalThis.LexendSettings;
+  const disabledSites = Array.from({ length: 250 }, (_, index) => `legacy${index}.example.com`);
+  const page = await openSettings({ desktop: true, initial: { disabledSites } });
+  const initial = structuredClone(page.rawStored());
+  const editor = editorFor(page.rows()[0]);
+  editor.fields.scope.value = "all";
+  editor.fields.includeSubdomains.value = "true";
+  await editor.form.emit("submit", { preventDefault() {} });
+  assert.deepEqual(page.rawStored(), initial);
+  assert.equal(page.rows().length, 250);
+  assert.match(page.get("#save-status-text").textContent, /room for these site rules/);
+  assert.equal(page.get("#retry-save").hidden, false);
+  const imported = api.normalizeSettings({ ...initial, theme: "dark", siteRules: page.stored().siteRules.map((rule, i) =>
+    i === 0 ? { ...rule, includeSubdomains: true, scope: "all" } : rule) });
+  await page.import(imported);
+  await page.get("#apply-import").emit("click");
+  assert.deepEqual(page.rawStored(), initial);
+  assert.match(page.get("#import-error").textContent, /room for these site rules/);
+  assert.equal(Object.hasOwn(page.rawStored(), "siteRules"), false);
+  assert.deepEqual(page.stored().siteRules.map((rule) => rule.hostname), disabledSites);
 });

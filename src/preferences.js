@@ -101,14 +101,14 @@
           const current = api.decodeSettings(raw);
           validateExpected(current, operation);
           const next = applyOperation(current, operation);
-          const encoded = api.encodeSettings(next);
-          // Existing oversized data must remain readable and must not prevent
-          // unrelated edits. Authentic supported legacy lists always fit the
-          // compact encoding; preserve other oversized lists without migration.
-          const rulesFit = api.ruleStorageBytes(next) <= 8192;
-          if (!rulesFit) {
-            if (operation.type !== "patch") api.validateCapacity(next);
-            delete encoded.siteRules;
+          const encoded = api.encodeSettingsForStorage(next, raw);
+          const rulesChanged = !api.settingsEqual({ siteRules: current.siteRules }, { siteRules: next.siteRules });
+          // Validate the representation this profile can actually write. A
+          // compact-capable model can still exceed the compatible array quota.
+          // Existing oversized rules remain untouched by unrelated edits.
+          const rulesFit = api.storedRuleBytes(encoded) <= 8192;
+          if (rulesChanged && (!rulesFit || next.siteRules.length > 250)) {
+            throw api.settingsError("RULE_CAPACITY", "There isn't room for these site rules. Remove some rules before adding or importing more.");
           }
           const patch = Object.fromEntries(Object.entries(encoded).filter(([key, value]) => (
             JSON.stringify(value) !== JSON.stringify(raw[key])
@@ -116,7 +116,8 @@
           if (Object.keys(patch).length) await storage.set(patch);
           // Once the canonical keys are stored, old keys are harmless. Cleanup
           // failure must not make a successful write look like a failed mutation.
-          try { await storage.remove?.(rulesFit ? legacyKeys : legacyKeys.filter((key) => key !== "disabledSites")); } catch {}
+          const canonicalRules = Object.hasOwn(encoded, "siteRules") && rulesFit;
+          try { await storage.remove?.(canonicalRules ? legacyKeys : legacyKeys.filter((key) => key !== "disabledSites")); } catch {}
           return next;
         };
         const result = queue.then(write, write);
@@ -134,6 +135,7 @@
     let readError = null;
     let generation = 0;
     let eventRevision = 0;
+    let responseRevision = 0;
     let startupChanges = {};
     const pending = [];
     let connection;
@@ -264,14 +266,31 @@
         pending.push(entry);
         emit();
         const revision = eventRevision;
+        const loadGeneration = generation;
         try {
           const response = await sendOperation(operation);
           if (!response) throw unavailable();
           if (!response?.ok) throw api.settingsError(response?.code ?? "SAVE_FAILED", response?.message ?? "Changes could not be saved.");
+          const reconciliation = ++responseRevision;
           // Do not overwrite a newer storage event with an older response.
-          if (revision === eventRevision) {
+          if (revision === eventRevision && loadGeneration === generation) {
             confirmed = api.normalizeSettings(response.settings);
-            confirmedRaw = { ...confirmedRaw, ...api.encodeSettings(confirmed) };
+            // A normalized response cannot prove which rule key was written or
+            // whether best-effort legacy cleanup succeeded. Read actual bytes
+            // instead of inventing a raw snapshot that can hide later events.
+            try {
+              const raw = await extension.storage.sync.get(null);
+              if (revision === eventRevision && loadGeneration === generation && reconciliation === responseRevision) {
+                confirmed = api.decodeSettings(raw);
+                confirmedRaw = raw;
+                readError = null;
+              }
+            } catch (error) {
+              if (revision === eventRevision && loadGeneration === generation && reconciliation === responseRevision) {
+                loaded = false;
+                readError = error;
+              }
+            }
           }
           return response.settings;
         } finally {
