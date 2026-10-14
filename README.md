@@ -203,6 +203,14 @@ including keyboard and screen-reader checks and installed Firefox Android popup
 and settings flows. Desktop narrow-window and axe results do not establish those
 manual/device checks.
 
+The next public release is blocked by historical performance-baseline failure
+and compact-rule compatibility with older installations. Review the
+[baseline decision proposal](docs/release-baseline-policy.md) and
+[saved-rule upgrade and rollback plan](docs/rule-format-rollout.md) before
+changing release qualification or enabling a public migration. These documents
+describe required decisions and work; they do not change the current gate or
+implement a compatibility writer.
+
 ## For website authors
 
 Add `data-lexend-ignore` to an element to keep its original typography,
