@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/release_051_independent_review",
+  "reviewedAt": "2026-10-14T19:05:46.203223+00:00",
+  "decision": "Supported source-contract correction: native whole-millisecond duration49 is legitimate for the pinned default non-isolated Chromium profile; do not treat it as below-threshold fabricated data.",
+  "scope": "Independent primary normative and exact Chromium153.0.8010.12 source assessment, plus read-only inspection of the existing collector/raw report. No browser run, test run, benchmark rerun or repository edit. This assessment approves no unreviewed code implementation or release proof.",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/timing/performance.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/performance.cc",
+      "sha256": "ff28d26044d705b1580a504d3b59814d0023d85ce700bc77c40c0d1724dc6234",
+      "bytes": 61625
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/timing/time_clamper.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/time_clamper.cc",
+      "sha256": "2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c",
+      "bytes": 3572
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/timing/time_clamper.h",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/time_clamper.h",
+      "sha256": "f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944",
+      "bytes": 1889
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/frame/performance_monitor.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/performance_monitor.cc",
+      "sha256": "92153300e9a32c8fd75305671d5236775e6f0fc6acdc13ea51d2d8ec6e56e8ca",
+      "bytes": 13686
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/timing/performance_long_task_timing.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/performance_long_task_timing.cc",
+      "sha256": "026b9db3e78fd9ac0fcdbcf0d50c85f34892b0deeff1c3439150101246c89b2e",
+      "bytes": 2249
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/timing/window_performance.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/window_performance.cc",
+      "sha256": "c365fd27365ff504a4ecb948d49dcf926757629d76f591d98174ab54c1b5277a",
+      "bytes": 77532
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/platform/runtime_enabled_features.json5",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/runtime_enabled_features.json5",
+      "sha256": "eac5599379b3034c617d1c147a79b359a243b386676b4279ad59a4aa291115d6",
+      "bytes": 232839
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/frame/animation_frame_timing_monitor.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/animation_frame_timing_monitor.cc",
+      "sha256": "d4a1c7cc30d5393811f42a071f05c71f3fb4844b012621a555d3831fd74bb678",
+      "bytes": 48301
+    },
+    {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/153.0.8010.12/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/web_frame_widget_impl.cc",
+      "sha256": "e7e827937796026f7634f620c34ce8925d3ed88b0f0c42ff5278dcae98990737",
+      "bytes": 232914
+    },
+    {
+      "url": "https://www.w3.org/TR/longtasks-1/",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/longtasks-1.html",
+      "sha256": "2e9c51917aaf0a2d81cabbcc99f5476f2e7126a5b8a3532ea473e1f9c1002245",
+      "bytes": 223246
+    },
+    {
+      "url": "https://www.w3.org/TR/2026/WD-longtasks-1-20260319/",
+      "path": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/native-duration-source-assessment-v1-sources/longtasks-1-20260319.html",
+      "sha256": "2e9c51917aaf0a2d81cabbcc99f5476f2e7126a5b8a3532ea473e1f9c1002245",
+      "bytes": 223246
+    }
+  ],
+  "sourceManifestSha256": "a3c79d28c3c0dadb2033b3a12ade15a62af267bf37358932b0236e1c462f2fc7",
+  "normativeChain": {
+    "specification": "W3C Working Draft19 March2026, Long Tasks4.1, current and dated copies byte-identical. Revision metadata65eb2e6aad59f4d342ff3be81777c4b25b9d10d0.",
+    "ordering": "The internal end-minus-start threshold is checked before endpoint coarsening. Entry start is coarsened; duration is the integer part of coarsened end minus that coarsened start.",
+    "consequence": "The50ms task-classification boundary does not imply an exposed entry.duration lower bound of50. Spec-wide privacy coarsening can vary, so implementation-specific lower bounds require implementation evidence."
+  },
+  "exactImplementationChain": [
+    {
+      "source": "runtime_enabled_features.json5:3949",
+      "finding": "LongTaskFromLongAnimationFrame has stable status in the exact Chromium release; the default path is the animation monitor, not only the legacy PerformanceMonitor."
+    },
+    {
+      "source": "animation_frame_timing_monitor.cc:40,427",
+      "finding": "Default animation monitor compares native task_duration against a50ms TimeDelta before forwarding original start/end timestamps."
+    },
+    {
+      "source": "web_frame_widget_impl.cc:1773 and window_performance.cc:610",
+      "finding": "The widget forwards those original endpoints to each WindowPerformance ReportLongTask; WindowPerformance passes them to AddLongTaskTiming."
+    },
+    {
+      "source": "performance.cc:822,1319",
+      "finding": "AddLongTaskTiming independently converts start and end through MonotonicTimeToDOMHighResTimeStamp, subtracts the exposed doubles and casts the result to int. Conversion uses the document isolation flag and the same origin subtraction."
+    },
+    {
+      "source": "time_clamper.h:23 and time_clamper.cc:22",
+      "finding": "Non-isolated resolution is100 microseconds; isolated resolution is5 microseconds. Per-interval deterministic pseudorandom thresholds round each endpoint to its current or next resolution boundary."
+    },
+    {
+      "source": "performance_long_task_timing.cc:18",
+      "finding": "The entry constructor takes int duration and passes it unchanged to PerformanceEntry; native reported duration is an integer, not an arbitrary fractional sample."
+    },
+    {
+      "source": "performance_monitor.cc:316 and window_performance.cc:135,311",
+      "finding": "The legacy fallback also applies its internal50ms subscription threshold before conversion. This confirms compatibility but is not substituted for checking the default path."
+    }
+  ],
+  "supportedMinimum": {
+    "profile": "Pinned Chromium153.0.8010.12 via Playwright1.63.0, ordinary non-isolated benchmark page, standard timing policy, finite benchmark task/window durations.",
+    "resolutionMs": 0.1,
+    "nativeInternalThresholdMs": 50,
+    "supportedExposedDurationMinimumMs": 49,
+    "integerRequired": true,
+    "derivation": "Each independently clamped endpoint differs from its internal endpoint by less than0.1ms. Thus their difference for a threshold task is greater than49.8ms before tiny ordinary floating-point representation error. Integer truncation may return49, while48 is unsupported by this profile. The shared coarsened origin cancels in the endpoint difference apart from ordinary double rounding.",
+    "illustrativePossibleWitness": "Internal start1000.050ms and end1050.051ms differ by50.001ms. Allowed endpoint decisions may expose1000.1ms and1050.0ms. Their49.9ms difference truncates to49. This is a mathematical source-semantics example, not a fabricated benchmark record or claim about the hidden endpoint values of the actual observed task.",
+    "limits": "This is not a universal lower bound for all browsers, privacy modes, alternate timing policies, arbitrary experimental flags or exceptionally large timestamp magnitudes. A different runtime/profile requires separate contract review. It does not establish the exact pre-coarsening duration of the observed49ms record."
+  },
+  "actualExistingEvidence": {
+    "report": "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/policy-implementation/qualification/final-c7266ca/transition-positive/report.json",
+    "sha256": "cb80356b682f47f4bfb2f229aae221fa933f5d12a0271be6ea2a0f576a1fba6a",
+    "candidateCommit": "c7266ca9141ca852c6b58eb464d5f74dc0ebc9a0",
+    "environment": {
+      "node": "v24.21.0",
+      "playwright": "1.63.0",
+      "platform": "linux",
+      "release": "6.18.54",
+      "arch": "x64",
+      "cpu": "AMD Ryzen 5 3600 6-Core Processor",
+      "logicalCpus": 12,
+      "chromium": "153.0.8010.12"
+    },
+    "location": "conversation-120/rawResponsiveness/candidate/sampleIndex4/longTasks/taskIndex2",
+    "rawTask": {
+      "startTime": 11325.699999999255,
+      "duration": 49
+    },
+    "collector": "/home/costeer/.t3/worktrees/lexendingTheWeb/release-051-transition-05869f6c/scripts/performance/responsiveness.mjs",
+    "collectorSha256": "1beeccaa5cda41dabb634dff8382d6523cad800936b6a6269df9fecb61adf614",
+    "collectorObservation": "The observer copies entry.startTime and entry.duration directly. It neither derives duration from timestamps nor rounds/clamps/invents49. Metrics then use the preserved duration unchanged.",
+    "statusBoundary": "The old report records numerical passed/zero regressions but existing raw verifier rejects duration49. This assessment does not edit or relabel any report, historical error, failed verifier result or source identity."
+  },
+  "correctionClassification": {
+    "supportedNarrowChange": "Validate Number.isInteger(task.duration) && task.duration >=49 for native task representation in this pinned profile, retaining all existing timing-window/order checks.",
+    "whyNotRegressionToleranceRelaxation": "This adjusts admissible native API representation. It does not change the comparator acceptance bound, max statistic, relative0.30 allowance, absolute50ms allowance, idle/pause/memory/work gates, task-count or blocking-time computations. Requiring integers also rejects fractional fabricated durations previously accepted.",
+    "mustRemainUnchanged": [
+      "All original raw49 bytes and computed metrics. No rounding49 up to50 and no dropping that entry.",
+      "Native PerformanceObserver collection, workload/harness sources, protocol/default3x5 sampling and source hashes.",
+      "Separate70ms positive-control task and its observed span coverage; existing2ms attribution slack.",
+      "Fixed comparator policy/thresholds and single-sample1000ms slowdown detection.",
+      "Negative-control null requirement, source/tag/harness/policy/artifact identity and full workload coverage."
+    ],
+    "requiredMeaningfulCases": [
+      "Accept real-form integer49 measured entry with exact recomputed raw-derived metrics.",
+      "Accept an incidental49 entry in calibration.tasks while retaining the distinct observed70ms positive control.",
+      "Reject48, nonintegers including49.5 and50.5, negative/nonfinite/string/missing duration and invalid observation windows/order.",
+      "Continue rejecting a1000ms raw outlier even with unchanged medians/stored pass."
+    ],
+    "requiredProcess": "Author only a minimal separately frozen correction; obtain fresh independent source review, run unit/comparator negatives, and rerun actual final-tag historical/full-anchor and injected-browser proofs. An implementation differing from these limits is not covered by this source assessment."
+  },
+  "repositoryMutations": false,
+  "testsExecuted": false,
+  "browserRunsExecuted": false,
+  "releaseQualificationGranted": false,
+  "unresolvedSourceObjectionsToTheNarrowRepresentationConclusion": []
+}

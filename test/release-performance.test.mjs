@@ -162,7 +162,7 @@ test('release gate requires calibrated, timed, uncontaminated raw responsiveness
     ['shortened measured window', runs => { runs.rawResponsiveness.candidate[0].endTime = 2690; }, /responsiveness window/],
     ['task before measured window', runs => { runs.rawResponsiveness.candidate[0].longTasks[0].startTime = 199; }, /observation window/],
     ['task at exclusive window end', runs => { runs.rawResponsiveness.candidate[0].longTasks[0].startTime = 3000; }, /observation window/],
-    ['sub-threshold native task', runs => { runs.rawResponsiveness.candidate[0].longTasks[0].duration = 49; }, /observation window/],
+    ['unsupported native task representation', runs => { runs.rawResponsiveness.candidate[0].longTasks[0].duration = 48; }, /observation window/],
     ['nonfinite task timestamp', runs => { runs.rawResponsiveness.candidate[0].longTasks[0].startTime = Infinity; }, /observation window/],
     ['duplicated native task', runs => { const raw = runs.rawResponsiveness.candidate[0]; raw.longTasks.push({ ...raw.longTasks[0] }); }, /overlap or are unordered/],
     ['stream misses an edit', runs => { runs.rawResponsiveness.candidate[0].stream.pop(); }, /edit count differs/],
@@ -230,7 +230,8 @@ async function transitionFixture(t) {
     'manifests/manifest.chrome.json', 'manifests/manifest.firefox.json',
     'scripts/performance/release-gate.mjs', 'scripts/performance/baseline-transition.mjs',
     'scripts/release-performance.mjs', transitionPolicyPath,
-    ...(await readdir(resolve(project, 'release/v0.5.1-provenance'))).map(name => `release/v0.5.1-provenance/${name}`)];
+    ...(await readdir(resolve(project, 'release/v0.5.1-provenance'))).map(name => `release/v0.5.1-provenance/${name}`),
+    ...(await readdir(resolve(project, 'release/v0.5.1-ordinal-provenance'))).map(name => `release/v0.5.1-ordinal-provenance/${name}`)];
   for (const path of paths) {
     await mkdir(dirname(resolve(root, path)), { recursive: true });
     await writeFile(resolve(root, path), await readFile(resolve(project, path)));
@@ -320,7 +321,7 @@ test('v0.5.1 transition rejects missing state, unknown historical failures, dirt
     ['unhealthy runtime', () => { f.historical.failure.observation.atomic.state.healthy = false; }, /pending predicate/],
     ['wrong refresh provenance', () => { f.historical.failure.observation.atomic.state.refreshRevision = 2; }, /unexpected or undiagnosed/],
     ['missing original assertion', () => { delete f.historical.failure.observation.originalAssertion; }, /original assertion provenance/],
-    ['candidate failure', () => { f.historical.failure.version = 'candidate'; }, /first warmup/],
+    ['candidate failure', () => { f.historical.failure.version = 'candidate'; }, /baseline startup sampling position/],
     ['wrong phase', () => { f.historical.failure.observation.phase = 'settings'; }, /phase\/source/],
     ['wrong workload', () => { f.historical.failure.workload = 'reading-400'; }, /phase\/source/],
     ['resource failure', () => { f.historical.failure.observation.browserErrors.push('missing font'); }, /browser errors/],
@@ -433,4 +434,163 @@ test('v0.5.1 accepts only the reviewed conversation timeout and rejects earlier 
   f.historical.workloads['reading-80'].order.shift();
   await f.save();
   await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /preceding sampling order differs/);
+});
+
+const historicalReadingPrefixCounts = [[0, 0], [0, 1], [1, 1], [2, 3], [3, 3], [4, 5]];
+function readingPrefix(f, round) {
+  const [baseline, candidate] = historicalReadingPrefixCounts[round];
+  f.historical.failure.round = round;
+  f.historical.failure.warmup = round === 0;
+  const samples = f.anchor.workloads['reading-80'];
+  f.historical.workloads['reading-80'] = {
+    baseline: structuredClone(samples.baseline.slice(0, baseline)),
+    candidate: structuredClone(samples.candidate.slice(0, candidate)),
+    order: Array.from({ length: round + 1 }, (_, index) => ({ warmup: index === 0,
+      versions: index % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'] }))
+  };
+}
+
+test('v0.5.1 reading failure eligibility preserves the exact raw sampling prefix for all six rounds', async t => {
+  const { createTransitionManifest, verifyTransitionEvidence } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  for (let round = 0; round <= 5; round++) {
+    readingPrefix(f, round);
+    const runs = f.historical.workloads['reading-80'];
+    // Distinguish an unpaired record so preserving it is checked explicitly.
+    if (round % 2) runs.candidate.at(-1)['startup.layouts'] = 7;
+    await f.save();
+    await assert.doesNotReject(() => createTransitionManifest(f.root, f.tag, f.evidence), `round ${round}`);
+    await assert.doesNotReject(() => verifyTransitionEvidence(f.root, f.tag,
+      resolve(f.evidence, 'transition-manifest.json')), `round ${round}`);
+    const retained = JSON.parse(await readFile(resolve(f.evidence, 'historical-report.json')));
+    assert.equal(retained.status, 'error');
+    assert.deepEqual([retained.workloads['reading-80'].baseline.length,
+      retained.workloads['reading-80'].candidate.length], historicalReadingPrefixCounts[round]);
+    assert.deepEqual(retained.workloads['reading-80'], runs, 'Every completed raw metric must remain intact');
+  }
+});
+
+test('v0.5.1 reading ordinal eligibility rejects malformed schedules, lost or excess records and invalid metrics', async t => {
+  const { createTransitionManifest } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  const attacks = [
+    ['round below zero', h => { h.failure.round = -1; }, /sampling position/],
+    ['round beyond default samples', h => { h.failure.round = 6; }, /sampling position/],
+    ['fractional round', h => { h.failure.round = 1.5; }, /sampling position/],
+    ['string round', h => { h.failure.round = '5'; }, /sampling position/],
+    ['missing round', h => { delete h.failure.round; }, /sampling position/],
+    ['measured round called warmup', h => { h.failure.warmup = true; }, /sampling position/],
+    ['missing warmup flag', h => { delete h.failure.warmup; }, /sampling position/],
+    ['missing warmup order', (h, runs) => { runs.order.shift(); }, /sampling prefix/],
+    ['missing failed round order', (h, runs) => { runs.order.pop(); }, /sampling prefix/],
+    ['extra future round order', (h, runs) => { runs.order.push({ warmup: false, versions: ['baseline', 'candidate'] }); }, /sampling prefix/],
+    ['reordered versions', (h, runs) => { runs.order[5].versions.reverse(); }, /sampling prefix/],
+    ['false schedule warmup', (h, runs) => { runs.order[0].warmup = false; }, /sampling prefix/],
+    ['missing completed baseline', (h, runs) => { runs.baseline.pop(); }, /measured baseline count/],
+    ['extra completed baseline', (h, runs) => { runs.baseline.push(structuredClone(runs.baseline[0])); }, /measured baseline count/],
+    ['missing unpaired candidate', (h, runs) => { runs.candidate.pop(); }, /measured candidate count/],
+    ['extra candidate', (h, runs) => { runs.candidate.push(structuredClone(runs.candidate[0])); }, /measured candidate count/],
+    ['missing metric from paired sample', (h, runs) => { delete runs.baseline[0]['settings.taskMs']; }, /metric coverage/],
+    ['missing metric from unpaired sample', (h, runs) => { delete runs.candidate[4]['settings.taskMs']; }, /metric coverage/],
+    ['unexpected metric', (h, runs) => { runs.candidate[4]['unexpected.taskMs'] = 0; }, /metric coverage/],
+    ['negative metric', (h, runs) => { runs.candidate[4]['settings.taskMs'] = -1; }, /finite and nonnegative/],
+    ['nonfinite metric', (h, runs) => { runs.candidate[4]['settings.taskMs'] = Infinity; }, /finite and nonnegative/],
+    ['NaN metric', (h, runs) => { runs.candidate[4]['settings.taskMs'] = NaN; }, /finite and nonnegative/],
+    ['string metric', (h, runs) => { runs.candidate[4]['settings.taskMs'] = '1'; }, /finite and nonnegative/],
+    ['missing sample object', (h, runs) => { runs.candidate[4] = null; }, /Missing historical reading sample/],
+    ['partial comparison', (h, runs) => { runs.comparison = []; }, /cannot contain a comparison/],
+    ['partial raw responsiveness', (h, runs) => { runs.rawResponsiveness = {}; }, /cannot contain raw responsiveness/]
+  ];
+  for (const [name, attack, message] of attacks) {
+    readingPrefix(f, 5);
+    attack(f.historical, f.historical.workloads['reading-80']);
+    await f.save();
+    await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), message, name);
+  }
+  readingPrefix(f, 0);
+  f.historical.failure.warmup = false;
+  await f.save();
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /sampling position/);
+});
+
+test('v0.5.1 reading partial pairs cannot hide a measured regression or extend conversation eligibility', async t => {
+  const { createTransitionManifest } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  for (const round of [4, 5]) {
+    readingPrefix(f, round);
+    for (const sample of f.historical.workloads['reading-80'].candidate) sample['settings.taskMs'] = 1000;
+    await f.save();
+    await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /partial reading regression/, `round ${round}`);
+  }
+  // Four real common-index pairs must all enter the comparator. The first
+  // three alone have median zero, whereas all four show a clear regression.
+  readingPrefix(f, 5);
+  for (const index of [2, 3]) f.historical.workloads['reading-80'].candidate[index]['settings.taskMs'] = 1000;
+  await f.save();
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /partial reading regression/);
+  f.historical.failure.workload = 'conversation-120';
+  f.historical.failure.round = 1;
+  f.historical.failure.warmup = false;
+  const observation = f.historical.failure.observation;
+  observation.workload = 'conversation-120';
+  Object.assign(observation.atomic, { kind: 'settle-timeout', loaded: true, stableFrames: 0,
+    elapsedMs: 15016.7, firstFontFrameMs: 680 });
+  observation.atomic.state.refreshRevision = 20;
+  await f.save();
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /unexpected or undiagnosed/);
+});
+
+test('release gate preserves legitimate integer49 native tasks and their exact raw-derived metrics', async t => {
+  const f = await fixture(t);
+  const report = await passingEvidence(f);
+  const runs = report.workloads['conversation-120'];
+  for (const version of ['baseline', 'candidate']) {
+    runs.rawResponsiveness[version][0].longTasks[0].duration = 49;
+    Object.assign(runs[version][0], { 'responsiveness.maxLongTaskMs': 49,
+      'responsiveness.longTaskCount': 1, 'responsiveness.totalBlockingMs': 0 });
+  }
+  runs.comparison = compareSamples(runs.baseline, runs.candidate);
+  const original = structuredClone(report);
+  await assert.doesNotReject(() => verifyReleaseEvidence(f.root, f.tag, report));
+  assert.deepEqual(report, original, 'Verification must preserve every raw49 entry and its exact metrics');
+  const rounded = structuredClone(report);
+  rounded.workloads['conversation-120'].candidate[0]['responsiveness.maxLongTaskMs'] = 50;
+  await assert.rejects(() => verifyReleaseEvidence(f.root, f.tag, rounded), /Raw responsiveness metric differs: maxLongTaskMs/);
+});
+
+test('release gate accepts incidental calibration49 only alongside the distinct observed70ms control', async t => {
+  const f = await fixture(t);
+  const report = await passingEvidence(f);
+  const runs = report.workloads['conversation-120'];
+  for (const version of ['baseline', 'candidate']) {
+    runs.rawResponsiveness[version][0].calibration.tasks.unshift({ startTime: 20, duration: 49 });
+  }
+  const original = structuredClone(report);
+  await assert.doesNotReject(() => verifyReleaseEvidence(f.root, f.tag, report));
+  assert.deepEqual(report, original);
+  const absentControl = structuredClone(report);
+  absentControl.workloads['conversation-120'].rawResponsiveness.candidate[0].calibration.tasks = [{ startTime: 100, duration: 49 }];
+  await assert.rejects(() => verifyReleaseEvidence(f.root, f.tag, absentControl), /calibration was not observed/);
+});
+
+test('release gate rejects unsupported durations and invalid49 windows without weakening raw controls', async t => {
+  const f = await fixture(t);
+  const report = await passingEvidence(f);
+  for (const duration of [48, 49.5, 50.5, -1, Infinity, -Infinity, NaN, '49', null, undefined]) {
+    const changed = structuredClone(report);
+    changed.workloads['conversation-120'].rawResponsiveness.candidate[0].longTasks[0].duration = duration;
+    await assert.rejects(() => verifyReleaseEvidence(f.root, f.tag, changed), /observation window/, `unsupported duration ${String(duration)}`);
+  }
+  const attacks = [
+    ['before window', raw => { raw.longTasks[0] = { startTime: raw.startTime - 1, duration: 49 }; }, /observation window/],
+    ['exclusive window end', raw => { raw.longTasks[0] = { startTime: raw.endTime, duration: 49 }; }, /observation window/],
+    ['duplicate49 event', raw => { raw.longTasks = [{ startTime: 2750, duration: 49 }, { startTime: 2750, duration: 49 }]; }, /overlap or are unordered/],
+    ['invalid calibration duration', raw => { raw.calibration.tasks.unshift({ startTime: 20, duration: 48 }); }, /observation window/],
+    ['fractional calibration duration', raw => { raw.calibration.tasks.unshift({ startTime: 20, duration: 50.5 }); }, /observation window/]
+  ];
+  for (const [name, attack, message] of attacks) {
+    const changed = structuredClone(report);
+    attack(changed.workloads['conversation-120'].rawResponsiveness.candidate[0]);
+    await assert.rejects(() => verifyReleaseEvidence(f.root, f.tag, changed), message, name);
+  }
 });

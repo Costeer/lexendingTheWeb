@@ -21,7 +21,7 @@ automatic failed-baseline fallback, or transferable exception authorizes release
 
 ## Reviewed historical failure mechanisms
 
-The first `reading-80` baseline warmup can finish its two settled frames before
+A fresh `reading-80` baseline startup context can finish its two settled frames before
 the first font `loadingdone` callback schedules a 100 ms refresh. The final
 original check then sees healthy/active/ready with `pending: true`, revision 1.
 The retained native trace identifies the exact `FunctionCall` registered at
@@ -30,6 +30,33 @@ lifetime after the final frame. **A literal `loadingdone`-labelled or enclosing
 `EventDispatch` is absent.** The independent review explicitly accepted the
 exact native callback/source/lifetime evidence and disclosed that adjustment.
 No event label is invented.
+
+A later exact-tag historical command at `c7266ca` reproduced that same atomic
+predicate at measured round 1, after the warmup and one candidate sample had
+completed. Its original report remains `error`/exit 1 and the original gate
+rejects it. The separate [independent ordinal review](../release/v0.5.1-ordinal-provenance/historical-round-eligibility-review-v1.json)
+binds that report, command and log unchanged. Each `runWorkload` invocation
+creates a fresh context and document-local font-listener state; the sampling
+ordinal does not distinguish a new mechanism. The approved reading class may
+therefore occur only at baseline startup in default rounds 0–5, with the exact
+same final-check/revision-1 predicate. Conversation eligibility remains only
+baseline startup round 0/warmup.
+
+The historical reading report must retain the exact alternating schedule prefix
+through its failed round. Completed baseline/candidate counts must respectively
+be `0/0`, `0/1`, `1/1`, `2/3`, `3/3`, or `4/5` for rounds 0–5; the warmup flag
+must equal round zero. Every retained record, including any unpaired candidate,
+must contain exactly the unchanged 24 reading metrics, all finite and
+nonnegative. Missing, excess or reordered schedule entries/samples/metrics,
+or partial `comparison`/`rawResponsiveness` fields block qualification. When
+at least three common-index pairs exist, recompute the unchanged comparator
+over all of those pairs and reject every observable regression. Preserve an
+unpaired candidate without inventing a partner or discarding its raw values.
+This incomplete prefix is not a completed comparison against `v0.5.0` and never
+replaces the unchanged full default three-workload/five-sample anchor pass.
+The original canonical causal inventory stays unchanged; ordinal provenance
+is a separately pinned supplement. A fresh final clean successor tag and all
+required proofs remain necessary after the eligibility correction.
 
 The conversation fixture's author observer and historical unconditional
 invalidation produce ongoing refresh feedback. Source-linked queue evidence
@@ -79,7 +106,8 @@ sources, same exact candidate/harness/environment in both reports, default
 three workloads and five samples plus alternating warmups, complete metrics,
 raw responsiveness calibration/tasks/stream, recomputed comparisons, clean
 source at both ends, original command arguments/exits/log/report hashes and
-serial order. Any negative control remains disallowed. The generated manifest
+serial order, and the approved historical failure’s exact completed prefix.
+Any negative control remains disallowed. The generated manifest
 binds the exact tag/commit/tree, policy blob, gate/harness/provenance hashes and
 all raw artifact hashes. The committed policy avoids a self-referential
 candidate hash.

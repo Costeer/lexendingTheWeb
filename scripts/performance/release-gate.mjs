@@ -67,7 +67,11 @@ function verifyResponsiveness(raw, sample) {
       const task = tasks[i];
       // The observer includes tasks that START in the half-open measurement
       // window. A final task may finish after it; do not silently clip its cost.
-      assert(task && finiteTime(task.startTime) && Number.isFinite(task.duration) && task.duration >= 50
+      // Pinned Chromium coarsens endpoints before integer truncation, so a
+      // native >=50 ms task may expose duration49. Exact primary-source review:
+      // release/performance-observation-provenance/native-duration-source-assessment-v1.json
+      // SHA256 61f49cd43fc648c6d613f8e1fb09f5f828c343e06bfd63ec7f30633c5e0a2cdb.
+      assert(task && finiteTime(task.startTime) && Number.isInteger(task.duration) && task.duration >= 49
         && Number.isFinite(task.startTime + task.duration) && task.startTime >= start && task.startTime < end,
       'Raw responsiveness task falls outside its observation window');
       assert(i === 0 || (task.startTime > tasks[i - 1].startTime

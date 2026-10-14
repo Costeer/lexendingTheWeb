@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 2,
+  "status": "error",
+  "startedAt": "2026-10-14T18:48:56.732Z",
+  "protocol": {
+    "version": 2,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "settingsChanges": 6,
+    "idleMs": 4000,
+    "streamEdits": 100,
+    "replacements": 6,
+    "sampleTimeoutMs": 45000,
+    "responsiveness": {
+      "edits": 100,
+      "intervalMs": 25,
+      "calibrationBlockMs": 70
+    }
+  },
+  "policy": {
+    "firstFontFrameMs": {
+      "relative": 0.3,
+      "absolute": 30
+    },
+    "settledMs": {
+      "relative": 0.3,
+      "absolute": 50
+    },
+    "taskMs": {
+      "relative": 0.3,
+      "absolute": 25
+    },
+    "styleReads": {
+      "relative": 0.15,
+      "absolute": 100
+    },
+    "boxReads": {
+      "relative": 0.15,
+      "absolute": 50
+    },
+    "heapBytes": {
+      "relative": 0.2,
+      "absolute": 1000000
+    },
+    "domNodes": {
+      "relative": 0.05,
+      "absolute": 20
+    },
+    "refreshes": null,
+    "layouts": null,
+    "styleRecalculations": null,
+    "maxLongTaskMs": {
+      "relative": 0.3,
+      "absolute": 50,
+      "statistic": "max"
+    },
+    "longTaskCount": null,
+    "totalBlockingMs": null,
+    "heapGrowthBytes": {
+      "maximum": 1000000
+    },
+    "nodeGrowth": {
+      "maximum": 20
+    }
+  },
+  "workloads": {
+    "reading-80": {
+      "baseline": [],
+      "candidate": [
+        {
+          "startup.firstFontFrameMs": 54.80000000074506,
+          "startup.settledMs": 215.09999999962747,
+          "startup.taskMs": 223.07600000000002,
+          "startup.layouts": 4,
+          "startup.styleRecalculations": 88,
+          "startup.styleReads": 6504,
+          "startup.boxReads": 2162,
+          "startup.refreshes": 1,
+          "settings.firstFontFrameMs": 49.43333333265036,
+          "settings.settledMs": 137.48333333277455,
+          "settings.taskMs": 131.5105,
+          "settings.layouts": 2,
+          "settings.styleRecalculations": 85,
+          "settings.styleReads": 5294,
+          "settings.boxReads": 2162,
+          "settings.refreshes": 1,
+          "insertion.firstFontFrameMs": 540.2000000011176,
+          "insertion.settledMs": 629.4000000003725,
+          "insertion.taskMs": 146.76400000000012,
+          "insertion.layouts": 3,
+          "insertion.styleRecalculations": 88,
+          "insertion.styleReads": 5419,
+          "insertion.boxReads": 2171,
+          "insertion.refreshes": 1
+        }
+      ],
+      "order": [
+        {
+          "warmup": true,
+          "versions": [
+            "baseline",
+            "candidate"
+          ]
+        },
+        {
+          "warmup": false,
+          "versions": [
+            "candidate",
+            "baseline"
+          ]
+        }
+      ]
+    }
+  },
+  "negativeControl": null,
+  "samplesPerVersion": 5,
+  "baseline": {
+    "ref": "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+    "commit": "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+    "hashes": {
+      "manifests/manifest.chrome.json": "abe2adf55ae195a76c6531430e886e2c484f639b7f7501ca20601002b660015f",
+      "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
+      "src/adaptive-controls.js": "05f05c1a0de14632485e37a00fb57529c09b9bc49ef1affaaf2bd486725ab87b",
+      "src/adaptive-layout.js": "18d95ef1d8d71be61d7e9b80d52ebfc7687c8d5a85fe553d695fb892fd5cdb68",
+      "src/content.js": "7667b43e9830ee5ef41ce3154b123ed797dea851b286bddb2061540cd153180b",
+      "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+      "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+      "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+      "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+    }
+  },
+  "candidate": {
+    "commit": "c7266ca9141ca852c6b58eb464d5f74dc0ebc9a0",
+    "tree": "0478b6545af0c4cb03b40f08a22a08fb003301e7",
+    "gitStatus": "",
+    "hashes": {
+      "manifests/manifest.chrome.json": "51ff1f8cd18614426621ad6800b39e833b3e06051f37eb414c94985a6ae9e766",
+      "src/settings.js": "f8e926720b502fbe8ffebe2d5e6fddb598d4125447b3193ed1fda2bb947de709",
+      "src/adaptive-controls.js": "691735876db76f94313353163139338773a3ee40bea14576eeaf63216dd9578e",
+      "src/adaptive-layout.js": "10c4b75eec18f1cf40aecca73f37e4c99dcc0112998f9dcd222626e2e321da3b",
+      "src/content.js": "dc5a64cff1975fe93c389d0477b68d89b7820c67ec72c5f778c1fc17837ebfb9",
+      "src/shadow-discovery.js": "ec617f10688c3fe785d38cdae7130ca762badbc354686b63e20feb6805e8c1dd",
+      "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+      "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+      "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+      "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+    }
+  },
+  "harnessHashes": {
+    "scripts/test-performance.mjs": "95046f9e5fb92f76fc5fda3f3a8136296067ae1fdc60ddba517bbb99e6c382dc",
+    "scripts/performance/sources.mjs": "1258cb107c1667c2b3292f9eca36c95bf8a0d0e6ef564d2bbb1534e338ec5696",
+    "scripts/performance/runtime-resources.mjs": "a73b9932ea3fb11e796dcba84e8b73ad912535d3f01e973c9b4eec214f3cc86d",
+    "scripts/performance/workloads.mjs": "1d4bc02c218d79e3e794f24c82cac74a2baae52ad22babdd9fdbf21d09af51c3",
+    "scripts/performance/comparison.mjs": "951591aaf0228ab8039c32864933230d41504f2b680a1f5a9fc3ac4cf38db764",
+    "scripts/performance/responsiveness.mjs": "1beeccaa5cda41dabb634dff8382d6523cad800936b6a6269df9fecb61adf614",
+    "test/helpers/conversation.mjs": "91e21774091790b8c56110c7024c9030baddbf1b9b15cd86742e2bcd030587f6"
+  },
+  "environment": {
+    "node": "v24.21.0",
+    "playwright": "1.63.0",
+    "platform": "linux",
+    "release": "6.18.54",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 3600 6-Core Processor",
+    "logicalCpus": 12,
+    "chromium": "153.0.8010.12"
+  },
+  "error": "page.evaluate: Error: Runtime did not finish healthy and active\n    at bench.check (eval at evaluate (:311:30), <anonymous>:39:13)\n    at eval (eval at evaluate (:311:30), <anonymous>:1:15)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)\n    at measureChange (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:181:16)\n    at async measure (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:185:21)\n    at async runWorkload (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:134:12)\n    at async main (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/test-performance.mjs:75:31)\n    at async file:///home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/test-performance.mjs:30:3",
+  "failure": {
+    "workload": "reading-80",
+    "version": "baseline",
+    "round": 1,
+    "warmup": false,
+    "observation": {
+      "workload": "reading-80",
+      "phase": "startup",
+      "atomic": {
+        "kind": "final-check",
+        "state": {
+          "ready": true,
+          "pending": true,
+          "refreshRevision": 1,
+          "healthy": true,
+          "error": null,
+          "active": true,
+          "hostname": "performance.test",
+          "scope": "all"
+        },
+        "requestedSize": 19.2,
+        "fontsStatus": "loaded",
+        "capturedAt": 670.0999999996275
+      },
+      "browserErrors": [],
+      "source": "scripts/performance/workloads.mjs",
+      "originalAssertion": true
+    }
+  },
+  "endGitStatus": "",
+  "finishedAt": "2026-10-14T18:49:06.385Z"
+}

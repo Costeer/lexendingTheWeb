@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
-import { policy } from './comparison.mjs';
+import { compareSamples, policy } from './comparison.mjs';
 import { protocol, workloads } from './workloads.mjs';
-import { releaseBaseline, verifyMeasuredEvidence } from './release-gate.mjs';
+import { releaseBaseline, requiredMetrics, verifyMeasuredEvidence } from './release-gate.mjs';
 import { commitFor, git, gitState, harnessHashes, runtimeSnapshot, sha256 } from './sources.mjs';
 
 export const transitionTag = 'v0.5.1';
@@ -11,7 +11,9 @@ export const transitionPolicyPath = 'release/performance-baseline-transition.jso
 const historicalCommit = 'f2670e24aa210b80f6baedfcf09d22a5dd91e640';
 const anchorCommit = '9ba8c632ba900c39c0b102daa163ae3f0409488e';
 const reviewedCausalHash = 'a352ee31c5b2d9b9bc7f39caf70d54b7142bdc77f98b05d15ebada90de82a038';
-const adoptedPolicySha256 = 'a7bff7998e659bebb7b5608f6847f71e5a23dfafc64a94de64fbf90a1240a966';
+const reviewedOrdinalHash = '18c43f31b08be80cf629e127ce5e6ad24607bf5efbc0ec854c0fa200d45ee24e';
+const ordinalReviewPath = 'release/v0.5.1-ordinal-provenance/historical-round-eligibility-review-v1.json';
+const adoptedPolicySha256 = 'a8416e057bd8c70444abf920b9deec78d8b53e6e2b7060bd56dc7ab9bc3468a7';
 const transitionId = 'lexend-v0.5.1-historical-settling-2026-10-14';
 const fileHash = async path => sha256(await readFile(path));
 const parse = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -80,6 +82,24 @@ export async function transitionPlan(root, tag) {
   assert.equal(authorization.intendedTag, tag, 'Authorization tag differs');
   assert.equal(authorization.historicalCommit, historicalCommit, 'Authorization historical identity differs');
   assert.equal(authorization.frozenAnchor, anchorCommit, 'Authorization anchor differs');
+
+  // This separate ordinal review supplements, never replaces or edits, the
+  // canonical causal inventory above. Its original occurrence stays error.
+  assert.equal(record.ordinalProvenance?.review, ordinalReviewPath, 'Ordinal review path differs');
+  const ordinalBytes = git(root, 'show', `${release.candidate}:${ordinalReviewPath}`);
+  assert.equal(sha256(ordinalBytes), reviewedOrdinalHash, 'Unapproved ordinal eligibility review');
+  const ordinalReview = JSON.parse(ordinalBytes);
+  const ordinalFiles = Object.fromEntries(Object.values(ordinalReview.actualUnsuccessfulOccurrence.artifacts)
+    .map(({ recommendedCommittedPath, sha256: hash }) => [recommendedCommittedPath, hash]));
+  ordinalFiles[ordinalReviewPath] = reviewedOrdinalHash;
+  same(record.ordinalProvenance.files, ordinalFiles, 'Ordinal provenance inventory differs');
+  for (const [path, hash] of Object.entries(ordinalFiles)) assert.equal(
+    sha256(git(root, 'show', `${release.candidate}:${path}`)), hash, `Ordinal scope evidence changed: ${path}`);
+  for (const path of ['scripts/performance/workloads.mjs', 'scripts/test-performance.mjs', 'scripts/performance/comparison.mjs']) {
+    assert.equal(record.harnessHashes[path], ordinalReview.reviewedCandidate.sourceHashes[path],
+      `Ordinal review measurement source differs: ${path}`);
+  }
+
   return { ...release, kind: 'one-time-transition', historical: historicalCommit, baseline: anchorCommit,
     policySha256: sha256(bytes), transitionId, record };
 }
@@ -106,8 +126,9 @@ async function verifyHistorical(root, plan, report) {
   assert.equal(report.regressions, undefined, 'Historical failure may not masquerade as a completed comparison');
   await commonIdentity(root, plan, report, historicalCommit);
   const failure = report.failure;
-  assert(failure && failure.version === 'baseline' && failure.round === 0 && failure.warmup === true,
-    'Only diagnosed historical first warmup failures are authorized');
+  assert(failure && failure.version === 'baseline' && Number.isInteger(failure.round)
+    && failure.round >= 0 && failure.round <= 5 && failure.warmup === (failure.round === 0),
+    'Historical baseline startup sampling position differs');
   const observation = failure.observation;
   assert(observation && observation.originalAssertion === true && observation.phase === 'startup'
     && observation.workload === failure.workload && observation.source === 'scripts/performance/workloads.mjs',
@@ -122,7 +143,8 @@ async function verifyHistorical(root, plan, report) {
   assert.equal(atomic.requestedSize, 19.2, 'Historical requested typography differs');
   assert(Number.isFinite(atomic.capturedAt) && atomic.capturedAt >= 0, 'Missing atomic historical failure capture');
   const reading = failure.workload === 'reading-80' && atomic.kind === 'final-check' && state.refreshRevision === 1;
-  const conversation = failure.workload === 'conversation-120' && atomic.kind === 'settle-timeout'
+  const conversation = failure.workload === 'conversation-120' && failure.round === 0 && failure.warmup === true
+    && atomic.kind === 'settle-timeout'
     && Number.isInteger(state.refreshRevision) && state.refreshRevision >= 2
     && atomic.loaded === true && atomic.stableFrames < 2 && atomic.elapsedMs > 15000
     && Number.isFinite(atomic.firstFontFrameMs);
@@ -134,7 +156,9 @@ async function verifyHistorical(root, plan, report) {
   for (const workload of workloads) {
     const runs = report.workloads[workload.name];
     if (!runs) continue;
-    if (workload.name === failure.workload) {
+    if (reading) {
+      verifyReadingPrefix(runs, workload, failure.round);
+    } else if (workload.name === failure.workload) {
       same(runs.baseline, [], 'Historical failed warmup has measured baseline records');
       same(runs.candidate, [], 'Historical failed warmup has candidate records');
       same(runs.order, measuredOrder.slice(0, 1), 'Historical warmup order differs');
@@ -153,8 +177,6 @@ async function verifyHistorical(root, plan, report) {
   // that into an approved settling failure. A complete surrogate is forbidden:
   // check just the genuinely completed raw reading records directly.
   if (conversation) {
-    const { compareSamples } = await import('./comparison.mjs');
-    const { requiredMetrics } = await import('./release-gate.mjs');
     for (const workload of workloads.filter(item => !item.conversation)) {
       const runs = report.workloads[workload.name];
       for (const sample of [...runs.baseline, ...runs.candidate]) for (const metric of requiredMetrics(workload)) {
@@ -166,6 +188,42 @@ async function verifyHistorical(root, plan, report) {
     }
   }
   return reading ? 'historical-loadingdone-after-settled-frame' : 'historical-author-style-feedback';
+}
+
+// Each workload invocation has a fresh document. The reviewed late loadingdone
+// mechanism is independent of its sampling ordinal, but every completed sample
+// and the exact default schedule prefix still have to be retained and valid.
+function verifyReadingPrefix(runs, workload, failedRound) {
+  same(runs.order, measuredOrder.slice(0, failedRound + 1), 'Historical reading sampling prefix differs');
+  const completed = { baseline: 0, candidate: 0 };
+  for (let round = 0; round <= failedRound; round++) {
+    for (const version of measuredOrder[round].versions) {
+      if (round === failedRound && version === 'baseline') break;
+      if (round > 0) completed[version]++;
+    }
+  }
+  for (const version of ['baseline', 'candidate']) {
+    assert(Array.isArray(runs[version]) && runs[version].length === completed[version],
+      `Historical failed prefix measured ${version} count differs`);
+  }
+  assert.equal(runs.comparison, undefined, 'Incomplete historical reading cannot contain a comparison');
+  assert.equal(runs.rawResponsiveness, undefined, 'Historical reading cannot contain raw responsiveness');
+  const metrics = requiredMetrics(workload).sort();
+  assert.equal(metrics.length, 24, 'Reviewed historical reading metric coverage differs');
+  for (const sample of [...runs.baseline, ...runs.candidate]) {
+    assert(sample && typeof sample === 'object' && !Array.isArray(sample), 'Missing historical reading sample');
+    same(Object.keys(sample).sort(), metrics, 'Historical reading metric coverage differs');
+    for (const metric of metrics) assert(Number.isFinite(sample[metric]) && sample[metric] >= 0,
+      `Historical reading metric must be finite and nonnegative: ${metric}`);
+  }
+  // Only actual common-index pairs enter the unchanged comparator. An extra
+  // completed candidate remains in the raw report/manifest, never fabricated
+  // into a pair or discarded. This is a veto, not a completed v0.5.0 comparison.
+  const paired = runs.baseline.length;
+  if (paired >= 3) {
+    const comparison = compareSamples(runs.baseline, runs.candidate.slice(0, paired));
+    assert(!comparison.some(row => row.regression), 'Historical partial reading regression remains blocking');
+  }
 }
 
 function artifactPath(directory, name) {
@@ -220,6 +278,7 @@ async function binding(root, directory, verified) {
     gateHashes: Object.fromEntries(['scripts/performance/release-gate.mjs', 'scripts/performance/baseline-transition.mjs', 'scripts/release-performance.mjs']
       .map(path => [path, sha256(git(root, 'show', `${plan.candidate}:${path}`))])),
     provenanceHashes: plan.record.provenance.files,
+    ordinalProvenanceHashes: plan.record.ordinalProvenance.files,
     artifacts: Object.fromEntries(await Promise.all(files.map(async name => [name, await fileHash(resolve(directory, name))])))
   };
 }

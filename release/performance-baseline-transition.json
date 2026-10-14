@@ -183,9 +183,61 @@
       "workload": "reading-80",
       "phase": "startup",
       "version": "baseline",
-      "round": 0,
       "requiredState": "ready/healthy/active/pending, revision1, fontsloaded; exact original final-check assertion",
-      "causalBasis": "Exact native FunctionCall exclusively registered as loadingdone callback1039 and live TimerInstall stack1059→913→909. Literal loadingdone EventDispatch absent; independently accepted openly."
+      "causalBasis": "Exact native FunctionCall exclusively registered as loadingdone callback1039 and live TimerInstall stack1059\u2192913\u2192909. Literal loadingdone EventDispatch absent; independently accepted openly.",
+      "rounds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "ordinalScope": "Each runWorkload invocation creates a fresh context/page with document-local loadingdone state; the same source-linked revision1 pending predicate is eligible in baseline startup round0..5. Warmup must equal round0. No other workload/phase/version/predicate is added.",
+      "requiredRawPrefix": {
+        "schedule": "Exact default alternating order prefix through failed round, with no missing/excess/reordered entries",
+        "counts": [
+          {
+            "round": 0,
+            "warmup": true,
+            "baselineMeasuredCount": 0,
+            "candidateMeasuredCount": 0
+          },
+          {
+            "round": 1,
+            "warmup": false,
+            "baselineMeasuredCount": 0,
+            "candidateMeasuredCount": 1
+          },
+          {
+            "round": 2,
+            "warmup": false,
+            "baselineMeasuredCount": 1,
+            "candidateMeasuredCount": 1
+          },
+          {
+            "round": 3,
+            "warmup": false,
+            "baselineMeasuredCount": 2,
+            "candidateMeasuredCount": 3
+          },
+          {
+            "round": 4,
+            "warmup": false,
+            "baselineMeasuredCount": 3,
+            "candidateMeasuredCount": 3
+          },
+          {
+            "round": 5,
+            "warmup": false,
+            "baselineMeasuredCount": 4,
+            "candidateMeasuredCount": 5
+          }
+        ],
+        "metrics": "Exactly the unchanged24 reading metrics, every retained value finite and nonnegative, including all unpaired candidate records",
+        "comparison": "No comparison/rawResponsiveness fields on incomplete reading. With >=3 common-index pairs, unchanged comparator on ALL retained pairs must show no regression; never invent a partner or drop raw records.",
+        "coverage": "Incomplete historical samples remain unsuccessful diagnostic evidence; no default3x5 comparison or numerical claim versusv0.5.0."
+      }
     },
     {
       "id": "historical-author-style-feedback",
@@ -205,5 +257,14 @@
     "separate machine verification result, explicitly no human-approval claim",
     "independent source and final raw evidence review retained separately"
   ],
-  "disclosure": "The unchanged comparison against v0.5.0 could not complete because of diagnosed historical settling incompatibilities. This release was qualified against the explicitly frozen pre-audit revision 9ba8c632ba900c39c0b102daa163ae3f0409488e. Numerical regression coverage for the intervening 19 commits is unavailable. No unchanged or improved performance claim relative to v0.5.0."
+  "disclosure": "The unchanged comparison against v0.5.0 could not complete because of diagnosed historical settling incompatibilities. This release was qualified against the explicitly frozen pre-audit revision 9ba8c632ba900c39c0b102daa163ae3f0409488e. Numerical regression coverage for the intervening 19 commits is unavailable. No unchanged or improved performance claim relative to v0.5.0. The diagnosed reading-80 baseline startup failure may occur in any fresh-context default sampling round0..5. Preserve its exact alternating prefix and every completed/unpaired metric; an incomplete historical prefix never qualifies as a completed comparison.",
+  "ordinalProvenance": {
+    "review": "release/v0.5.1-ordinal-provenance/historical-round-eligibility-review-v1.json",
+    "files": {
+      "release/v0.5.1-ordinal-provenance/historical-round-eligibility-review-v1.json": "18c43f31b08be80cf629e127ce5e6ad24607bf5efbc0ec854c0fa200d45ee24e",
+      "release/v0.5.1-ordinal-provenance/historical-report.json": "f79bcc9e6149889332e930b7b6e4cdfb3e2f64aef8dca2bb1a00ad7da7453120",
+      "release/v0.5.1-ordinal-provenance/historical-command.json": "13ebd7e9726bb52f45d1af18f055d87fc2bfcffe602aaa3d70a1ab7602e7e1bf",
+      "release/v0.5.1-ordinal-provenance/historical.log": "d839484cf08d62fe68e4520a3aef966c3d8f35fb31ac47b25bdc4f352760c06c"
+    }
+  }
 }

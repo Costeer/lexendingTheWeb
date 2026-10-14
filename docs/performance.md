@@ -113,6 +113,22 @@ the detector works. The positive control is outside the measured window.
 Unsupported or inactive detectors fail the command. The window includes the
 final queued refresh and deferred repair.
 
+The shared raw verifier accepts native whole-millisecond task durations of at
+least 49 ms for the pinned Chromium 153 / Playwright 1.63.0 profile. Chromium
+classifies the internal task against 50 ms before separately coarsening its
+endpoints at 100 µs and integer-truncating their exposed difference, so a valid
+entry can report 49 ms. The [independent primary-source assessment](../release/performance-observation-provenance/native-duration-source-assessment-v1.json)
+retains the exact implementation chain, immutable source URLs/hashes and scope.
+A different browser or timing profile needs a separate contract review.
+
+This validates the native representation: keep every raw entry and its original
+metrics, including duration 49 and its zero contribution to blocking time above
+50 ms. Do not round it up or drop it. Values 48, fractional/nonfinite durations,
+invalid windows and ordering still fail. The distinct 70 ms calibration control
+and its original span checks remain mandatory; an incidental 49 ms entry cannot
+replace that control. The max-task regression statistic and its 30%/50 ms
+allowance, collector, workload and sampling protocol remain unchanged.
+
 To demonstrate the real browser failure path while retaining all default
 workloads and samples:
 
