@@ -73,6 +73,12 @@ npm run check
 npm run build
 ```
 
+Run `npm test` from a Git checkout with full history and tags: release-gate
+tests clone the repository and verify frozen historical revisions. For an
+existing shallow clone, run `git fetch --unshallow --tags` first. Containers
+running the tests must also expose the worktree’s referenced Git directory
+and common Git directory.
+
 `npm test` runs at most four test files concurrently because several launch
 real browsers. The empirical performance command runs separately on an idle
 machine.
