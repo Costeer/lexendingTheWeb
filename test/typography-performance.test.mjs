@@ -461,10 +461,15 @@ test("conversation style feedback settles across cooldowns while fonts, streamin
     const page = await browser.newPage();
     await prepare(page, conversationHtml(), { settings: { textScale: 120 }, settle: false });
     await page.evaluate(() => document.fonts.ready);
-    // Do not wait for pending=false first: the broken implementation never
-    // settles. Observe several real cooldowns, including a delayed restart.
-    await page.waitForTimeout(1500);
-    const before = await page.evaluate(() => __state());
+    // A late startup font can queue a legitimate refresh behind the cooldown.
+    // Bound the wait: the broken feedback loop never settles and must fail.
+    // Sample readiness and revision together before observing idle cooldowns.
+    const handle = await page.waitForFunction(() => {
+      const state = __state();
+      return state?.healthy && !state.pending && document.fonts.status === "loaded" ? state : false;
+    }, null, { timeout: 10000 });
+    const before = await handle.jsonValue();
+    await handle.dispose();
     await page.waitForTimeout(4000);
     const after = await page.evaluate(() => __state());
     assert.equal(after.pending, false, "author restoration must not perpetually queue full-page work");

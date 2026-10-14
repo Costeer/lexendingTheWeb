@@ -233,26 +233,47 @@ test("typography preserves protected content and refreshes atomic inherited base
     });
     await page.waitForTimeout(150);
     assert.ok(Math.abs((await page.evaluate(() => __metrics("fit-clone"))).size-fittedSize)<0.05, "cloned fitted heading starts from original authored size, not an already fitted size");
-    await page.evaluate(() => {
+    // Conversion precedes deferred repair. Inspect the wrapper, focus and scroll
+    // in the same task that confirms a newer refresh has completely settled.
+    const settledTable = async (revision) => {
+      const handle = await page.waitForFunction((revision) => {
+        const state = __state();
+        if (!state.healthy || state.pending || state.refreshRevision <= revision || document.fonts.status !== "loaded") return false;
+        const table = document.querySelector("#keyboard-table");
+        return { box: table.getBoundingClientRect().toJSON(), font: getComputedStyle(table.firstChild.firstChild.firstChild).font,
+          repair: table.dataset.lexendLayoutRepair, state, bodyScroll: document.body.scrollTop,
+          role: table.parentElement.getAttribute("role"), focused: document.activeElement === table.parentElement,
+          scroll: table.parentElement.scrollLeft };
+      }, revision);
+      const snapshot = await handle.jsonValue();
+      await handle.dispose();
+      return snapshot;
+    };
+    const tableRevision = await page.evaluate(() => {
+      const revision = __state().refreshRevision;
       const table=document.createElement("table");table.id="keyboard-table";
       table.style.cssText="font:20px Arial;letter-spacing:0;border-collapse:collapse";
       table.innerHTML='<tr><td style="white-space:nowrap">MMMMMMMMMMMMMM</td><td style="white-space:nowrap">MMMMMMMMMMMMMM</td></tr>';
       document.body.append(table);
       table.scrollIntoView({block:"center"});
+      return revision;
     });
-    await page.waitForTimeout(150);
-    const tableDiagnostic = await page.locator("#keyboard-table").evaluate((table) => ({box:table.getBoundingClientRect().toJSON(),font:getComputedStyle(table.firstChild.firstChild.firstChild).font,repair:table.dataset.lexendLayoutRepair,state:__state(),bodyScroll:document.body.scrollTop}));
-    assert.equal(await page.locator("#keyboard-table").evaluate((table) => table.parentElement.getAttribute("role")),"region",JSON.stringify(tableDiagnostic));
+    const tableDiagnostic = await settledTable(tableRevision);
+    assert.equal(tableDiagnostic.role,"region",JSON.stringify(tableDiagnostic));
     await page.locator("#keyboard-table").evaluate((table) => table.parentElement.focus());
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(200);
     const tableX = await page.locator("#keyboard-table").evaluate((table) => table.parentElement.scrollLeft);
     assert.ok(tableX>5,"keyboard ArrowRight scrolls enlarged table: "+JSON.stringify(await page.locator("#keyboard-table").evaluate(table=>({scroll:table.parentElement.scrollLeft,width:table.parentElement.clientWidth,extent:table.parentElement.scrollWidth,active:document.activeElement.tagName,focus:document.activeElement===table.parentElement,rect:table.getBoundingClientRect().toJSON(),style:table.parentElement.style.cssText,state:__state()}))));
-    await page.evaluate(() => {document.querySelector("#wrapper").textContent="Focused table region survives refresh";});
-    await page.waitForTimeout(150);
-    assert.equal(await page.locator("#keyboard-table").evaluate((table) => document.activeElement===table.parentElement),true,"replacement table wrapper retains keyboard focus");
-    assert.ok(Math.abs((await page.locator("#keyboard-table").evaluate((table) => table.parentElement.scrollLeft))-tableX)<1,"replacement table wrapper retains keyboard scroll offset");
+    const focusedRevision = await page.evaluate(() => {
+      const revision = __state().refreshRevision;
+      document.querySelector("#wrapper").textContent="Focused table region survives refresh";
+      return revision;
+    });
+    const focusedTable = await settledTable(focusedRevision);
+    assert.equal(focusedTable.focused,true,"replacement table wrapper retains keyboard focus");
+    assert.ok(Math.abs(focusedTable.scroll-tableX)<1,"replacement table wrapper retains keyboard scroll offset");
     await page.evaluate(() => {
       document.documentElement.style.height=`${innerHeight}px`;
       document.documentElement.style.overflow="hidden";
