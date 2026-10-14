@@ -75,6 +75,25 @@ jobs:
           mkdir -p "$RUNNER_TEMP/lexend-browser-tests"
           cp dist/releases/*.zip "$RUNNER_TEMP/lexend-browser-tests/"
           npm run test:packages 2>&1 | tee "$RUNNER_TEMP/lexend-browser-tests/package-verification.log"
+      - name: Provision the requested browser and driver
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
+          TEST_BROWSER_VERSION: ${{ matrix.version }}
+        shell: bash
+        run: |
+          # Retry downloads before testing; never retry a failed browser assertion.
+          for attempt in 1 2 3; do
+            if node_modules/selenium-webdriver/bin/linux-x86_64/selenium-manager \
+              --browser "$TEST_BROWSER" --browser-version "$TEST_BROWSER_VERSION" \
+              --force-browser-download --avoid-stats \
+              2>&1 | tee -a "$RUNNER_TEMP/lexend-browser-tests/provisioning.log"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
       - name: Verify the installed release artifact
         env:
           TEST_BROWSER: ${{ matrix.browser }}

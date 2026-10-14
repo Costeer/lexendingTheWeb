@@ -53,7 +53,11 @@ node scripts/shadow-browser-tests.mjs firefox --browser-version 140.0 \
 
 On Linux without a desktop, prefix each browser command with `xvfb-run -a`.
 Selenium Manager downloads matching browser and driver binaries; its usage
-statistics are disabled. The runner asserts that a requested numeric version
+statistics are disabled. CI provisions the requested engine and driver before
+either installed suite, with up to three download attempts and 5/10-second
+delays for transient network failures. Exhausted provisioning fails the job;
+browser assertions are not retried. The provisioning log is retained with the
+other browser evidence. The runner asserts that a requested numeric version
 matches the actual browser's version prefix. An unavailable download or driver is
 a verification failure, not a minimum-version pass.
 
