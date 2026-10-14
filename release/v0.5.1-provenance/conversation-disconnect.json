@@ -1,0 +1,2210 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-14T17:38:25.122Z",
+  "mode": "conversation-disconnect",
+  "baseline": "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+  "protocol": {
+    "version": 2,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "settingsChanges": 6,
+    "idleMs": 4000,
+    "streamEdits": 100,
+    "replacements": 6,
+    "sampleTimeoutMs": 45000,
+    "responsiveness": {
+      "edits": 100,
+      "intervalMs": 25,
+      "calibrationBlockMs": 70
+    }
+  },
+  "scope": "Diagnostic only: minimally probed immutable historical source and original startup assertions. Reading records accepted queues and the exact state returned to the original check; conversation may disconnect only author observer AFTER actual original15s timeout, then observe2s. Startup prefix only; instrumentation/intervention cannot qualify a release or supply comparative numbers.",
+  "cases": [
+    {
+      "workload": "conversation-120",
+      "phase": "startup",
+      "calls": [
+        {
+          "index": 0,
+          "phase": "setup",
+          "kind": "evaluate",
+          "startedAt": "2026-10-14T17:38:25.307Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:25.328Z"
+        },
+        {
+          "index": 1,
+          "phase": "setup",
+          "kind": "evaluate",
+          "startedAt": "2026-10-14T17:38:25.330Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:25.331Z"
+        },
+        {
+          "index": 2,
+          "phase": "startup",
+          "kind": "done",
+          "startedAt": "2026-10-14T17:38:26.104Z",
+          "status": "failed",
+          "error": "page.evaluate: Error: Typography did not settle with loaded fonts within 15 seconds\n    at frame (eval at evaluate (:311:30), <anonymous>:70:18)\n    at page.evaluate (/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:159:29)\n    at measureChange (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:165:31)\n    at async measure (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:171:21)\n    at async runWorkload (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:123:12)\n    at async file:///home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:196:11",
+          "errorOrigin": "original-page-evaluate",
+          "finishedAt": "2026-10-14T17:38:42.618Z"
+        }
+      ],
+      "console": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "httpErrors": [],
+      "originalStartupRejection": {
+        "kind": "done",
+        "callIndex": 2,
+        "error": "page.evaluate: Error: Typography did not settle with loaded fonts within 15 seconds\n    at frame (eval at evaluate (:311:30), <anonymous>:70:18)\n    at page.evaluate (/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:159:29)\n    at measureChange (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:165:31)\n    at async measure (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:171:21)\n    at async runWorkload (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:123:12)\n    at async file:///home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:196:11",
+        "knownAssertion": true
+      },
+      "observation": {
+        "state": {
+          "ready": true,
+          "pending": true,
+          "refreshRevision": 20,
+          "healthy": true,
+          "error": null,
+          "active": true,
+          "hostname": "performance.test",
+          "scope": "all"
+        },
+        "time": 15291.200000000186,
+        "fontsStatus": "loaded",
+        "paragraph": {
+          "family": "\"Lexend for the Web\", Arial, \"Lexend Nerd Symbols\"",
+          "size": "19.2px"
+        },
+        "fontCheck": true,
+        "trace": {
+          "events": [
+            {
+              "sequence": 0,
+              "at": 808.7999999998137,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 2,
+              "refreshRevision": 1,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 1,
+              "at": 840.6000000005588,
+              "kind": "new-font-metrics",
+              "refreshRevision": 1
+            },
+            {
+              "sequence": 2,
+              "at": 1588.5,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 4,
+              "refreshRevision": 2,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 3,
+              "at": 2357.600000000559,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 6,
+              "refreshRevision": 3,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 4,
+              "at": 3113.2000000001863,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 8,
+              "refreshRevision": 4,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 5,
+              "at": 3863.2999999998137,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 10,
+              "refreshRevision": 5,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 6,
+              "at": 4636.299999999814,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 12,
+              "refreshRevision": 6,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 7,
+              "at": 5408.9000000003725,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 14,
+              "refreshRevision": 7,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 8,
+              "at": 6187.4000000003725,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 16,
+              "refreshRevision": 8,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 9,
+              "at": 6927.799999999814,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 18,
+              "refreshRevision": 9,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 10,
+              "at": 7665.799999999814,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 20,
+              "refreshRevision": 10,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 11,
+              "at": 8433,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 22,
+              "refreshRevision": 11,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 12,
+              "at": 9205.600000000559,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 24,
+              "refreshRevision": 12,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 13,
+              "at": 9974.799999999814,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 26,
+              "refreshRevision": 13,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 14,
+              "at": 10730.299999999814,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 28,
+              "refreshRevision": 14,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 15,
+              "at": 11485.900000000373,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 30,
+              "refreshRevision": 15,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 16,
+              "at": 12227.5,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 32,
+              "refreshRevision": 16,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 17,
+              "at": 12983.400000000373,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 34,
+              "refreshRevision": 17,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 18,
+              "at": 13755,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 36,
+              "refreshRevision": 18,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 19,
+              "at": 14510.200000000186,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 38,
+              "refreshRevision": 19,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 20,
+              "at": 15282.700000000186,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 40,
+              "refreshRevision": 20,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+            },
+            {
+              "sequence": 21,
+              "at": 15285.200000000186,
+              "kind": "original-done-rejected",
+              "error": "Error: Typography did not settle with loaded fonts within 15 seconds"
+            }
+          ],
+          "counts": {
+            "queue-accepted": 20,
+            "new-font-metrics": 1,
+            "original-done-rejected": 1
+          },
+          "limit": 512,
+          "dropped": 0,
+          "authorWrites": 40
+        }
+      },
+      "controlPreconditionSatisfied": true,
+      "intervention": {
+        "kind": "disconnect-only-author-observer-after-original-timeout",
+        "windowMs": 2000,
+        "actualWindowMs": 2011.6000000005588,
+        "before": {
+          "at": 15300.400000000373,
+          "state": {
+            "ready": true,
+            "pending": true,
+            "refreshRevision": 20,
+            "healthy": true,
+            "error": null,
+            "active": true,
+            "hostname": "performance.test",
+            "scope": "all"
+          },
+          "authorWrites": 40,
+          "trace": {
+            "events": [
+              {
+                "sequence": 0,
+                "at": 808.7999999998137,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 2,
+                "refreshRevision": 1,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 1,
+                "at": 840.6000000005588,
+                "kind": "new-font-metrics",
+                "refreshRevision": 1
+              },
+              {
+                "sequence": 2,
+                "at": 1588.5,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 4,
+                "refreshRevision": 2,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 3,
+                "at": 2357.600000000559,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 6,
+                "refreshRevision": 3,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 4,
+                "at": 3113.2000000001863,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 8,
+                "refreshRevision": 4,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 5,
+                "at": 3863.2999999998137,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 10,
+                "refreshRevision": 5,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 6,
+                "at": 4636.299999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 12,
+                "refreshRevision": 6,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 7,
+                "at": 5408.9000000003725,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 14,
+                "refreshRevision": 7,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 8,
+                "at": 6187.4000000003725,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 16,
+                "refreshRevision": 8,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 9,
+                "at": 6927.799999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 18,
+                "refreshRevision": 9,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 10,
+                "at": 7665.799999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 20,
+                "refreshRevision": 10,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 11,
+                "at": 8433,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 22,
+                "refreshRevision": 11,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 12,
+                "at": 9205.600000000559,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 24,
+                "refreshRevision": 12,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 13,
+                "at": 9974.799999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 26,
+                "refreshRevision": 13,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 14,
+                "at": 10730.299999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 28,
+                "refreshRevision": 14,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 15,
+                "at": 11485.900000000373,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 30,
+                "refreshRevision": 15,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 16,
+                "at": 12227.5,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 32,
+                "refreshRevision": 16,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 17,
+                "at": 12983.400000000373,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 34,
+                "refreshRevision": 17,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 18,
+                "at": 13755,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 36,
+                "refreshRevision": 18,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 19,
+                "at": 14510.200000000186,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 38,
+                "refreshRevision": 19,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 20,
+                "at": 15282.700000000186,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 40,
+                "refreshRevision": 20,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 21,
+                "at": 15285.200000000186,
+                "kind": "original-done-rejected",
+                "error": "Error: Typography did not settle with loaded fonts within 15 seconds"
+              }
+            ],
+            "counts": {
+              "queue-accepted": 20,
+              "new-font-metrics": 1,
+              "original-done-rejected": 1
+            },
+            "limit": 512,
+            "dropped": 0,
+            "authorWrites": 40
+          }
+        },
+        "firstSettled": {
+          "at": 16028.799999999814,
+          "state": {
+            "ready": true,
+            "pending": false,
+            "refreshRevision": 21,
+            "healthy": true,
+            "error": null,
+            "active": true,
+            "hostname": "performance.test",
+            "scope": "all"
+          },
+          "authorWrites": 40,
+          "queueCount": 20
+        },
+        "after": {
+          "at": 17310.900000000373,
+          "state": {
+            "ready": true,
+            "pending": false,
+            "refreshRevision": 21,
+            "healthy": true,
+            "error": null,
+            "active": true,
+            "hostname": "performance.test",
+            "scope": "all"
+          },
+          "authorWrites": 40,
+          "trace": {
+            "events": [
+              {
+                "sequence": 0,
+                "at": 808.7999999998137,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 2,
+                "refreshRevision": 1,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 1,
+                "at": 840.6000000005588,
+                "kind": "new-font-metrics",
+                "refreshRevision": 1
+              },
+              {
+                "sequence": 2,
+                "at": 1588.5,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 4,
+                "refreshRevision": 2,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 3,
+                "at": 2357.600000000559,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 6,
+                "refreshRevision": 3,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 4,
+                "at": 3113.2000000001863,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 8,
+                "refreshRevision": 4,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 5,
+                "at": 3863.2999999998137,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 10,
+                "refreshRevision": 5,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 6,
+                "at": 4636.299999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 12,
+                "refreshRevision": 6,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 7,
+                "at": 5408.9000000003725,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 14,
+                "refreshRevision": 7,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 8,
+                "at": 6187.4000000003725,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 16,
+                "refreshRevision": 8,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 9,
+                "at": 6927.799999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 18,
+                "refreshRevision": 9,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 10,
+                "at": 7665.799999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 20,
+                "refreshRevision": 10,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 11,
+                "at": 8433,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 22,
+                "refreshRevision": 11,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 12,
+                "at": 9205.600000000559,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 24,
+                "refreshRevision": 12,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 13,
+                "at": 9974.799999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 26,
+                "refreshRevision": 13,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 14,
+                "at": 10730.299999999814,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 28,
+                "refreshRevision": 14,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 15,
+                "at": 11485.900000000373,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 30,
+                "refreshRevision": 15,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 16,
+                "at": 12227.5,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 32,
+                "refreshRevision": 16,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 17,
+                "at": 12983.400000000373,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 34,
+                "refreshRevision": 17,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 18,
+                "at": 13755,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 36,
+                "refreshRevision": 18,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 19,
+                "at": 14510.200000000186,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 38,
+                "refreshRevision": 19,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 20,
+                "at": 15282.700000000186,
+                "kind": "queue-accepted",
+                "urgent": false,
+                "delay": 100,
+                "refreshTimer": 40,
+                "refreshRevision": 20,
+                "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at MutationObserver.<anonymous> (src/content.js:3411:5)"
+              },
+              {
+                "sequence": 21,
+                "at": 15285.200000000186,
+                "kind": "original-done-rejected",
+                "error": "Error: Typography did not settle with loaded fonts within 15 seconds"
+              },
+              {
+                "sequence": 22,
+                "at": 15300.5,
+                "kind": "diagnostic-author-observer-disconnected"
+              }
+            ],
+            "counts": {
+              "queue-accepted": 20,
+              "new-font-metrics": 1,
+              "original-done-rejected": 1,
+              "diagnostic-author-observer-disconnected": 1
+            },
+            "limit": 512,
+            "dropped": 0,
+            "authorWrites": 40
+          },
+          "fontsStatus": "loaded",
+          "fontCheck": true
+        },
+        "observations": [
+          {
+            "at": 15300.600000000559,
+            "state": {
+              "ready": true,
+              "pending": true,
+              "refreshRevision": 20,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 15311.200000000186,
+            "state": {
+              "ready": true,
+              "pending": true,
+              "refreshRevision": 20,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 15327.700000000186,
+            "state": {
+              "ready": true,
+              "pending": true,
+              "refreshRevision": 20,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 15344.299999999814,
+            "state": {
+              "ready": true,
+              "pending": true,
+              "refreshRevision": 20,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 15360.900000000373,
+            "state": {
+              "ready": true,
+              "pending": true,
+              "refreshRevision": 20,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 15377.600000000559,
+            "state": {
+              "ready": true,
+              "pending": true,
+              "refreshRevision": 20,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16024.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16028.799999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16028.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16044.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16060.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16077.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16094.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16110.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16127.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16144.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16161,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16177.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16194.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16210.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16227.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16244.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16260.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16277.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16294.400000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16310.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16327.600000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16344.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16361.100000000559,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16377.700000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16394.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16411,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16427.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16444.400000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16461,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16477.700000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16494.400000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16511,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16527.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16544.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16561,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16577.700000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16594.400000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16611.10000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16627.700000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16644.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16661,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16677.700000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16694.400000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16711,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16727.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16744.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16761,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16777.700000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16794.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16811,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16827.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16844.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16860.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16877.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16894.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16911,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16927.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16944.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16960.799999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16977.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 16994.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17010.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17027.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17044.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17060.799999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17077.5,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17094.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17110.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17127.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17144.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17160.799999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17177.5,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17194.299999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17210.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17227.60000000056,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17244.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17260.799999999814,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17277.5,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17294.200000000186,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          },
+          {
+            "at": 17310.900000000373,
+            "state": {
+              "ready": true,
+              "pending": false,
+              "refreshRevision": 21,
+              "healthy": true,
+              "error": null,
+              "active": true,
+              "hostname": "performance.test",
+              "scope": "all"
+            },
+            "authorWrites": 40,
+            "queueCount": 20
+          }
+        ],
+        "originalTypographyCheck": {
+          "passed": true
+        },
+        "recoveredForThisDiagnostic": true,
+        "scope": "Diagnostic intervention only. Fonts, runtime invalidations, geometry, original source fixtures and failure report remain retained. No full workload or numerical release proof."
+      },
+      "contextCloseSucceeded": true,
+      "status": "original-startup-assertion-failed",
+      "error": "page.evaluate: Error: Typography did not settle with loaded fonts within 15 seconds\n    at frame (eval at evaluate (:311:30), <anonymous>:70:18)\n    at page.evaluate (/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:159:29)\n    at measureChange (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:165:31)\n    at async measure (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:171:21)\n    at async runWorkload (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:123:12)\n    at async file:///home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:196:11",
+      "browserResourceErrors": false,
+      "observationSucceeded": true,
+      "diagnosticIntegrity": true,
+      "interventionIntegrity": true,
+      "coverageLimit": "Startup prefix only: the host stop bypasses later phases and final workload page/resource-error assertions. Errors are independently retained and invalidate diagnostic integrity. Context-close success is checked below.",
+      "finishedAt": "2026-10-14T17:38:42.622Z"
+    }
+  ],
+  "scriptSha256": "e3e038871964e9881ab3d6d3d4b48de2ab8a0dd8b41ea1bf301bc103e0f6bd3d",
+  "originalRuntimeHashes": {
+    "manifests/manifest.chrome.json": "abe2adf55ae195a76c6531430e886e2c484f639b7f7501ca20601002b660015f",
+    "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
+    "src/adaptive-controls.js": "05f05c1a0de14632485e37a00fb57529c09b9bc49ef1affaaf2bd486725ab87b",
+    "src/adaptive-layout.js": "18d95ef1d8d71be61d7e9b80d52ebfc7687c8d5a85fe553d695fb892fd5cdb68",
+    "src/content.js": "7667b43e9830ee5ef41ce3154b123ed797dea851b286bddb2061540cd153180b",
+    "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+    "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+    "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+    "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+  },
+  "harnessHashes": {
+    "scripts/test-performance.mjs": "6725f0a6907344fe779963520da9f5ac5e3e82d14c0fe43fb7c63ffadbccbc08",
+    "scripts/performance/sources.mjs": "1258cb107c1667c2b3292f9eca36c95bf8a0d0e6ef564d2bbb1534e338ec5696",
+    "scripts/performance/runtime-resources.mjs": "a73b9932ea3fb11e796dcba84e8b73ad912535d3f01e973c9b4eec214f3cc86d",
+    "scripts/performance/workloads.mjs": "28c61058aff24cc5e1fa71097b0024611807c396e4fd29a4901bff012cb933c4",
+    "scripts/performance/comparison.mjs": "951591aaf0228ab8039c32864933230d41504f2b680a1f5a9fc3ac4cf38db764",
+    "scripts/performance/responsiveness.mjs": "1beeccaa5cda41dabb634dff8382d6523cad800936b6a6269df9fecb61adf614",
+    "test/helpers/conversation.mjs": "91e21774091790b8c56110c7024c9030baddbf1b9b15cd86742e2bcd030587f6"
+  },
+  "checkout": {
+    "commit": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+    "tree": "0b41d8f404afa19b5531fd569092f9b464e80ef4",
+    "gitStatus": ""
+  },
+  "expectedInputsSha256": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+  "currentRuntimeHashes": {
+    "manifests/manifest.chrome.json": "e1205c91bab94c94dc26b0caa6865ea3ae60e96a93237cb5e56918c98feec9d6",
+    "src/settings.js": "f8e926720b502fbe8ffebe2d5e6fddb598d4125447b3193ed1fda2bb947de709",
+    "src/adaptive-controls.js": "691735876db76f94313353163139338773a3ee40bea14576eeaf63216dd9578e",
+    "src/adaptive-layout.js": "10c4b75eec18f1cf40aecca73f37e4c99dcc0112998f9dcd222626e2e321da3b",
+    "src/content.js": "dc5a64cff1975fe93c389d0477b68d89b7820c67ec72c5f778c1fc17837ebfb9",
+    "src/shadow-discovery.js": "ec617f10688c3fe785d38cdae7130ca762badbc354686b63e20feb6805e8c1dd",
+    "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+    "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+    "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+    "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+  },
+  "reviewedInputsVerified": true,
+  "transformedContentSha256": "a64e936ecc2f1d4248ca6087c24364cc235fa92d8ab33d0e680b42f0045f1eb2",
+  "transforms": [
+    {
+      "label": "accepted queue only",
+      "needleSha256": "3acbeaff5fb682f9bfbc4d3ca1fcf924d477e92fe9255478c63b2a8940e855d8",
+      "replacementSha256": "516f133fe1ddab1d826debe3fda3b105a8f51a01090906a1eeb2f781e447e5b0"
+    },
+    {
+      "label": "new font metrics only",
+      "needleSha256": "5c559d5d5e2a1ee9d6b61acd949a7b8db40d7a9f05b95e1d19dee08b79b30ec4",
+      "replacementSha256": "6d87128dea0e09ffb3af3af3a0c553d5beb8bcdf5a4258600e7712f12da75a1a"
+    }
+  ],
+  "prefixSha256": "86bd07e5819b3c73e51b98c19dfa55d94cfe5c3ecb74abea4a82742deb1e49b5",
+  "interventionFunctionSha256": "c21a6cbbb472b043c7b3bb913a840a7e37e889e1da957490504689177f35b87b",
+  "chromium": "153.0.8010.12",
+  "browserClosed": true,
+  "finishedAt": "2026-10-14T17:38:42.652Z",
+  "scriptSha256After": "e3e038871964e9881ab3d6d3d4b48de2ab8a0dd8b41ea1bf301bc103e0f6bd3d",
+  "scriptStable": true,
+  "checkoutAfter": {
+    "commit": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+    "tree": "0b41d8f404afa19b5531fd569092f9b464e80ef4",
+    "gitStatus": ""
+  },
+  "harnessHashesAfter": {
+    "scripts/test-performance.mjs": "6725f0a6907344fe779963520da9f5ac5e3e82d14c0fe43fb7c63ffadbccbc08",
+    "scripts/performance/sources.mjs": "1258cb107c1667c2b3292f9eca36c95bf8a0d0e6ef564d2bbb1534e338ec5696",
+    "scripts/performance/runtime-resources.mjs": "a73b9932ea3fb11e796dcba84e8b73ad912535d3f01e973c9b4eec214f3cc86d",
+    "scripts/performance/workloads.mjs": "28c61058aff24cc5e1fa71097b0024611807c396e4fd29a4901bff012cb933c4",
+    "scripts/performance/comparison.mjs": "951591aaf0228ab8039c32864933230d41504f2b680a1f5a9fc3ac4cf38db764",
+    "scripts/performance/responsiveness.mjs": "1beeccaa5cda41dabb634dff8382d6523cad800936b6a6269df9fecb61adf614",
+    "test/helpers/conversation.mjs": "91e21774091790b8c56110c7024c9030baddbf1b9b15cd86742e2bcd030587f6"
+  },
+  "harnessStable": true,
+  "currentRuntimeHashesAfter": {
+    "manifests/manifest.chrome.json": "e1205c91bab94c94dc26b0caa6865ea3ae60e96a93237cb5e56918c98feec9d6",
+    "src/settings.js": "f8e926720b502fbe8ffebe2d5e6fddb598d4125447b3193ed1fda2bb947de709",
+    "src/adaptive-controls.js": "691735876db76f94313353163139338773a3ee40bea14576eeaf63216dd9578e",
+    "src/adaptive-layout.js": "10c4b75eec18f1cf40aecca73f37e4c99dcc0112998f9dcd222626e2e321da3b",
+    "src/content.js": "dc5a64cff1975fe93c389d0477b68d89b7820c67ec72c5f778c1fc17837ebfb9",
+    "src/shadow-discovery.js": "ec617f10688c3fe785d38cdae7130ca762badbc354686b63e20feb6805e8c1dd",
+    "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+    "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+    "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+    "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+  },
+  "currentRuntimeStable": true
+}

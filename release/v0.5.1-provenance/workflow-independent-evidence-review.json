@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-14T18:00:51.839200+00:00",
+  "reviewer": "independent_plan_review final raw/source/policy review",
+  "status": "diagnostic-mechanisms-supported; publication-remains-blocked",
+  "artifactHashes": {
+    "primary-c38-report.json": "3e08672e81c67c1064f9bd870a57d6d320a2646e935b7c7ec8adc4600e0d951a",
+    "primary-command-result.json": "d52578d5419c5cddbe352a04b67f7cc1144d39d83c6774be16158b9eeea0eb66",
+    "startup-trace.json": "dde685d85af1ee1d16262910cb19e5e7a709511627ff9202588760a65aa66257",
+    "reading-minimal.json": "4cc113265d1ad1febce8bbc919544b4b61b562ce41b43a49f23df04678bc504b",
+    "conversation-disconnect.json": "b4eabf82219b3ecd559b9257ab2cfe150c2c7060e5b51f99e38de48f58751d2d",
+    "focused-commands.json": "19b18234ed99538303abd278a0e94b6aeee5662c9e09e786047995a51cd25963",
+    "reading-native.json": "b600965ae442e669ca431809764d2bdf3740caf967f1b340d3aa720e5a8d853b",
+    "reading-native.json.trace.json": "7098abe64a2d8d191207c9520e6086b4e3d8e7b2a2d3114f58939f7f586a7531",
+    "trace-analysis-v4.json": "2135dfe57d6b5a4955d6aea6f136d6039c2330eaf59fd36da33d1fed48173880",
+    "focused-results-analysis.json": "3daf4f80895ce5e21de199d32975b1413a6290eacc35c2f70751055831897b32",
+    "native-causal-analysis.json": "90b72dedd798daa57db09c242acaea121a5e94712c9db547bf62dab8a8033c18",
+    "release-policy-decision-proposal.json": "19e77b3e286738c728f49542ad7c18a89c504d252163285931392a87e5f011e4",
+    "independent-plan-review-v1.json": "265750758ac455bb3a2abaed3abfa83fe67cfad630587a0099219e738eefd009",
+    "independent-plan-review-v3.json": "9b8bda64235e64ea1498cee73296d183832199c0e043bc1c5633652879af4502",
+    "independent-plan-review-v4.json": "d29ae74abf8139e238a064f57773d78aa94b194b423ce8005e4a1069f97a9ff9",
+    "focused-source-review-v1.json": "0a01bcba42565a8ec9430e28c2b42403110c0333ff4a2be1abb18c3490abcee2",
+    "native-source-review-v1.json": "ec5944d45f757e44709b5320794a9b42e50d0228a642e629ed6e38f84bb64e6a",
+    "workflow-outcome-author.json": "3c06e67ad22d9d2c2520b0e6c8555890acb143c66482f52d4b812f00e56fe786",
+    "diagnose-startup.mjs": "e9d94248936d704d89638fb0fa858ed503a5dfabcaba49ae2df4b45a2d911492",
+    "diagnose-focused.mjs": "e3e038871964e9881ab3d6d3d4b48de2ab8a0dd8b41ea1bf301bc103e0f6bd3d",
+    "diagnose-reading-native.mjs": "0d01b03f52dd1ceaf33944025da2ac0f364507dba81cc79ef82af4e3c1f0e115",
+    "primary-c38.log": "bad613982d59872cf8aa723c422e82cb605010e4a7f4843df445a30eeed15806",
+    "reading-minimal.log": "22c72d2e2b72a48b40fe0980d2df37487e2bb8f775767cbb96919eb6879243cd",
+    "conversation-disconnect.log": "678fb1df152b5d82bd1719e89b10746f2d406c92c5343acbdfa3f26d7adde362",
+    "expected-inputs.json": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+    "diagnostic-plan.txt": "72bbae26d82b819192530d4e3aeecedbd8fac16b313febfde1217ef732752e32",
+    "focused-plan-v1.txt": "bfbd9375d4af4c25ceb9a05ef68ed3822de442b09399a4dd1e7a67cab8b228ce",
+    "native-plan-v1.txt": "d76a0115dbcb2ce7c5ccb95ff1170d82ac3f5aa9a00cfebbc553d2118fb9ac72"
+  },
+  "priorImmutableEvidenceHashes": {
+    "compatible-rule-writes/final-outcome.json": "a81b15a677e75d59ff6c9b4f72f00b228253f83db7af39305e3308a1cad8ce7e",
+    "compatible-rule-writes/failure-diagnosis.json": "69c00d146e94d32331005bb9583c5512d7ef29e54443dd7415926d9a6a6beb55",
+    "compatible-rule-writes/diagnostic-20261014T161958Z/historical-after-failure.json": "2b3ad8677468a690246a8c3eebb2ef5f5af12f24ac610515492787a707a35f2d",
+    "next-release-readiness/historical-full-command-report.json": "db86d269e9e77876b1bd47017c078d6ca47610599b0954da7e70e40f11e4aa0b",
+    "next-release-readiness/historical-startup-diagnostic.json": "b875dc93e7bc5106dc0d9db5be112d73dad1986870957199418bcf7f2f390f03"
+  },
+  "identity": "Exact clean c38 HEAD/tree, all reviewed current/historical runtime/font/harness bytes, all author raw/derived/review hashes independently verified.",
+  "primary": {
+    "baseline": "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+    "exitCode": 1,
+    "status": "error",
+    "phase": "reading80 first baseline warmup final startup check",
+    "measuredBaseline": 0,
+    "candidateSamples": 0,
+    "logResultReportConsistent": true,
+    "candidateRegressionOrNumericalComparisonEstablished": false
+  },
+  "reading": {
+    "classification": "First new-font-metrics invalidation from historical loadingdone callback installs100ms refresh after final settled frame; original check fails pending predicate.",
+    "actualCheckState": {
+      "ready": true,
+      "pending": true,
+      "refreshRevision": 1,
+      "healthy": true,
+      "error": null,
+      "active": true,
+      "hostname": "performance.test",
+      "scope": "all"
+    },
+    "requestedSize": 19.2,
+    "doneCompletedBeforeFailedCheck": true,
+    "injectedSha256": "671dfc3342526124cd32ae6012e10d08f64d03824108166bef5efe1ce69f9d8f",
+    "pausedOriginalHarnessSha256": "eabdc623647f45d886bb396eadaaac7babcddef7b456a2b593d5744e598ffe7e",
+    "contentLineOffset": 2387,
+    "rawEvents": 3695,
+    "timer": {
+      "id": 1,
+      "timeoutMs": 100,
+      "stack": [
+        {
+          "line": 909,
+          "text": "    refreshTimer = setTimeout(refresh, urgent ? 0 : 100);"
+        },
+        {
+          "line": 913,
+          "text": "    queueRefresh(urgent === true);"
+        },
+        {
+          "line": 1059,
+          "text": "      if (newMetrics) invalidateAutoContent();"
+        }
+      ],
+      "exclusiveCallbackRegistrationLine": 1039,
+      "afterFinalFrameUs": 264,
+      "fireOrRemoveEvents": 0,
+      "sameRendererThreadFrameIsolate": true
+    },
+    "literalEarlierEventDispatchCriterionMet": false,
+    "explicitEvidenceAdjustment": "Accept exact native FunctionCall identity of anonymous function exclusively registered as document.fonts loadingdone callback at1039, containing unique TimerInstall stack1059\u2192913\u2192909 with complete live lifetime and actual atomic failed check predicate, as sufficient source-causal evidence. Literal labelled/enclosing EventDispatch is absent, openly acknowledged. This changes diagnostic evidence form only; no release gate/threshold/assertion/fixture/sample changed. No event label invented.",
+    "primaryOccurrenceLimit": "Diagnostic reproduces same original failure mechanism; primary report itself has no atomic local state/timer trace, so no retrospective state is inserted into that immutable occurrence. Diagnostic timing/deoptimization overhead may alter frequency.",
+    "earlierPassingTraces": "V4 and minimal passes retained; they do not supersede failed primary."
+  },
+  "conversation": {
+    "classification": "Synthetic author-label observer plus historical inline retention/unconditional invalidation is ongoing refresh cause.",
+    "acceptedQueuesSourceLinkedToMutationObserver": 20,
+    "newFontDecisions": 1,
+    "unchangedLaterFontDecisions": 19,
+    "afterOriginalTimeoutOnly": true,
+    "samples": 86,
+    "actualWindowMs": 2011.6000000005588,
+    "authorWritesBeforeAfter": [
+      40,
+      40
+    ],
+    "queuesBeforeAfter": [
+      20,
+      20
+    ],
+    "revisionBeforeAfter": [
+      20,
+      21
+    ],
+    "firstSettledAfterDisconnectMs": 728.3999999994412,
+    "remainingSettledMs": 1282.1000000005588,
+    "healthyActiveThroughout": true,
+    "pendingFalseAfterFirstSettled": true,
+    "fontsLoaded": true,
+    "fontCheck": true,
+    "originalTypographyCheck": true,
+    "limit": "Intervention disables only fixture author observer after original15s error; runtime/font listeners remain. Synthetic instrumented context, not full workload or authenticated remote incident proof."
+  },
+  "executionEvidence": {
+    "fiveCommandsTenWrapperEventsVerified": true,
+    "primaryResultAndFocusedLogsConsistent": true,
+    "nativeOnePauseAndCompleteNoLossTrace": true,
+    "reviewerHeavyWork": false,
+    "allStartupFocusedNativeRawSourceAndCleanupBindingsVerified": true
+  },
+  "policyReview": {
+    "status": "Fail-closed decision proposal only; no adopted exception or usable authorization.",
+    "default": "Keep unchanged strict previous-published-tag baseline; publication blocked.",
+    "optionalTransition": "Explicit owner adoption overriding no-newer-baseline rule for exactly one future named stable release, frozen9ba,19commit numeric coverage loss, expiry/nonreuse; future version/tag null.",
+    "requirementsReviewed": "Exact clean tagged candidate/policy blob/generated manifest, dual same-candidate/harness reports, immutable failed historical raw report plus narrow reviewed provenance, full default3x5 frozen-anchor pass, raw comparator/detector checks, common CI/publishing verifier, comprehensive rejection negatives, actual slowdown rejected by ordinary and transition verifiers, all other release requirements.",
+    "qualified": false,
+    "materialFindings": []
+  },
+  "remainingMaterialFindings": [],
+  "remainingUnclassified": [
+    "No quantitative relative performance to v0.5.0, failure frequency or all-website behavior measured.",
+    "No contemporaneous state retroactively assigned to primary; mechanism is independently reproduced diagnostic explanation.",
+    "Actual other-device authenticated ChatGPT incident cause remains outside synthetic evidence."
+  ],
+  "coverageLimits": [
+    "19intervening commits lack numeric regression coverage.",
+    "No future version/tag, adopted policy, implementation, exact intended-tag dual proof or future slowdown validation exists.",
+    "NoEventDispatch caveat and explicit evidence adjustment must accompany future policy provenance.",
+    "Diagnostic exit0 establishes internal evidence validity, not performance/workload pass."
+  ],
+  "repositoryEdits": false,
+  "oldReportsModifiedOrRelabelled": false,
+  "moreBrowserWorkRecommended": false,
+  "publication": "blocked pending explicit policy choice and all future qualification if transition adopted"
+}

@@ -33,7 +33,7 @@ See docs/performance.md for metrics, noise tolerances, and model workflow.`);
 async function main() {
   const output = resolve(root, values.output);
   const report = { schemaVersion: 2, status: 'error', startedAt: new Date().toISOString(), protocol, policy, workloads: {} };
-  let browser;
+  let browser, inFlight;
   try {
     const samples = Number(values.samples);
     if (!Number.isInteger(samples) || samples < 3 || samples > 15) throw new Error('--samples must be an integer from 3 to 15');
@@ -71,6 +71,7 @@ async function main() {
         runs.order.push({ warmup: round === 0, versions: order });
         for (const label of order) {
           console.log(`${workload.name}: ${round ? `sample ${round}/${samples}` : 'warm-up'} ${label}`);
+          inFlight = { workload: workload.name, version: label, round, warmup: round === 0 };
           const measurement = await runWorkload(browser, label === 'baseline' ? baseline : candidate, workload, {
             injectedBlockMs: label === 'candidate' && round === samples ? injectedBlockMs : 0
           });
@@ -89,20 +90,22 @@ async function main() {
     }
     report.regressions = Object.entries(report.workloads).flatMap(([workload, runs]) =>
       runs.comparison.filter(row => row.regression).map(row => ({ workload, ...row })));
-    report.endGitStatus = gitState(root).gitStatus;
     report.status = report.regressions.length ? 'failed' : 'passed';
     if (report.regressions.length) process.exitCode = 1;
   } catch (error) {
     report.error = error.stack ?? String(error);
+    report.failure = { ...inFlight, observation: error.performanceFailure ?? null };
     console.error(report.error);
     process.exitCode = 1;
   } finally {
     try { await browser?.close(); }
     catch (error) {
       report.status = 'error';
+      report.browserShutdownError = error.stack ?? String(error);
       report.error = [report.error, `Browser shutdown failed: ${error.stack ?? error}`].filter(Boolean).join('\n');
       process.exitCode = 1;
     }
+    report.endGitStatus = gitState(root).gitStatus;
     report.finishedAt = new Date().toISOString();
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, JSON.stringify(report, null, 2) + '\n');

@@ -1,0 +1,3 @@
+Waiting for isolated validation: release-baseline-c38-conversation-disconnect
+Running isolated validation: release-baseline-c38-conversation-disconnect
+{"output":"/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/conversation-disconnect.json","cases":[{"workload":"conversation-120","status":"original-startup-assertion-failed","state":{"ready":true,"pending":true,"refreshRevision":20,"healthy":true,"error":null,"active":true,"hostname":"performance.test","scope":"all"},"traceCounts":{"queue-accepted":20,"new-font-metrics":1,"original-done-rejected":1}}]}

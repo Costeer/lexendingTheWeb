@@ -211,3 +211,226 @@ test('release gate preserves native start-window semantics and permits task-free
   runs.comparison = compareSamples(runs.baseline, runs.candidate);
   await assert.doesNotReject(() => verifyReleaseEvidence(f.root, f.tag, report));
 });
+
+// Transition fixtures clone real history so frozen commit/source identities and
+// ancestry are exercised. Their numerical records are synthetic verifier units,
+// explicitly not browser performance measurements or qualification evidence.
+async function transitionFixture(t) {
+  const { readdir } = await import('node:fs/promises');
+  const { transitionPolicyPath } = await import('../scripts/performance/baseline-transition.mjs');
+  const directory = resolve(project, 'dist/release-gate-tests');
+  await mkdir(directory, { recursive: true });
+  const root = await mkdtemp(`${directory}/transition-`);
+  t.after(() => rm(root, { recursive: true, force: true }));
+  git(project, 'clone', '--quiet', '--shared', project, root);
+  git(root, 'config', 'user.email', 'test@example.invalid');
+  git(root, 'config', 'user.name', 'Transition verifier unit');
+  git(root, 'config', 'commit.gpgsign', 'false');
+  const paths = [...harnessFiles, 'package.json', 'package-lock.json',
+    'manifests/manifest.chrome.json', 'manifests/manifest.firefox.json',
+    'scripts/performance/release-gate.mjs', 'scripts/performance/baseline-transition.mjs',
+    'scripts/release-performance.mjs', transitionPolicyPath,
+    ...(await readdir(resolve(project, 'release/v0.5.1-provenance'))).map(name => `release/v0.5.1-provenance/${name}`)];
+  for (const path of paths) {
+    await mkdir(dirname(resolve(root, path)), { recursive: true });
+    await writeFile(resolve(root, path), await readFile(resolve(project, path)));
+  }
+  git(root, 'add', '.');
+  git(root, 'commit', '--quiet', '--allow-empty', '-m', 'Synthetic transition verifier fixture; not empirical evidence');
+  git(root, 'tag', '--force', 'v0.5.1');
+  const candidate = gitState(root).commit;
+  const baseline = '9ba8c632ba900c39c0b102daa163ae3f0409488e';
+  const f = { root, baseline, candidate, tag: 'v0.5.1' };
+  const evidence = resolve(root, 'dist/transition-unit-evidence');
+  await mkdir(evidence, { recursive: true });
+  const anchor = await passingEvidence(f);
+  anchor.startedAt = '2026-10-14T19:00:05.100Z';
+  anchor.finishedAt = '2026-10-14T19:00:09.900Z';
+  const historical = {
+    schemaVersion: 2, status: 'error', startedAt: '2026-10-14T19:00:00.100Z', finishedAt: '2026-10-14T19:00:04.900Z',
+    negativeControl: null, samplesPerVersion: 5, protocol, policy,
+    baseline: { ref: 'f2670e24aa210b80f6baedfcf09d22a5dd91e640', commit: 'f2670e24aa210b80f6baedfcf09d22a5dd91e640',
+      hashes: (await runtimeSnapshot(root, 'f2670e24aa210b80f6baedfcf09d22a5dd91e640')).hashes },
+    candidate: anchor.candidate, endGitStatus: '', harnessHashes: anchor.harnessHashes, environment: anchor.environment,
+    workloads: { 'reading-80': { baseline: [], candidate: [], order: [{ warmup: true, versions: ['baseline', 'candidate'] }] } },
+    error: 'Synthetic unit: Runtime did not finish healthy and active',
+    failure: { workload: 'reading-80', version: 'baseline', round: 0, warmup: true, observation: {
+      workload: 'reading-80', phase: 'startup', source: 'scripts/performance/workloads.mjs', originalAssertion: true, browserErrors: [],
+      atomic: { kind: 'final-check', requestedSize: 19.2, fontsStatus: 'loaded', capturedAt: 700,
+        state: { ready: true, healthy: true, active: true, pending: true, refreshRevision: 1,
+          error: null, hostname: 'performance.test', scope: 'all' } }
+    } }
+  };
+  const save = async () => {
+    const { sha256 } = await import('../scripts/performance/sources.mjs');
+    for (const [name, report, filename, commit, exitCode, start, end] of [
+      ['historical', historical, 'historical-report.json', historical.baseline.commit, 1, '2026-10-14T19:00:00.000Z', '2026-10-14T19:00:05.000Z'],
+      ['anchor', anchor, 'report.json', baseline, 0, '2026-10-14T19:00:05.000Z', '2026-10-14T19:00:10.000Z']
+    ]) {
+      const bytes = JSON.stringify(report, null, 2) + '\n';
+      const log = 'Synthetic verifier unit command record, not browser execution.\n';
+      const output = resolve(evidence, filename);
+      await writeFile(output, bytes);
+      await writeFile(resolve(evidence, `${name}.log`), log);
+      await writeFile(resolve(evidence, `${name}-command.json`), JSON.stringify({ schemaVersion: 1,
+        cwd: root, output, argv: ['npm', 'run', 'test:performance', '--', '--base', commit, '--output', output],
+        startedAt: start, finishedAt: end, exitCode, signal: null,
+        candidateBefore: gitState(root), candidateAfter: gitState(root),
+        reportSha256: sha256(bytes), logSha256: sha256(log)
+      }, null, 2));
+    }
+  };
+  await save();
+  return { ...f, evidence, anchor, historical, save };
+}
+
+test('v0.5.1 transition accepts only complete dual evidence and keeps the ordinary selector strict', async t => {
+  const { transitionPlan, createTransitionManifest, verifyTransitionEvidence } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  assert.equal(releaseBaseline(f.root, f.tag).baseline, f.historical.baseline.commit);
+  assert.equal((await transitionPlan(f.root, f.tag)).baseline, f.baseline);
+  await assert.rejects(() => verifyReleaseEvidence(f.root, f.tag, f.historical), /not passed/);
+  await assert.rejects(() => verifyReleaseEvidence(f.root, f.tag, f.anchor), /wrong release baseline/);
+  await createTransitionManifest(f.root, f.tag, f.evidence);
+  const manifestPath = resolve(f.evidence, 'transition-manifest.json');
+  await assert.doesNotReject(() => verifyTransitionEvidence(f.root, f.tag, manifestPath));
+  const manifest = JSON.parse(await readFile(manifestPath));
+  assert.equal(manifest.finalCandidateSignoff.kind, 'machine-verification');
+  assert.equal(manifest.finalCandidateSignoff.reviewer, undefined);
+  await assert.rejects(() => verifyTransitionEvidence(f.root, 'v0.5.2', manifestPath), /only authorized.*reuse/);
+  const packagePath = resolve(f.root, 'package.json');
+  const next = JSON.parse(await readFile(packagePath));
+  next.version = '0.5.2';
+  await writeFile(packagePath, JSON.stringify(next));
+  git(f.root, 'add', 'package.json');
+  git(f.root, 'commit', '--quiet', '-m', 'Synthetic following release');
+  git(f.root, 'tag', 'v0.5.2');
+  assert.equal(releaseBaseline(f.root, 'v0.5.2').baseline, f.candidate, 'v0.5.2 must select v0.5.1 itself');
+});
+
+test('v0.5.1 transition rejects missing state, unknown historical failures, dirty identity and incomplete measurements', async t => {
+  const { createTransitionManifest } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  const originalHistorical = structuredClone(f.historical), originalAnchor = structuredClone(f.anchor);
+  const attacks = [
+    ['historical pass relabelling', () => { f.historical.status = 'passed'; }, /remain error/],
+    ['appended browser shutdown failure', () => { f.historical.error += '\nBrowser shutdown failed: synthetic browser crash'; }, /browser shutdown failure/],
+    ['explicit browser shutdown failure', () => { f.historical.browserShutdownError = 'synthetic close failure'; }, /browser shutdown failure/],
+    ['message only', () => { f.historical.failure.observation.atomic = null; }, /pending predicate/],
+    ['unhealthy runtime', () => { f.historical.failure.observation.atomic.state.healthy = false; }, /pending predicate/],
+    ['wrong refresh provenance', () => { f.historical.failure.observation.atomic.state.refreshRevision = 2; }, /unexpected or undiagnosed/],
+    ['missing original assertion', () => { delete f.historical.failure.observation.originalAssertion; }, /original assertion provenance/],
+    ['candidate failure', () => { f.historical.failure.version = 'candidate'; }, /first warmup/],
+    ['wrong phase', () => { f.historical.failure.observation.phase = 'settings'; }, /phase\/source/],
+    ['wrong workload', () => { f.historical.failure.workload = 'reading-400'; }, /phase\/source/],
+    ['resource failure', () => { f.historical.failure.observation.browserErrors.push('missing font'); }, /browser errors/],
+    ['fonts still loading', () => { f.historical.failure.observation.atomic.fontsStatus = 'loading'; }, /fonts are not loaded/],
+    ['missing end stability', () => { delete f.historical.endGitStatus; }, /source stability/],
+    ['historical stale candidate', () => { f.historical.candidate.tree = '0'.repeat(40); }, /candidate source/],
+    ['historical negative control', () => { f.historical.negativeControl = { durationMs: 1000 }; }, /negative control/],
+    ['historical harness mismatch', () => { f.historical.harnessHashes['scripts/test-performance.mjs'] = 'changed'; }, /harness differs/],
+    ['historical measured records injected', () => { f.historical.workloads['reading-80'].baseline.push({}); }, /measured baseline/],
+    ['anchor runtime mismatch', () => { f.anchor.candidate.hashes['src/content.js'] = 'changed'; }, /runtime hashes differ/],
+    ['anchor missing metric', () => { delete f.anchor.workloads['reading-80'].candidate[0]['settings.taskMs']; }, /Missing required metric/],
+    ['anchor too few samples', () => { f.anchor.workloads['reading-80'].candidate.pop(); }, /sample count differs/],
+    ['anchor missing raw calibration', () => { f.anchor.workloads['conversation-120'].rawResponsiveness.baseline[0].calibration.tasks = []; }, /calibration was not observed/],
+    ['anchor raw metric mismatch', () => { f.anchor.workloads['conversation-120'].rawResponsiveness.candidate[0].longTasks[0].duration = 101; }, /Raw responsiveness metric differs/],
+    ['anchor injected report', () => { f.anchor.negativeControl = { durationMs: 1000 }; }, /negative-control reports/],
+    ['anchor forged comparison', () => { f.anchor.workloads['reading-80'].comparison = []; }, /Stored comparison differs/],
+    ['anchor raw slowdown', () => { for (const sample of f.anchor.workloads['reading-80'].candidate) sample['settings.taskMs'] = 1000; }, /Raw performance samples regress/],
+    ['different environment', () => { f.anchor.environment.chromium = 'another-browser'; }, /environment mismatch/]
+  ];
+  for (const [name, attack, message] of attacks) {
+    for (const key of Object.keys(f.historical)) delete f.historical[key];
+    Object.assign(f.historical, structuredClone(originalHistorical));
+    for (const key of Object.keys(f.anchor)) delete f.anchor[key];
+    Object.assign(f.anchor, structuredClone(originalAnchor));
+    attack();
+    await f.save(); // Rehashing cannot make semantically invalid raw records pass.
+    await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), message, name);
+  }
+});
+
+test('v0.5.1 generated manifest rejects altered artifacts, stale signoff and wrong command exits', async t => {
+  const { createTransitionManifest, verifyTransitionEvidence } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  await createTransitionManifest(f.root, f.tag, f.evidence);
+  const path = resolve(f.evidence, 'transition-manifest.json');
+  const original = await readFile(path);
+  const manifestAttacks = [
+    ['missing final acceptance', m => { delete m.finalCandidateSignoff; }],
+    ['false human claim', m => { m.finalCandidateSignoff.kind = 'human-approval'; }],
+    ['stale source binding', m => { m.candidate.commit = f.baseline; }],
+    ['altered policy binding', m => { m.policySha256 = '0'.repeat(64); }],
+    ['missing raw artifact binding', m => { delete m.artifacts['historical-report.json']; }],
+    ['stale final acceptance', m => { m.finalCandidateSignoff.binding.artifacts['report.json'] = 'wrong'; }]
+  ];
+  for (const [name, attack] of manifestAttacks) {
+    const changed = JSON.parse(original);
+    attack(changed);
+    await writeFile(path, JSON.stringify(changed));
+    await assert.rejects(() => verifyTransitionEvidence(f.root, f.tag, path), undefined, name);
+  }
+  await writeFile(path, original);
+  await writeFile(resolve(f.evidence, 'historical.log'), 'altered command log');
+  await assert.rejects(() => verifyTransitionEvidence(f.root, f.tag, path), /output bytes changed/);
+  await f.save();
+  const commandPath = resolve(f.evidence, 'historical-command.json');
+  const command = JSON.parse(await readFile(commandPath));
+  command.exitCode = 0;
+  await writeFile(commandPath, JSON.stringify(command));
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /command exit differs/);
+  await f.save();
+  await rm(resolve(f.evidence, 'historical-report.json'));
+  await assert.rejects(() => verifyTransitionEvidence(f.root, f.tag, path), /ENOENT/);
+});
+
+test('v0.5.1 transition rejects moved tags, dirty checkout and changed committed policy', async t => {
+  const { transitionPlan } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  await writeFile(resolve(f.root, 'src/content.js'), 'dirty runtime');
+  await assert.rejects(() => transitionPlan(f.root, f.tag), /clean checkout/);
+  git(f.root, 'restore', 'src/content.js');
+  git(f.root, 'tag', '--force', 'v0.5.0', f.baseline);
+  await assert.rejects(() => transitionPlan(f.root, f.tag), /Historical v0.5.0 tag moved/);
+  git(f.root, 'tag', '--force', 'v0.5.0', f.historical.baseline.commit);
+  const path = resolve(f.root, 'release/performance-baseline-transition.json');
+  const record = JSON.parse(await readFile(path));
+  record.anchor.commit = f.candidate;
+  await writeFile(path, JSON.stringify(record));
+  git(f.root, 'add', 'release/performance-baseline-transition.json');
+  git(f.root, 'commit', '--quiet', '-m', 'Attempted policy substitution');
+  git(f.root, 'tag', '--force', 'v0.5.1');
+  await assert.rejects(() => transitionPlan(f.root, f.tag), /Adopted transition policy changed|Frozen anchor bytes differ/);
+});
+
+test('v0.5.1 accepts only the reviewed conversation timeout and rejects earlier measured regressions', async t => {
+  const { createTransitionManifest } = await import('../scripts/performance/baseline-transition.mjs');
+  const f = await transitionFixture(t);
+  Object.assign(f.historical, { error: 'Synthetic unit: Typography did not settle with loaded fonts within 15 seconds',
+    workloads: {
+      'reading-80': structuredClone(f.anchor.workloads['reading-80']),
+      'reading-400': structuredClone(f.anchor.workloads['reading-400']),
+      'conversation-120': { baseline: [], candidate: [], order: [{ warmup: true, versions: ['baseline', 'candidate'] }],
+        rawResponsiveness: { baseline: [], candidate: [] } }
+    } });
+  f.historical.failure.workload = 'conversation-120';
+  const observation = f.historical.failure.observation;
+  observation.workload = 'conversation-120';
+  Object.assign(observation.atomic, { kind: 'settle-timeout', loaded: true, stableFrames: 0,
+    elapsedMs: 15016.7, firstFontFrameMs: 680, capturedAt: 15017 });
+  observation.atomic.state.refreshRevision = 20;
+  await f.save();
+  await assert.doesNotReject(() => createTransitionManifest(f.root, f.tag, f.evidence));
+  for (const sample of f.historical.workloads['reading-80'].candidate) sample['settings.taskMs'] = 1000;
+  await f.save();
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /preceding measured regression/);
+  f.historical.workloads['reading-80'] = structuredClone(f.anchor.workloads['reading-80']);
+  delete f.historical.workloads['reading-80'].candidate[0]['settings.taskMs'];
+  await f.save();
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /Missing historical preceding metric/);
+  f.historical.workloads['reading-80'] = structuredClone(f.anchor.workloads['reading-80']);
+  f.historical.workloads['reading-80'].order.shift();
+  await f.save();
+  await assert.rejects(() => createTransitionManifest(f.root, f.tag, f.evidence), /preceding sampling order differs/);
+});

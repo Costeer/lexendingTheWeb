@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-14T17:37:46.671510+00:00",
+  "reviewer": "independent_plan_review",
+  "status": "technically-ready-for-two-proposed-single-context-diagnostics",
+  "reviewedHashes": {
+    "diagnose-focused.mjs": "e3e038871964e9881ab3d6d3d4b48de2ab8a0dd8b41ea1bf301bc103e0f6bd3d",
+    "focused-plan-v1.txt": "bfbd9375d4af4c25ceb9a05ef68ed3822de442b09399a4dd1e7a67cab8b228ce",
+    "trace-analysis-v4.json": "2135dfe57d6b5a4955d6aea6f136d6039c2330eaf59fd36da33d1fed48173880",
+    "expected-inputs.json": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+    "startup-trace.json": "dde685d85af1ee1d16262910cb19e5e7a709511627ff9202588760a65aa66257",
+    "primary-c38-report.json": "3e08672e81c67c1064f9bd870a57d6d320a2646e935b7c7ec8adc4600e0d951a"
+  },
+  "readyManifestSha256": "f4741877691244f20a6c378719d9536b2e2cf5fc0ab4c0debb46c74fd7bc6610",
+  "verifiedIdentity": "Exact clean c38 HEAD/tree and all expected current/historical runtime+harness hashes recomputed. Reviewed original v4 and primary artifacts retain pinned hashes.",
+  "transforms": {
+    "count": 2,
+    "labels": [
+      "accepted queue only",
+      "new font metrics only"
+    ],
+    "allExactlyOnce": true,
+    "transformedContentSha256": "a64e936ecc2f1d4248ca6087c24364cc235fa92d8ab33d0e680b42f0045f1eb2",
+    "semantics": "Accepted queue log follows native timer assignment; new-metrics block retains conditional invalidation. No runtime observer/font handler disabled by probes. Diagnostic source remains in-memory only."
+  },
+  "sourceReview": {
+    "atomicCheckState": "Prefix calls original bench.state once and records returned value synchronously only during original check. This is the actual state read used by that check, unlike later observe() state. Original check body/assertions unmodified.",
+    "reading": "No added browser evaluation before original done/check success or failure; prefix/check/queue logging still changes timing. One successful focused startup cannot explain immutable primary error.",
+    "conversationPrecondition": "Only conversation-disconnect mode, original done rejection text matching original15s timeout, and successful pre-intervention observation permit evaluate(disconnectAfterTimeout). Original failed outcome captured and rethrown unchanged after intervention.",
+    "observerIdentity": "Fixture conversationHtml assigns globalThis.__authorObserver to label-only style MutationObserver. Intervention invokes only that handle disconnect; no runtime/font observer or listener disconnected.",
+    "intervention": "State sampled over2s target window, original typography/protected-code bench.check invoked afterward, retained result separate from failed startup. Snapshots copy event/count values and before failure remains unmodified.",
+    "inheritedGuards": "v4 strict identities, original rejection identity classification, page/crash/request/http errors, successful context-close, successful observation, script/current runtime/harness/checkout after stability retained. Intervention errors/missing precondition/dropped trace invalidate integrity.",
+    "traceFactRecount": [
+      {
+        "workload": "reading-80",
+        "status": "startup-completed-diagnostic",
+        "dropped": 0,
+        "queues": 1,
+        "fontTrue": 1,
+        "fontFalse": 1
+      },
+      {
+        "workload": "conversation-120",
+        "status": "original-startup-assertion-failed",
+        "dropped": 0,
+        "queues": 20,
+        "fontTrue": 1,
+        "fontFalse": 19
+      }
+    ]
+  },
+  "remainingMaterialFindings": [],
+  "interpretationRequirements": [
+    {
+      "topic": "2s bound",
+      "requirement": "The2000ms condition is an observation target, not a strict wall-time upper bound: requestAnimationFrame and synchronous runtime work can overshoot. Use actualWindowMs; the retained45s sample timeout is outer cleanup boundary. Do not claim actual duration was at most2s unless raw observation proves it."
+    },
+    {
+      "topic": "Recovery flag",
+      "requirement": "recoveredForThisDiagnostic proves sampled settling plus typography/font checks only. It does not itself assert frozen authorWrites or no new queues. Independently inspect raw before/after counts and observations before claiming author feedback stopped or causal isolation."
+    },
+    {
+      "topic": "Check trace",
+      "requirement": "intervention.after.trace snapshot precedes final bench.check; check outcome is retained separately in originalTypographyCheck. Do not expect final check events in that earlier snapshot."
+    },
+    {
+      "topic": "Reading attribution",
+      "requirement": "Require actual done-resolved\u2192acceptedqueue attributed by stack/marker\u2192originalcheck-rejected with atomic pending state. Passing reading or unrelated error leaves published-primary failure unclassified."
+    },
+    {
+      "topic": "Diagnostic interference",
+      "requirement": "Prefix branch, stack creation, queue log and2 probes affect timing. Minimal means fewer probes than v4, not unchanged timing or ordinary release proof."
+    }
+  ],
+  "approvalScope": "Technical readiness only for ONE reading-minimal and ONE conversation-disconnect fresh context, sequential global-wrapper execution if separately authorized by root. No retries/additional primary/other intervention authorized. No release qualification or baseline-policy waiver.",
+  "noHeavyExecution": true,
+  "repositoryEdits": false,
+  "oldReportsModified": false,
+  "publication": "blocked"
+}

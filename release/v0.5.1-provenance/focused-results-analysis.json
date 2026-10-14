@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "writtenAt": "2026-10-14T17:43:34.593367+00:00",
+  "status": "Conversation author-style feedback causally supported within retained diagnostic; original reading failure remains unclassified",
+  "inputHashes": {
+    "reading-minimal.json": "4cc113265d1ad1febce8bbc919544b4b61b562ce41b43a49f23df04678bc504b",
+    "conversation-disconnect.json": "b4eabf82219b3ecd559b9257ab2cfe150c2c7060e5b51f99e38de48f58751d2d",
+    "focused-commands.json": "19b18234ed99538303abd278a0e94b6aeee5662c9e09e786047995a51cd25963",
+    "focused-source-review-v1.json": "0a01bcba42565a8ec9430e28c2b42403110c0333ff4a2be1abb18c3490abcee2",
+    "primary-c38-report.json": "3e08672e81c67c1064f9bd870a57d6d320a2646e935b7c7ec8adc4600e0d951a"
+  },
+  "conversation": {
+    "original15sFailureRetained": true,
+    "actualWindowMs": 2011.6000000005588,
+    "samples": 86,
+    "beforeState": {
+      "ready": true,
+      "pending": true,
+      "refreshRevision": 20,
+      "healthy": true,
+      "error": null,
+      "active": true,
+      "hostname": "performance.test",
+      "scope": "all"
+    },
+    "afterState": {
+      "ready": true,
+      "pending": false,
+      "refreshRevision": 21,
+      "healthy": true,
+      "error": null,
+      "active": true,
+      "hostname": "performance.test",
+      "scope": "all"
+    },
+    "firstSettledAfterDisconnectMs": 728.3999999994412,
+    "remainingSettledObservationMs": 1282.1000000005588,
+    "authorWritesBeforeAfter": [
+      40,
+      40
+    ],
+    "observedAuthorWrites": [
+      40
+    ],
+    "queueCountBeforeAfter": [
+      20,
+      20
+    ],
+    "observedQueueCounts": [
+      20
+    ],
+    "allAfterFirstSettledRemainPendingFalse": true,
+    "allHealthyActive": true,
+    "fontsStatus": "loaded",
+    "fontCheck": true,
+    "originalTypographyCheck": {
+      "passed": true
+    },
+    "traceDropped": 0,
+    "contextClosed": true,
+    "browserClosed": true,
+    "runtimeHarnessScriptStable": true,
+    "conclusion": "After actual original timeout, disconnecting only fixture author observer froze40 author writes and20 accepted queues. One already pending timer completed revision20\u219221; state settled and stayed settled for1282.1ms, with loaded fonts and unchanged original typography checks passing. Together with v4 origin traces this identifies the author-style observer/runtime inline retention cycle as ongoing cause in this fixture; repeated font events are not an independent ongoing scheduling cause here.",
+    "limits": [
+      "Instrumented historical runtime copy and a diagnostic intervention; not a full workload/pass/comparison or publication evidence.",
+      "actualWindowMs2011.6, rather than an exact2000ms duration, used in analysis.",
+      "after.trace predates final original check logging; explicit originalTypographyCheck.passed is separately retained."
+    ]
+  },
+  "reading": {
+    "minimalOutcome": "passed startup with revision2, pendingfalse",
+    "originObserved": "one initial newly loaded font-metrics queue before done resolved",
+    "classification": "Original exact unchanged reading80 failure remains unclassified: neither source-instrumented pass reproduced failedcheck chronology.",
+    "nextMethod": "One finite native CDP pause-on-exception plus Tracing pass, original runtime/harness bytes unchanged and no inline prefix. Proceed only after fresh exact-source review/parent release. If it passes, loses trace/stack/state, or prior unexpected pauses confound it, preserve unclassified blocker and stop."
+  },
+  "publication": "blocked; no policy exception or alternate baseline justified"
+}

@@ -62,7 +62,13 @@ function installHarness() {
   bench.counters = () => ({ styleReads: bench.styleReads, boxReads: bench.boxReads, refreshes: bench.state()?.refreshRevision ?? 0 });
   bench.check = (size = 16 * bench.settings.textScale / 100) => {
     const state = bench.state();
-    if (!state?.healthy || !state.active || state.pending) throw new Error('Runtime did not finish healthy and active');
+    if (!state?.healthy || !state.active || state.pending) {
+      // Failure-only observation of the exact predicate. Keep the assertion and
+      // original throw; successful measurements allocate no diagnostic record.
+      bench.failure = { kind: 'final-check', state, requestedSize: size,
+        fontsStatus: document.fonts.status, capturedAt: performance.now() };
+      throw new Error('Runtime did not finish healthy and active');
+    }
     for (const element of document.querySelectorAll('main p, main h2, main button, #author-label')) {
       const text = nativeStyle(element);
       if (!text.fontFamily.includes('Lexend') || ((element.tagName === 'P' || element.id === 'author-label')
@@ -98,6 +104,11 @@ function installHarness() {
         if (stableFrames >= 2) {
           resolve({ firstFontFrameMs, settledMs: performance.now() - start });
         } else if (performance.now() - start > 15000) {
+          // Capture the state already read by this failing frame, before reject.
+          bench.failure = { kind: 'settle-timeout', state, loaded, stableFrames,
+            firstFontFrameMs, elapsedMs: performance.now() - start,
+            fontsStatus: document.fonts.status, requestedSize: 16 * bench.settings.textScale / 100,
+            capturedAt: performance.now() };
           reject(new Error('Typography did not settle with loaded fonts within 15 seconds'));
         } else requestAnimationFrame(frame);
       };
@@ -143,6 +154,8 @@ async function measure(context, version, workload, injectedBlockMs) {
     errors.push(`Unexpected resource: ${url.pathname}`);
     await route.abort();
   });
+  let phase = 'setup';
+  try {
   await page.goto('http://performance.test/');
   await page.evaluate(installHarness);
   const client = await context.newCDPSession(page);
@@ -159,7 +172,8 @@ async function measure(context, version, workload, injectedBlockMs) {
   const record = (phase, metrics) => {
     for (const [key, value] of Object.entries(metrics)) result[`${phase}.${key}`] = value;
   };
-  const measureChange = async action => {
+  const measureChange = async (name, action) => {
+    phase = name;
     const before = await snapshot();
     await action();
     const timing = await page.evaluate(() => __bench.done);
@@ -168,7 +182,7 @@ async function measure(context, version, workload, injectedBlockMs) {
     return metrics;
   };
 
-  record('startup', await measureChange(() => page.addScriptTag({ content:
+  record('startup', await measureChange('startup', () => page.addScriptTag({ content:
     '__bench.begin();\n' + version.scripts.map(path => `${version.files.get(path).toString('utf8')}\n//# sourceURL=${path}\n`).join('\n')
   })));
 
@@ -176,14 +190,14 @@ async function measure(context, version, workload, injectedBlockMs) {
   // rapid operations in a context are not treated as independent browser runs.
   const changes = [];
   for (let i = 0; i < protocol.settingsChanges; i++) {
-    changes.push(await measureChange(() => page.evaluate(scale => {
+    changes.push(await measureChange('settings', () => page.evaluate(scale => {
       __bench.begin();
       __bench.update({ textScale: scale });
     }, i % 2 ? 120 : 110)));
   }
   record('settings', Object.fromEntries(Object.keys(changes[0]).map(key => [key, changes.reduce((n, m) => n + m[key], 0) / changes.length])));
 
-  record('insertion', await measureChange(() => page.evaluate(() => {
+  record('insertion', await measureChange('insertion', () => page.evaluate(() => {
     __bench.begin('#inserted');
     document.querySelector('main').insertAdjacentHTML('beforeend', '<article><p id="inserted">New reading content arrives.</p><button>Read more</button></article>');
   })));
@@ -191,12 +205,13 @@ async function measure(context, version, workload, injectedBlockMs) {
   if (workload.conversation) {
     // Observe several cooldowns after settling. A single pending=false sample
     // is insufficient evidence that an author/extension feedback loop stopped.
+    phase = 'idle';
     let before = await snapshot();
     await page.waitForTimeout(protocol.idleMs);
     record('idle', delta(before, await snapshot()));
     await page.evaluate(() => __bench.check());
 
-    record('stream', await measureChange(() => page.evaluate(async edits => {
+    record('stream', await measureChange('stream', () => page.evaluate(async edits => {
       __bench.begin();
       const text = document.querySelector('main p').firstChild;
       for (let i = 0; i < edits; i++) { text.data += 'word '; await Promise.resolve(); }
@@ -210,7 +225,7 @@ async function measure(context, version, workload, injectedBlockMs) {
     let warm;
     before = await snapshot();
     for (let i = 0; i < protocol.replacements; i++) {
-      await measureChange(() => page.evaluate(iteration => {
+      await measureChange('replacement', () => page.evaluate(iteration => {
         __bench.begin();
         document.querySelector('main').innerHTML = Array.from({ length: 120 }, (_, j) =>
           `<article><p>Conversation ${iteration}, reply ${j}. ${'Streamed text. '.repeat(12)}</p><pre>const value = true;</pre><div class="host"></div></article>`).join('');
@@ -227,6 +242,7 @@ async function measure(context, version, workload, injectedBlockMs) {
       nodeGrowth: Math.max(0, finalMemory.domNodes - warm.domNodes)
     });
 
+    phase = 'paused';
     await page.evaluate(() => __bench.update({ enabled: false }));
     before = await snapshot();
     await page.evaluate(() => {
@@ -240,14 +256,26 @@ async function measure(context, version, workload, injectedBlockMs) {
     assert.equal(paused.state.active, false);
     assert.equal(paused.state.pending, false);
     assert.equal(paused.size, '16px');
-    record('resume', await measureChange(() => page.evaluate(() => { __bench.begin(); __bench.update({ enabled: true }); })));
+    record('resume', await measureChange('resume', () => page.evaluate(() => { __bench.begin(); __bench.update({ enabled: true }); })));
 
     // Appended after every existing phase so probe allocations cannot influence
     // the old work/timing/retention gate. This is timed streaming, not the earlier
     // intentionally unchanged microtask burst.
+    phase = 'responsiveness';
     responsiveness = await measureResponsiveness(page, injectedBlockMs);
     record('responsiveness', responsiveness.metrics);
   }
   assert.deepEqual(errors, [], 'Browser errors invalidate the measurement');
   return { metrics: result, responsiveness: responsiveness?.raw };
+  } catch (error) {
+    // Observe only after the original assertion has failed. No timers, runtime
+    // listeners, source bytes, settling predicates or successful paths change.
+    let atomic;
+    try { atomic = await page.evaluate(() => globalThis.__bench?.failure ?? null); }
+    catch { atomic = null; }
+    error.performanceFailure = { workload: workload.name, phase, atomic,
+      browserErrors: [...errors], source: 'scripts/performance/workloads.mjs',
+      originalAssertion: true };
+    throw error;
+  }
 }

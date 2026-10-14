@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-14T17:47:33.339787+00:00",
+  "reviewer": "independent_plan_review",
+  "status": "technically-ready-for-one-native-reading-context",
+  "reviewedHashes": {
+    "diagnose-reading-native.mjs": "0d01b03f52dd1ceaf33944025da2ac0f364507dba81cc79ef82af4e3c1f0e115",
+    "native-plan-v1.txt": "d76a0115dbcb2ce7c5ccb95ff1170d82ac3f5aa9a00cfebbc553d2118fb9ac72",
+    "expected-inputs.json": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+    "focused-results-analysis.json": "3daf4f80895ce5e21de199d32975b1413a6290eacc35c2f70751055831897b32",
+    "reading-minimal.json": "4cc113265d1ad1febce8bbc919544b4b61b562ce41b43a49f23df04678bc504b",
+    "conversation-disconnect.json": "b4eabf82219b3ecd559b9257ab2cfe150c2c7060e5b51f99e38de48f58751d2d"
+  },
+  "readyManifestSha256": "7868bf4cadc571c496617cf7baf8abb63b621cd51d5952cbfaaaad2083dd6248",
+  "verifiedIdentity": "Exact clean c38 HEAD/tree plus complete current/historical runtime and current harness identities recomputed.",
+  "sourceFindings": {
+    "injection": "Exact options.content equality against same original harness construction enforced before forwarding original options. No source transformation/prefix/page-global wrapper; page.evaluate host wrapper still adds bookkeeping.",
+    "pause": "Native all-exception pause matching requires original in-flight check, exception description and check frame. Local ({state,size}) read occurs only after original throw using side-effect guard. Actual paused source retained; original assertion substring checked. Unexpected/repeated pauses retained and forbid causalCaptureReady.",
+    "timing": "No extra page evaluation before failure. Debugger/tracing themselves change execution, deoptimization and timing. Host call start/end timestamps are not the native event clock; timer/event lifetimes and source stacks must establish attribution independently.",
+    "trace": "All raw events retained until300000 limit; dropped events, dataLossOccurred not false, incomplete flush invalidate integrity. Tracing.end and complete wait occur while target VM paused before resume.",
+    "cleanup": "Per-CDP command2s/5s bounds, finally resume in pause handler, context cleanup tries stop/join/disable/resume/detach and always real context close; outer browser close plus pause join retained. A failed early cleanup CDP operation skips subsequent diagnostic cleanup operations, but real context close and outer resume/browser close remain attempted and diagnosticCleanupError invalidates evidence.",
+    "sourceStability": "Pinned expected-inputs before launch; script/current runtime/harness/checkout after comparisons retained. Page/crash/request/http errors independently invalidate integrity.",
+    "classification": "Host outcome records original exception separately from setup/timeout/cleanup; outcome is not causal acceptance. causalCaptureReady only checks raw-data availability; independent exact-match source/lifetime review still mandatory.",
+    "protocolReferences": "Official js_protocol.json and browser_protocol.json opened read-only; schema supports paused-frame/script-source and trace lifecycle approach. Installed browser compatibility not executed or assumed."
+  },
+  "remainingMaterialFindings": [],
+  "limits": [
+    "A passing check, unexpected earlier pause, missing locals, missing timer stack/source map, absent event fields, ambiguous timer/frame/thread identity or unmatched chronology leaves reading unclassified.",
+    "TimerInstall/EventDispatch existence alone does not establish cause; inspect complete lifetimes including TimerFire/TimerRemove and exact stack/source/enclosing event.",
+    "targetOriginalCheckThrow uses function-name/description matching plus retained script substring. Independent evidence review must verify paused script source and exact original assertion location; do not accept substring or readiness flag alone.",
+    "Pause handler/source capture failure resumes VM but invalidates capture. No retry authorized.",
+    "Outer45s workload deadline includes debugger delay; command timeouts cannot guarantee wall-time for all browser-close internals. Retain actual cleanup outcome rather than asserting guaranteed termination duration.",
+    "Original final full-workload assertions remain skipped by host startup stop; this is diagnostic only.",
+    "Focused-results-analysis remains separate diagnostic evidence; native review does not convert historical failed primary into passing comparison."
+  ],
+  "technicalApprovalScope": "One native reading startup diagnostic through shared wrapper only if separately authorized by root. Final bounded technique: no retry, duplicate primary, runtime/fixture/assertion change, additional intervention, baseline migration or publication approval.",
+  "protocolSources": [
+    "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/js_protocol.json",
+    "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json"
+  ],
+  "noNodeBrowserTestBuildExecution": true,
+  "repositoryEdits": false,
+  "priorReportsModified": false,
+  "publication": "blocked"
+}

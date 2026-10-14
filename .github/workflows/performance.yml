@@ -19,7 +19,7 @@ permissions:
 jobs:
   compare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,19 +38,37 @@ jobs:
           RELEASE_TAG: ${{ inputs.release-tag }}
         run: |
           if [ -n "$RELEASE_TAG" ]; then
-            PERFORMANCE_BASE=$(node scripts/release-performance.mjs baseline --tag "$RELEASE_TAG")
+            PLAN=$(node scripts/release-performance.mjs plan --tag "$RELEASE_TAG")
+            PERFORMANCE_BASE=$(node -e 'console.log(JSON.parse(process.argv[1]).baseline)' "$PLAN")
+            echo "mode=$(node -e 'console.log(JSON.parse(process.argv[1]).kind)' "$PLAN")" >> "$GITHUB_OUTPUT"
           fi
           test -n "$PERFORMANCE_BASE"
           echo "commit=$(git rev-parse --verify --end-of-options "$PERFORMANCE_BASE^{commit}")" >> "$GITHUB_OUTPUT"
       - name: Compare runtime performance
+        if: steps.baseline.outputs.mode != 'one-time-transition'
         env:
           PERFORMANCE_BASE: ${{ steps.baseline.outputs.commit }}
         run: npm run test:performance -- --base "$PERFORMANCE_BASE"
+      - name: Retain original historical failure and full frozen-anchor comparison
+        if: steps.baseline.outputs.mode == 'one-time-transition'
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: node scripts/release-performance.mjs collect-transition --tag "$RELEASE_TAG" --directory dist/performance
+      - name: Recompute and seal the generated transition evidence
+        if: steps.baseline.outputs.mode == 'one-time-transition'
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: node scripts/release-performance.mjs seal-transition --tag "$RELEASE_TAG" --directory dist/performance
       - name: Bind release evidence to the exact tagged source
         if: inputs.release-tag != ''
         env:
           RELEASE_TAG: ${{ inputs.release-tag }}
-        run: node scripts/release-performance.mjs verify --tag "$RELEASE_TAG" --report dist/performance/report.json
+        run: |
+          if [ "$RELEASE_TAG" = "v0.5.1" ]; then
+            node scripts/release-performance.mjs verify --tag "$RELEASE_TAG" --manifest dist/performance/transition-manifest.json
+          else
+            node scripts/release-performance.mjs verify --tag "$RELEASE_TAG" --report dist/performance/report.json
+          fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:

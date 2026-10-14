@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-14T17:27:29.857049+00:00",
+  "reviewer": "fresh independent_plan_review",
+  "scope": "Static read-only source, text and hash inspection; no node execution, tests, browsers, builds or containers; external review artifact only",
+  "candidateCommit": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+  "baselineCommit": "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+  "reviewedArtifactHashes": {
+    "contract-preparation.json": "5bae8152144e292720c969b3ffe11d37dba9711505f8f4431561caaef8787bfe",
+    "diagnostic-plan.txt": "b03baee1dbd837e3312bcb2aa2a0ce54191cbdbc417eefdd1709e6b5fa4e1d83",
+    "diagnose-startup.mjs": "54fcdf961bf9927b2dec1ea08d46cc7317542b88d38783bf8d226444ae004b58",
+    "preparation-ready.json": "2a396d0c08d5379475dd1ed947d3ddbc550fa462c7e4d9e7c188490aff3bc71a"
+  },
+  "verifiedCurrentSourceHashes": {
+    "AGENTS.md": "51e31a05d0b3066598cbac4900b4160d9ce822cb98c388edc90c5606e9a8072c",
+    "docs/release-baseline-policy.md": "2d685288ef038ea01ef504e6d622e5bd08f5b7348a722deef69a92a107945f95",
+    "scripts/performance/workloads.mjs": "28c61058aff24cc5e1fa71097b0024611807c396e4fd29a4901bff012cb933c4",
+    "scripts/performance/sources.mjs": "1258cb107c1667c2b3292f9eca36c95bf8a0d0e6ef564d2bbb1534e338ec5696",
+    "test/helpers/conversation.mjs": "91e21774091790b8c56110c7024c9030baddbf1b9b15cd86742e2bcd030587f6",
+    "scripts/performance/release-gate.mjs": "f2d06bca91c310c0e826e627449e9f5eb6e8e97f56651d0d3021106c2aafd310",
+    "src/content.js": "dc5a64cff1975fe93c389d0477b68d89b7820c67ec72c5f778c1fc17837ebfb9",
+    "node_modules/playwright-core/lib/coreBundle.js": "549070af3acabb3efcc4f55bfe6210f9f7c2fcf633cf7eaa59bfe60719969171"
+  },
+  "verifiedImmutableEvidenceHashes": {
+    "compatible-rule-writes/final-outcome.json": "a81b15a677e75d59ff6c9b4f72f00b228253f83db7af39305e3308a1cad8ce7e",
+    "compatible-rule-writes/failure-diagnosis.json": "69c00d146e94d32331005bb9583c5512d7ef29e54443dd7415926d9a6a6beb55",
+    "compatible-rule-writes/diagnostic-20261014T161958Z/historical-after-failure.json": "2b3ad8677468a690246a8c3eebb2ef5f5af12f24ac610515492787a707a35f2d",
+    "next-release-readiness/historical-full-command-report.json": "db86d269e9e77876b1bd47017c078d6ca47610599b0954da7e70e40f11e4aa0b",
+    "next-release-readiness/historical-startup-diagnostic.json": "b875dc93e7bc5106dc0d9db5be112d73dad1986870957199418bcf7f2f390f03"
+  },
+  "sourceInspection": {
+    "exactOnceAnchors": 10,
+    "everyAnchorCount": 1,
+    "originalContentSha256": "7667b43e9830ee5ef41ce3154b123ed797dea851b286bddb2061540cd153180b",
+    "staticallyTransformedContentSha256": "51ef8b446704b599629ef158fe2fe8ee5256ea5a762d3913a73352d0253f6aba",
+    "syntaxAssessment": "Insertion boundaries and referenced lexical bindings inspected; no parser or browser execution performed. All probes insert statements within existing function bodies; original control statements retained.",
+    "originalStartupAssertions": "Actual bench.check runs before successful stop marker; actual bench.done retains original 15s deadline. runWorkload retains original 45s timeout and finally context.close.",
+    "exactMode": "Original evaluate awaited before any observer evaluate. Host listener/bookkeeping overhead still changes timing.",
+    "traceMode": "Content mutated only in frozen in-memory baseline map; original and transformed identities separate. __bench state/begin/check are wrapped, retaining original functions; trace-only overhead affects timings.",
+    "limits": "12000 stored events, dropped counts retained, mutations truncate targets/attributes. Queue stack and mutation serialization still run after cap; cap bounds stored events rather than total instrumentation work. Page errors/console arrays currently uncapped."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "material",
+      "location": "diagnose-startup.mjs case catch",
+      "finding": "Every failure becomes original-startup-failed, including setup, probe exceptions, CDP failure, context timeout and cleanup failure. The status cannot distinguish original assertions from invalid diagnostic runs.",
+      "minimalExternalFix": "Store original done/check rejection identity separately; classify setup/probe/timeout/context cleanup/observation failures as diagnostic or infrastructure errors; use nonzero process exit for invalid diagnostic runs. Keep original thrown exception bytes unchanged."
+    },
+    {
+      "id": "F2",
+      "severity": "material",
+      "location": "diagnose-startup.mjs prelaunch identity checks",
+      "finding": "Initial checkout and harness identities are recorded but not enforced against exact clean c38 and reviewed identities; stability only proves no later change.",
+      "minimalExternalFix": "Before browser launch require expected commit and empty git status, and compare current source/harness/script hashes with separately frozen reviewed expectations. Record and check script identity after execution as well."
+    },
+    {
+      "id": "F3",
+      "severity": "material",
+      "location": "diagnose-startup.mjs successful stop; workloads.mjs251",
+      "finding": "Stopping after startup intentionally never reaches original final browser-errors assertion. Captured pageErrors/crash remain report fields but do not invalidate startup-completed-diagnostic status; unexpected resource errors in private harness errors are not visible in report.",
+      "minimalExternalFix": "Keep startup-check-passed as a narrow fact; separately surface captured page/crash and failed resource requests as diagnostic invalidity. Do not describe startup-prefix execution as preserving execution of all end-of-workload assertions."
+    },
+    {
+      "id": "F4",
+      "severity": "interpretation",
+      "finding": "After-failure-only pending observation is later than failed check; it cannot atomically establish pending as the check cause. In the observed healthy active revision1 snapshot, synchronous refresh cannot remain running while independent host evaluation executes; a pending timer is strongly source-supported, but origin remains unresolved.",
+      "requirement": "Reading cause requires reproduced done-resolution then accepted queue with attributable event/call stack then rejected original check state. Traced passing startup plus late queue does not explain immutable primary failure."
+    },
+    {
+      "id": "F5",
+      "severity": "interpretation",
+      "finding": "Inline addScriptTag content has no src; parent supplied HTML script-execution criterion disfavours native inline script-load hypothesis. Font loadingdone is plausible from source but remains unproved; other events must be traced.",
+      "requirement": "Avoid describing inline script load as likely. Event and accepted queue chronology must support origin."
+    }
+  ],
+  "evidenceAndSourceDistinction": {
+    "historicalPrimary": "Retained primary status error; first reading80 baseline warmup; zero baseline/candidate measured samples. Does not establish candidate regression.",
+    "afterFailure": "Later reading observation healthy active pending revision1 with loaded correct typography; conversation timeout later observation revision21. Neither identifies causal event.",
+    "conversationSource": "Fixture author observer restores label cssText; historical retention writes inline values and authored deliveries schedule invalidateAutoContent. Source supports a feedback hypothesis, not executed causality. Need repeated observed author label writes, authored deliveries and accepted refreshes; finite reviewed intervention may strengthen causal attribution.",
+    "controls": "Suppression changes instrumented behaviour and cannot qualify original published baseline. Any recovery after disconnect is diagnostic only.",
+    "primary": "One unchanged full default3x5 command versus f267 after trace, retained new output, exact clean c38 candidate. Unmatched failure remains blocking; no fallback or green hunting."
+  },
+  "readiness": {
+    "technical": "Conditional; external script bookkeeping/identity fixes F1-F3 need followup static review before validation release. Probe insertion approach is appropriate diagnostic scope.",
+    "intervention": "Not approved or implemented; must review concrete finite intervention after trace.",
+    "release": "Blocked; review provides no policy or publication authorization.",
+    "heavyWorkPerformed": false,
+    "repositoryEdits": false,
+    "priorReportsModified": false
+  }
+}

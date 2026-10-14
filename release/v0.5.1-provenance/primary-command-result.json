@@ -1,0 +1,20 @@
+{
+  "startedAt": "2026-10-14T17:30:45.311947+00:00",
+  "head": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+  "gitStatus": "",
+  "purpose": "Original full primary before source-reviewed causal trace; no instrumentation, waiver or baseline fallback.",
+  "command": [
+    "npm",
+    "run",
+    "test:performance",
+    "--",
+    "--base",
+    "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+    "--output",
+    "/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/primary-c38-report.json"
+  ],
+  "exitCode": 1,
+  "finishedAt": "2026-10-14T17:30:46.689376+00:00",
+  "headAfter": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+  "gitStatusAfter": ""
+}

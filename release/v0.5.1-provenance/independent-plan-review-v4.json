@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-14T17:32:08.663013+00:00",
+  "reviewer": "independent_plan_review",
+  "revision": "v4",
+  "status": "technically-ready-for-single-trace-only",
+  "reviewedHashes": {
+    "diagnose-startup.mjs": "e9d94248936d704d89638fb0fa858ed503a5dfabcaba49ae2df4b45a2d911492",
+    "diagnostic-plan.txt": "72bbae26d82b819192530d4e3aeecedbd8fac16b313febfde1217ef732752e32",
+    "expected-inputs.json": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+    "independent-plan-review-v3.json": "9b8bda64235e64ea1498cee73296d183832199c0e043bc1c5633652879af4502",
+    "primary-c38-report.json": "3e08672e81c67c1064f9bd870a57d6d320a2646e935b7c7ec8adc4600e0d951a"
+  },
+  "reviewReadySha256": "3432fd7ce28836d8d7ff8a9cfcf5296b69759e5036322686d4e92c46a172dac6",
+  "verified": {
+    "candidate": "Exact clean c38 HEAD/tree and expected identities verified again.",
+    "sources": "All manifest historical/current runtime and harness hashes independently recomputed.",
+    "transforms": {
+      "count": 10,
+      "allExactlyOnce": true,
+      "transformedContentSha256": "51ef8b446704b599629ef158fe2fe8ee5256ea5a762d3913a73352d0253f6aba"
+    },
+    "v4Diff": "Only observation success requirement and final script hash check added to reviewed v3 script. Original checks/15s settling/45s sample deadlines untouched.",
+    "V3-1": "Closed: observationError, missing state, or absent trace.events in trace mode now prevents observationSucceeded, diagnosticIntegrity and zero exit.",
+    "V3-2": "Closed: script read again after browser cleanup; hash mismatch sets scriptStabilityError and nonzero exit.",
+    "F1-F3": "Reviewed v3 fixes retained: strict input identity, original rejection identity, independent page/crash/request/http errors, successful context close.",
+    "F4-F5": "Source/event chronology still required; no cause inferred from traced passing reading or unsupported inline-load assumption.",
+    "primary": "Hash matches root report; original status error, exact clean c38 vs f267, reading80 zero measured baseline/candidate samples. Independent source review only; parent owns command exit/process evidence."
+  },
+  "remainingMaterialFindings": [],
+  "approvalScope": "Technical readiness of pinned v4 diagnostic script for one finite historical reading80/conversation120 startup trace via global validation wrapper only. Root must retain authorization/idle-owner conditions. No approval of intervention, additional primary run, release baseline migration, release or publication.",
+  "evidenceLimits": [
+    "Original startup assertions run before stop; full workload phases and final resource assertions remain skipped, independently captured errors invalidate diagnostics.",
+    "Instrumentation changes timing. Truncated/dropped trace cannot prove missing chronology.",
+    "A traced pass or a late queue without reproduced original failed-check chronology leaves historical reading cause unclassified.",
+    "Future concrete intervention requires independent review.",
+    "Source stability/global cleanup errors remain blocking even if a case-level integrity field was computed earlier.",
+    "Historical primary remains unsuccessful and immutable; no numerical comparison against published baseline exists."
+  ],
+  "noHeavyWork": true,
+  "repositoryEdits": false,
+  "priorReportsModified": false,
+  "publication": "blocked"
+}

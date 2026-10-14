@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-14T17:38:23.136Z",
+  "mode": "reading-minimal",
+  "baseline": "f2670e24aa210b80f6baedfcf09d22a5dd91e640",
+  "protocol": {
+    "version": 2,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "settingsChanges": 6,
+    "idleMs": 4000,
+    "streamEdits": 100,
+    "replacements": 6,
+    "sampleTimeoutMs": 45000,
+    "responsiveness": {
+      "edits": 100,
+      "intervalMs": 25,
+      "calibrationBlockMs": 70
+    }
+  },
+  "scope": "Diagnostic only: minimally probed immutable historical source and original startup assertions. Reading records accepted queues and the exact state returned to the original check; conversation may disconnect only author observer AFTER actual original15s timeout, then observe2s. Startup prefix only; instrumentation/intervention cannot qualify a release or supply comparative numbers.",
+  "cases": [
+    {
+      "workload": "reading-80",
+      "phase": "startup",
+      "calls": [
+        {
+          "index": 0,
+          "phase": "setup",
+          "kind": "evaluate",
+          "startedAt": "2026-10-14T17:38:23.319Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:23.333Z"
+        },
+        {
+          "index": 1,
+          "phase": "setup",
+          "kind": "evaluate",
+          "startedAt": "2026-10-14T17:38:23.336Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:23.337Z"
+        },
+        {
+          "index": 2,
+          "phase": "startup",
+          "kind": "done",
+          "startedAt": "2026-10-14T17:38:23.976Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:24.696Z"
+        },
+        {
+          "index": 3,
+          "phase": "startup",
+          "kind": "evaluate",
+          "startedAt": "2026-10-14T17:38:24.701Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:24.704Z"
+        },
+        {
+          "index": 4,
+          "phase": "startup",
+          "kind": "check",
+          "startedAt": "2026-10-14T17:38:24.704Z",
+          "status": "completed",
+          "finishedAt": "2026-10-14T17:38:24.708Z"
+        }
+      ],
+      "console": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "httpErrors": [],
+      "originalStartupCheckPassed": true,
+      "observation": {
+        "state": {
+          "ready": true,
+          "pending": false,
+          "refreshRevision": 2,
+          "healthy": true,
+          "error": null,
+          "active": true,
+          "hostname": "performance.test",
+          "scope": "all"
+        },
+        "time": 1405.5999999996275,
+        "fontsStatus": "loaded",
+        "paragraph": {
+          "family": "\"Lexend for the Web\", Arial, \"Lexend Nerd Symbols\"",
+          "size": "19.2px"
+        },
+        "fontCheck": true,
+        "trace": {
+          "events": [
+            {
+              "sequence": 0,
+              "at": 692.2999999998137,
+              "kind": "new-font-metrics",
+              "refreshRevision": 1
+            },
+            {
+              "sequence": 1,
+              "at": 692.3999999994412,
+              "kind": "queue-accepted",
+              "urgent": false,
+              "delay": 100,
+              "refreshTimer": 1,
+              "refreshRevision": 1,
+              "caller": "Error\n    at queueRefresh (src/content.js:3330:115)\n    at invalidateAutoContent (src/content.js:3334:5)\n    at FontFaceSet.<anonymous> (src/content.js:3482:9)"
+            },
+            {
+              "sequence": 2,
+              "at": 1391.0999999996275,
+              "kind": "original-done-resolved",
+              "value": {
+                "firstFontFrameMs": 640.0999999996275,
+                "settledMs": 1343.5999999996275
+              }
+            },
+            {
+              "sequence": 3,
+              "at": 1401,
+              "kind": "original-check-enter"
+            },
+            {
+              "sequence": 4,
+              "at": 1401.0999999996275,
+              "kind": "original-check-state",
+              "state": {
+                "ready": true,
+                "pending": false,
+                "refreshRevision": 2,
+                "healthy": true,
+                "error": null,
+                "active": true,
+                "hostname": "performance.test",
+                "scope": "all"
+              }
+            },
+            {
+              "sequence": 5,
+              "at": 1402.199999999255,
+              "kind": "original-check-passed"
+            }
+          ],
+          "counts": {
+            "new-font-metrics": 1,
+            "queue-accepted": 1,
+            "original-done-resolved": 1,
+            "original-check-enter": 1,
+            "original-check-state": 1,
+            "original-check-passed": 1
+          },
+          "limit": 512,
+          "dropped": 0
+        }
+      },
+      "contextCloseSucceeded": true,
+      "status": "startup-completed-diagnostic",
+      "error": "Error: DIAGNOSTIC_STOP_AFTER_STARTUP\n    at page.evaluate (file:///home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:185:17)\n    at async measureChange (file:///home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:167:5)\n    at async measure (file:///home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:171:21)\n    at async runWorkload (file:///home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:123:12)\n    at async file:///home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-focused.mjs:196:11",
+      "browserResourceErrors": false,
+      "observationSucceeded": true,
+      "diagnosticIntegrity": true,
+      "coverageLimit": "Startup prefix only: the host stop bypasses later phases and final workload page/resource-error assertions. Errors are independently retained and invalidate diagnostic integrity. Context-close success is checked below.",
+      "finishedAt": "2026-10-14T17:38:24.722Z"
+    }
+  ],
+  "scriptSha256": "e3e038871964e9881ab3d6d3d4b48de2ab8a0dd8b41ea1bf301bc103e0f6bd3d",
+  "originalRuntimeHashes": {
+    "manifests/manifest.chrome.json": "abe2adf55ae195a76c6531430e886e2c484f639b7f7501ca20601002b660015f",
+    "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
+    "src/adaptive-controls.js": "05f05c1a0de14632485e37a00fb57529c09b9bc49ef1affaaf2bd486725ab87b",
+    "src/adaptive-layout.js": "18d95ef1d8d71be61d7e9b80d52ebfc7687c8d5a85fe553d695fb892fd5cdb68",
+    "src/content.js": "7667b43e9830ee5ef41ce3154b123ed797dea851b286bddb2061540cd153180b",
+    "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+    "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+    "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+    "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+  },
+  "harnessHashes": {
+    "scripts/test-performance.mjs": "6725f0a6907344fe779963520da9f5ac5e3e82d14c0fe43fb7c63ffadbccbc08",
+    "scripts/performance/sources.mjs": "1258cb107c1667c2b3292f9eca36c95bf8a0d0e6ef564d2bbb1534e338ec5696",
+    "scripts/performance/runtime-resources.mjs": "a73b9932ea3fb11e796dcba84e8b73ad912535d3f01e973c9b4eec214f3cc86d",
+    "scripts/performance/workloads.mjs": "28c61058aff24cc5e1fa71097b0024611807c396e4fd29a4901bff012cb933c4",
+    "scripts/performance/comparison.mjs": "951591aaf0228ab8039c32864933230d41504f2b680a1f5a9fc3ac4cf38db764",
+    "scripts/performance/responsiveness.mjs": "1beeccaa5cda41dabb634dff8382d6523cad800936b6a6269df9fecb61adf614",
+    "test/helpers/conversation.mjs": "91e21774091790b8c56110c7024c9030baddbf1b9b15cd86742e2bcd030587f6"
+  },
+  "checkout": {
+    "commit": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+    "tree": "0b41d8f404afa19b5531fd569092f9b464e80ef4",
+    "gitStatus": ""
+  },
+  "expectedInputsSha256": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+  "currentRuntimeHashes": {
+    "manifests/manifest.chrome.json": "e1205c91bab94c94dc26b0caa6865ea3ae60e96a93237cb5e56918c98feec9d6",
+    "src/settings.js": "f8e926720b502fbe8ffebe2d5e6fddb598d4125447b3193ed1fda2bb947de709",
+    "src/adaptive-controls.js": "691735876db76f94313353163139338773a3ee40bea14576eeaf63216dd9578e",
+    "src/adaptive-layout.js": "10c4b75eec18f1cf40aecca73f37e4c99dcc0112998f9dcd222626e2e321da3b",
+    "src/content.js": "dc5a64cff1975fe93c389d0477b68d89b7820c67ec72c5f778c1fc17837ebfb9",
+    "src/shadow-discovery.js": "ec617f10688c3fe785d38cdae7130ca762badbc354686b63e20feb6805e8c1dd",
+    "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+    "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+    "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+    "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+  },
+  "reviewedInputsVerified": true,
+  "transformedContentSha256": "a64e936ecc2f1d4248ca6087c24364cc235fa92d8ab33d0e680b42f0045f1eb2",
+  "transforms": [
+    {
+      "label": "accepted queue only",
+      "needleSha256": "3acbeaff5fb682f9bfbc4d3ca1fcf924d477e92fe9255478c63b2a8940e855d8",
+      "replacementSha256": "516f133fe1ddab1d826debe3fda3b105a8f51a01090906a1eeb2f781e447e5b0"
+    },
+    {
+      "label": "new font metrics only",
+      "needleSha256": "5c559d5d5e2a1ee9d6b61acd949a7b8db40d7a9f05b95e1d19dee08b79b30ec4",
+      "replacementSha256": "6d87128dea0e09ffb3af3af3a0c553d5beb8bcdf5a4258600e7712f12da75a1a"
+    }
+  ],
+  "prefixSha256": "86bd07e5819b3c73e51b98c19dfa55d94cfe5c3ecb74abea4a82742deb1e49b5",
+  "interventionFunctionSha256": null,
+  "chromium": "153.0.8010.12",
+  "browserClosed": true,
+  "finishedAt": "2026-10-14T17:38:24.742Z",
+  "scriptSha256After": "e3e038871964e9881ab3d6d3d4b48de2ab8a0dd8b41ea1bf301bc103e0f6bd3d",
+  "scriptStable": true,
+  "checkoutAfter": {
+    "commit": "c38a14a1fbbf7f5e8083e3f4bdd36da3063f065d",
+    "tree": "0b41d8f404afa19b5531fd569092f9b464e80ef4",
+    "gitStatus": ""
+  },
+  "harnessHashesAfter": {
+    "scripts/test-performance.mjs": "6725f0a6907344fe779963520da9f5ac5e3e82d14c0fe43fb7c63ffadbccbc08",
+    "scripts/performance/sources.mjs": "1258cb107c1667c2b3292f9eca36c95bf8a0d0e6ef564d2bbb1534e338ec5696",
+    "scripts/performance/runtime-resources.mjs": "a73b9932ea3fb11e796dcba84e8b73ad912535d3f01e973c9b4eec214f3cc86d",
+    "scripts/performance/workloads.mjs": "28c61058aff24cc5e1fa71097b0024611807c396e4fd29a4901bff012cb933c4",
+    "scripts/performance/comparison.mjs": "951591aaf0228ab8039c32864933230d41504f2b680a1f5a9fc3ac4cf38db764",
+    "scripts/performance/responsiveness.mjs": "1beeccaa5cda41dabb634dff8382d6523cad800936b6a6269df9fecb61adf614",
+    "test/helpers/conversation.mjs": "91e21774091790b8c56110c7024c9030baddbf1b9b15cd86742e2bcd030587f6"
+  },
+  "harnessStable": true,
+  "currentRuntimeHashesAfter": {
+    "manifests/manifest.chrome.json": "e1205c91bab94c94dc26b0caa6865ea3ae60e96a93237cb5e56918c98feec9d6",
+    "src/settings.js": "f8e926720b502fbe8ffebe2d5e6fddb598d4125447b3193ed1fda2bb947de709",
+    "src/adaptive-controls.js": "691735876db76f94313353163139338773a3ee40bea14576eeaf63216dd9578e",
+    "src/adaptive-layout.js": "10c4b75eec18f1cf40aecca73f37e4c99dcc0112998f9dcd222626e2e321da3b",
+    "src/content.js": "dc5a64cff1975fe93c389d0477b68d89b7820c67ec72c5f778c1fc17837ebfb9",
+    "src/shadow-discovery.js": "ec617f10688c3fe785d38cdae7130ca762badbc354686b63e20feb6805e8c1dd",
+    "assets/fonts/lexend-latin-wght-normal.woff2": "b7e7538f59bff1812841d7627f8e49e70fe86438f9f7b397a028c0d05301c874",
+    "assets/fonts/lexend-latin-ext-wght-normal.woff2": "b5d815d42066da25e5894bdfe47a415e1f79ef436486e3f843b475806d2e613c",
+    "assets/fonts/lexend-vietnamese-wght-normal.woff2": "aab0b318aab11e9f0bcd21ff9d2b0ff6ad7a3f061a071b53af670d4749d2cba2",
+    "assets/fonts/nerd-fonts-symbols.woff2": "6b500afc199145b6ec48e1bb88876e7595e0f214da739a1d0afe0c86d41bca0f"
+  },
+  "currentRuntimeStable": true
+}

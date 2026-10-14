@@ -540,14 +540,16 @@ missing that anchor or the previous release's resources fails rather than
 choosing another baseline. Fetch the full history and tags when reproducing.
 
 The historical `v0.5.0` runtime (`f2670e24aa210b80f6baedfcf09d22a5dd91e640`)
-predates the author-style feedback fix. An unchanged conversation fixture run
-against those bytes fails startup because typography does not settle within
-15 seconds. Consequently, a next release selecting that baseline remains
-blocked even if the candidate passes against the pre-roadmap revision. Preserve
-the baseline failure; it is not candidate regression evidence or a successful
-comparison. Resolving this historical compatibility boundary requires an
-explicitly reviewed release-baseline policy. Do not silently substitute a newer
-revision or relax the fixture to publish.
+has independently reviewed reading font-settling and conversation author-style
+feedback incompatibilities. The owner explicitly authorized a **v0.5.1-only**
+transition against frozen `9ba8c632ba900c39c0b102daa163ae3f0409488e`. It requires
+the original unsuccessful full historical report and complete anchor report
+for the same exact clean candidate/harness, plus the generated manifest. The
+19 intervening commits lack numerical coverage against `v0.5.0`; this cannot
+establish unchanged or improved performance relative to it. All other release
+requirements remain. Follow [the complete transition contract](release-baseline-policy.md)
+for v0.5.1; the ordinary commands below apply to other releases. v0.5.2 must
+select v0.5.1 under the unchanged ordinary selector.
 
 ```sh
 node scripts/release-performance.mjs baseline --tag v0.6.0

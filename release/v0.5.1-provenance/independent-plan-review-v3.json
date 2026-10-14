@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-14T17:30:29.691164+00:00",
+  "reviewer": "independent_plan_review",
+  "reviewedRevision": "v3",
+  "status": "changes-required-before-trace",
+  "reviewedHashes": {
+    "diagnose-startup.mjs": "92939d709524e01a5c7db58f9d0e7ea8eaab5a257884d00a0319a1fa4da1310c",
+    "diagnostic-plan.txt": "837c6342d8245b74064ea14518a097c8f001e5ee645c84dd168d00cadff331c3",
+    "expected-inputs.json": "5c129467f2e5b42fe306984be5c268ffda82f40acd00188482ce6ba5c3d8c124",
+    "independent-plan-review-v1.json": "265750758ac455bb3a2abaed3abfa83fe67cfad630587a0099219e738eefd009"
+  },
+  "reviewReadySha256": "59da1bc3471d61687968b756d05fdb11aeaa5c49fd9871a0a2eb69832421153b",
+  "identityVerification": "Exact current clean HEAD/tree; complete historical/current runtime and harness bytes verified against expected-inputs; manifest hash matches script constant.",
+  "transforms": {
+    "exactOnce": 10,
+    "transformedContentSha256": "51ef8b446704b599629ef158fe2fe8ee5256ea5a762d3913a73352d0253f6aba",
+    "semanticReview": "Same insertions as v1; original startup check executes before stop; original done 15s and outer45s remain; trace changes timing."
+  },
+  "closedFindings": {
+    "F1": "Known original done/check rejection classification now requires identical Error surviving cleanup; setup/unclassified/timeout/cleanup cannot be original-known-assertion success.",
+    "F2": "Exact clean reviewed checkout/tree and complete runtime/harness identities now enforced before browser launch; runtime/harness/checkout compared after.",
+    "F3": "Context close recorded; captured page/crash/requestfailed/HTTP errors invalidate integrity; prefix coverage limitation explicit.",
+    "F4": "Plan explicitly requires actual done\u2192acceptedqueue\u2192failedcheck chronology; traced passing reading cannot explain old failure.",
+    "F5": "Plan avoids assigning inline script-load as likely origin; no causal attribution without trace."
+  },
+  "remainingFindings": [
+    {
+      "id": "V3-1",
+      "severity": "material",
+      "finding": "Both observation catch blocks swallow observationError, but diagnosticIntegrity checks no observationError or successful observation. Failed retrieval can leave diagnosticIntegrity=true and exit0 despite no trace/state evidence.",
+      "minimalExternalFix": "Require successful observation and absent observationError for diagnosticIntegrity; preserve original assertion outcome independently and exit nonzero for missing diagnostic evidence."
+    },
+    {
+      "id": "V3-2",
+      "severity": "material-evidence-identity",
+      "finding": "Root brief claimed script-after enforcement; reviewed source only records scriptSha256 once before launch. It never reads script after execution, so changed diagnostic instrumentation may escape stability report.",
+      "minimalExternalFix": "Record final script SHA256 and require equality with initial SHA256; mark diagnostic invalid and exit nonzero on mismatch. Retain reviewed initial hash check in external launch review."
+    }
+  ],
+  "limits": [
+    "Known assertion regex intentionally excludes typography mismatch so such failures remain original-startup-evaluate-unclassified and integrity false.",
+    "Probe cap bounds retained events rather than instrumentation overhead. Truncated/dropped traces cannot support missing chronology.",
+    "45s Promise.race plus finally context.close is retained; no browser execution performed to establish cleanup timing.",
+    "Assertions after startup remain skipped and no prefix completion is a workload pass.",
+    "No primary command, intervention or publication authorized by this review."
+  ],
+  "heavyWorkPerformed": false,
+  "repositoryEdits": false,
+  "oldReportsModified": false,
+  "publication": "blocked"
+}

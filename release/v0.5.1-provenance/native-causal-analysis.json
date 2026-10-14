@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-14T17:55:18.341394+00:00",
+  "classification": "Exact reading failure reproduced: first loadingdone invalidation queues100ms refresh after final settled frame and before original final check; source-linked interpretation awaits independent review.",
+  "inputHashes": {
+    "reading-native.json": "b600965ae442e669ca431809764d2bdf3740caf967f1b340d3aa720e5a8d853b",
+    "reading-native.json.trace.json": "7098abe64a2d8d191207c9520e6086b4e3d8e7b2a2d3114f58939f7f586a7531",
+    "diagnose-reading-native.mjs": "0d01b03f52dd1ceaf33944025da2ac0f364507dba81cc79ef82af4e3c1f0e115",
+    "native-source-review-v1.json": "ec5944d45f757e44709b5320794a9b42e50d0228a642e629ed6e38f84bb64e6a",
+    "primary-c38-report.json": "3e08672e81c67c1064f9bd870a57d6d320a2646e935b7c7ec8adc4600e0d951a"
+  },
+  "recomputed": {
+    "combinedInjectedSha256": "671dfc3342526124cd32ae6012e10d08f64d03824108166bef5efe1ce69f9d8f",
+    "originalHarnessSha256": "eabdc623647f45d886bb396eadaaac7babcddef7b456a2b593d5744e598ffe7e",
+    "pausedSourceExactlyOriginalHarness": true,
+    "contentLineOffset": 2387,
+    "sameHistoricalAndHarnessHashesAsPrimary": true,
+    "sameCandidateCommitAsPrimary": true,
+    "rawEventCount": 3695,
+    "rawTraceSha256": "7098abe64a2d8d191207c9520e6086b4e3d8e7b2a2d3114f58939f7f586a7531",
+    "traceHashMatchesReport": true,
+    "dataLossOccurred": false,
+    "dropped": 0,
+    "allSourceAndCleanupFlags": {
+      "scriptStable": true,
+      "harnessStable": true,
+      "currentRuntimeStable": true,
+      "checkoutStable": true,
+      "contextClosed": true,
+      "browserClosed": true,
+      "diagnosticSessionDetached": true
+    },
+    "pauses": 1,
+    "unexpectedPauses": 0
+  },
+  "ordering": {
+    "doneCall": {
+      "index": 2,
+      "phase": "startup",
+      "kind": "done",
+      "hostStartedAt": "2026-10-14T17:48:20.714Z",
+      "status": "completed",
+      "timing": {
+        "firstFontFrameMs": 682,
+        "settledMs": 694.5
+      },
+      "hostFinishedAt": "2026-10-14T17:48:20.748Z"
+    },
+    "checkCall": {
+      "index": 4,
+      "phase": "startup",
+      "kind": "check",
+      "hostStartedAt": "2026-10-14T17:48:20.749Z",
+      "status": "failed",
+      "error": "page.evaluate: Error: Runtime did not finish healthy and active\n    at bench.check (eval at evaluate (:311:30), <anonymous>:34:66)\n    at eval (eval at evaluate (:311:30), <anonymous>:1:15)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)\n    at page.evaluate (/home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-reading-native.mjs:151:30)\n    at measureChange (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:167:16)\n    at async measure (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:171:21)\n    at async runWorkload (/home/costeer/.t3/worktrees/lexendingTheWeb/t3-8edf757d/scripts/performance/workloads.mjs:123:12)\n    at async file:///home/costeer/.t3/workflows/lexend-audit-05869f6c/next-priorities-c38a14a/release-baseline/diagnose-reading-native.mjs:165:9",
+      "hostFinishedAt": "2026-10-14T17:48:20.811Z"
+    },
+    "localCheckState": {
+      "ready": true,
+      "pending": true,
+      "refreshRevision": 1,
+      "healthy": true,
+      "error": null,
+      "active": true,
+      "hostname": "performance.test",
+      "scope": "all"
+    },
+    "requestedSize": 19.2,
+    "finalAnimationFrame": {
+      "args": {
+        "data": {
+          "frame": "4891E360516FEE4846BE0B721D85267A",
+          "id": 3,
+          "sampleTraceId": 8339183048072649
+        }
+      },
+      "cat": "devtools.timeline",
+      "dur": 275,
+      "name": "FireAnimationFrame",
+      "ph": "X",
+      "pid": 62474,
+      "tdur": 271,
+      "tid": 62474,
+      "ts": 5902281668,
+      "tts": 731827
+    },
+    "finalHarnessFrameFunction": {
+      "args": {
+        "data": {
+          "columnNumber": 21,
+          "frame": "4891E360516FEE4846BE0B721D85267A",
+          "functionName": "frame",
+          "isolate": "8769734637483037935",
+          "lineNumber": 57,
+          "sampleTraceId": 8339183048072650,
+          "scriptId": "13",
+          "url": ""
+        }
+      },
+      "cat": "devtools.timeline",
+      "dur": 153,
+      "name": "FunctionCall",
+      "ph": "X",
+      "pid": 62474,
+      "tdur": 153,
+      "tid": 62474,
+      "ts": 5902281676,
+      "tts": 731835
+    },
+    "fontListenerFunction": {
+      "args": {
+        "data": {
+          "columnNumber": 53,
+          "frame": "4891E360516FEE4846BE0B721D85267A",
+          "functionName": "",
+          "isolate": "8769734637483037935",
+          "lineNumber": 3426,
+          "sampleTraceId": 8339183048072629,
+          "scriptId": "28",
+          "url": "src/content.js"
+        }
+      },
+      "cat": "devtools.timeline",
+      "dur": 177,
+      "name": "FunctionCall",
+      "ph": "X",
+      "pid": 62474,
+      "tdur": 173,
+      "tid": 62474,
+      "ts": 5902282048,
+      "tts": 732189
+    },
+    "timerInstall": {
+      "args": {
+        "data": {
+          "frame": "4891E360516FEE4846BE0B721D85267A",
+          "sampleTraceId": 8339183048072630,
+          "singleShot": true,
+          "stackTrace": [
+            {
+              "columnNumber": 20,
+              "functionName": "queueRefresh",
+              "lineNumber": 3296,
+              "scriptId": "28",
+              "url": "src/content.js"
+            },
+            {
+              "columnNumber": 5,
+              "functionName": "invalidateAutoContent",
+              "lineNumber": 3300,
+              "scriptId": "28",
+              "url": "src/content.js"
+            },
+            {
+              "columnNumber": 23,
+              "functionName": "",
+              "lineNumber": 3446,
+              "scriptId": "28",
+              "url": "src/content.js"
+            }
+          ],
+          "timeout": 100,
+          "timerId": 1
+        }
+      },
+      "cat": "devtools.timeline",
+      "name": "TimerInstall",
+      "ph": "I",
+      "pid": 62474,
+      "s": "t",
+      "tid": 62474,
+      "ts": 5902282207,
+      "tts": 732345
+    },
+    "microsecondsTimerAfterFinalAnimationFrameEnd": 264
+  },
+  "attribution": {
+    "stack": [
+      {
+        "native": {
+          "columnNumber": 20,
+          "functionName": "queueRefresh",
+          "lineNumber": 3296,
+          "scriptId": "28",
+          "url": "src/content.js"
+        },
+        "originalPath": "src/content.js",
+        "originalLine": 909,
+        "exactOriginalLine": "    refreshTimer = setTimeout(refresh, urgent ? 0 : 100);"
+      },
+      {
+        "native": {
+          "columnNumber": 5,
+          "functionName": "invalidateAutoContent",
+          "lineNumber": 3300,
+          "scriptId": "28",
+          "url": "src/content.js"
+        },
+        "originalPath": "src/content.js",
+        "originalLine": 913,
+        "exactOriginalLine": "    queueRefresh(urgent === true);"
+      },
+      {
+        "native": {
+          "columnNumber": 23,
+          "functionName": "",
+          "lineNumber": 3446,
+          "scriptId": "28",
+          "url": "src/content.js"
+        },
+        "originalPath": "src/content.js",
+        "originalLine": 1059,
+        "exactOriginalLine": "      if (newMetrics) invalidateAutoContent();"
+      }
+    ],
+    "exclusiveCallbackRegistration": {
+      "originalPath": "src/content.js",
+      "originalLine": 1039,
+      "exactOriginalLine": "    document.fonts?.addEventListener(\"loadingdone\", (event) => {"
+    },
+    "sameFrame": "4891E360516FEE4846BE0B721D85267A",
+    "rendererPid": 62474,
+    "rendererTid": 62474,
+    "threadName": "CrRendererMain",
+    "sameIsolateAsPausedHarness": "8769734637483037935",
+    "timerId": 1,
+    "timeoutMs": 100,
+    "singleShot": true,
+    "TimerFireOrRemoveEvents": [],
+    "lifetime": "OneTimerInstall and zeroTimerFire/TimerRemove before trace flush while paused at original check throw; only timer1 remains live, consistent with revision1,pendingtrue."
+  },
+  "reasoning": [
+    "Exact original done resolves only after two frames of loaded fonts, requested size, healthy active pendingfalse. Host records completed done before failed check.",
+    "Last frame callback ends5902281943; native loadingdone callback starts5902282048 and installs timer1 at5902282207,264us after frame end.",
+    "Native full timer stack maps to published909(setTimeout)\u2192913(queue forwarding)\u21921059(newMetrics branch), inside native callback mapping to1039(document.fonts loadingdone registration).",
+    "The first queued100ms refresh remains live when original final check samples state. Predicate fails solely because pendingtrue, with healthyactive,errornull,revision1,size19.2.",
+    "The two-frame condition can be satisfied before delivery of first loadingdone notification; that late notification legitimately invalidates typography metrics and schedules refresh between done and separately executed check."
+  ],
+  "nativeEventLabelLimit": {
+    "loadingdoneLabelledEventDispatch": false,
+    "enclosingEventDispatch": false,
+    "sourceLinkedEventProof": "Enclosing native FunctionCall is the exclusively registered document.fonts loadingdone callback at original1039; full TimerInstall stack executes its1059 branch. This is direct identity/source linkage, not proximity to generic load events.",
+    "planExpectationDisposition": "Literal enclosingEventDispatch expectation is not met: raw trace emits no loadingdone-labelled EventDispatch. Independent reviewer must explicitly assess exact FunctionCall registration and full stack as equivalent source-causal evidence. No missing event label is claimed."
+  },
+  "limits": [
+    "Native tracing/debugger adds timing/deoptimization overhead; runtime/harness/fixture/injection bytes unchanged.",
+    "Reproduction diagnoses observed failure mechanism; it cannot retrospectively insert contemporaneous state into immutable primary report.",
+    "Primary remains statuserror with0baseline/candidate measured samples; no candidate regression or numerical comparison to v0.5.0.",
+    "Earlier instrumented reading startup passes remain retained and do not supersede failed primary."
+  ],
+  "publication": "blocked; policy not adopted"
+}

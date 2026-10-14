@@ -103,6 +103,13 @@ function verifyResponsiveness(raw, sample) {
 }
 
 export async function verifyReleaseEvidence(root, tag, report) {
+  assert.equal(report.status, 'passed', 'Performance report is not passed');
+  return verifyMeasuredEvidence(root, releaseBaseline(root, tag), report);
+}
+
+// Internal measurement contract shared by the ordinary and named-transition
+// verifiers. This helper grants no baseline-selection or publishing authority.
+export async function verifyMeasuredEvidence(root, release, report) {
   // Check status before provenance so a failed browser command never gains a
   // publishing route merely because the tag metadata is also invalid.
   assert.equal(report.status, 'passed', 'Performance report is not passed');
@@ -110,7 +117,6 @@ export async function verifyReleaseEvidence(root, tag, report) {
   assert.equal(report.error, undefined, 'Errored performance evidence cannot publish');
   assert.equal(report.negativeControl, null, 'Injected or undeclared negative-control reports cannot qualify a release');
   assert.deepEqual(report.regressions, [], 'Performance regressions block publishing');
-  const release = releaseBaseline(root, tag);
   assert.equal(report.candidate?.commit, release.candidate, 'Performance evidence is for a different tagged commit');
   assert.equal(report.candidate?.tree, release.tree, 'Performance evidence is for a different source tree');
   assert.equal(report.candidate?.gitStatus, '', 'Performance candidate was dirty');
