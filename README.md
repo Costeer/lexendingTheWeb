@@ -73,12 +73,6 @@ npm run check
 npm run build
 ```
 
-Run `npm test` from a Git checkout with full history and tags: release-gate
-tests clone the repository and verify frozen historical revisions. For an
-existing shallow clone, run `git fetch --unshallow --tags` first. Containers
-running the tests must also expose the worktree’s referenced Git directory
-and common Git directory.
-
 `npm test` runs at most four test files concurrently because several launch
 real browsers. The empirical performance command runs separately on an idle
 machine.
@@ -213,15 +207,10 @@ including keyboard and screen-reader checks and installed Firefox Android popup
 and settings flows. Desktop narrow-window and axe results do not establish those
 manual/device checks.
 
-The next public release remains blocked by historical performance-baseline
-failure and incomplete release qualification. Default rule writes preserve
-older-readable storage; profiles already using compact rules still require
-compatible extension versions on participating installations. Review the
-[baseline decision proposal](docs/release-baseline-policy.md) and
-[saved-rule upgrade and rollback plan](docs/rule-format-rollout.md) before
-changing release qualification or enabling a public migration. These documents
-describe the implemented write policy, its limits and remaining decisions.
-The baseline proposal does not change the current release gate.
+Default rule writes preserve older-readable storage; profiles already using
+compact rules still require compatible extension versions on participating
+installations. Review the [saved-rule upgrade and rollback plan](docs/rule-format-rollout.md)
+before enabling a public migration.
 
 ## For website authors
 

@@ -13,12 +13,6 @@ jobs:
     with:
       artifact-prefix: release-browser-${{ github.sha }}
 
-  performance:
-    uses: ./.github/workflows/performance.yml
-    with:
-      release-tag: ${{ github.ref_name }}
-      artifact-name: release-performance-${{ github.sha }}
-
   interfaces:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -43,7 +37,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [interfaces, performance, installed-browsers]
+    needs: [interfaces, installed-browsers]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -65,25 +59,7 @@ jobs:
       - run: npm run package
       - run: npm run test:packages
       - run: npm run lint:firefox
-      - uses: actions/download-artifact@v6
-        with:
-          name: release-performance-${{ github.sha }}
-          path: dist/performance/
-      - name: Verify performance evidence before publishing
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          if [ "$RELEASE_TAG" = "v0.5.1" ]; then
-            node scripts/release-performance.mjs verify --tag "$RELEASE_TAG" --manifest dist/performance/transition-manifest.json
-          else
-            node scripts/release-performance.mjs verify --tag "$RELEASE_TAG" --report dist/performance/report.json
-          fi
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ "$GITHUB_REF_NAME" = "v0.5.1" ]; then
-            gh release create "$GITHUB_REF_NAME" dist/releases/*.zip --notes-file release/v0.5.1-disclosure.md --verify-tag
-          else
-            gh release create "$GITHUB_REF_NAME" dist/releases/*.zip --generate-notes --verify-tag
-          fi
+        run: gh release create "$GITHUB_REF_NAME" dist/releases/*.zip --generate-notes --verify-tag

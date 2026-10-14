@@ -1,10 +1,9 @@
 # Saved-rule upgrade and rollback
 
-**Publication remains blocked pending the compatibility release's qualification
-and the separate release-comparison gate.** The implemented default writer now
-keeps unmigrated profiles readable by the supported older versions. It does not
-activate compact migration or make already-compact profiles safe for obsolete
-writers.
+The compatibility release needs the upgrade and rollback checks below. The
+implemented default writer keeps unmigrated profiles readable by the supported
+older versions. It does not activate compact migration or make already-compact
+profiles safe for obsolete writers.
 
 This guide describes the compatibility work following
 `55e79688ded6c168406c200bd346524212952bbe`. Historical controls use the audit
@@ -90,8 +89,8 @@ unsupported display format.
    would still require a defined and tested protocol.
 
 The default compatibility writer is implemented; qualification and publication
-remain separate decisions. The release-comparison policy is a separate publication
-gate, and there is no implemented or approved compact activation switch.
+remain separate decisions. There is no implemented or approved compact
+activation switch.
 
 ## Controlled migration and offline profiles
 

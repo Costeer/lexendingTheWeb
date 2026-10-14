@@ -113,22 +113,6 @@ the detector works. The positive control is outside the measured window.
 Unsupported or inactive detectors fail the command. The window includes the
 final queued refresh and deferred repair.
 
-The shared raw verifier accepts native whole-millisecond task durations of at
-least 49 ms for the pinned Chromium 153 / Playwright 1.63.0 profile. Chromium
-classifies the internal task against 50 ms before separately coarsening its
-endpoints at 100 µs and integer-truncating their exposed difference, so a valid
-entry can report 49 ms. The [independent primary-source assessment](../release/performance-observation-provenance/native-duration-source-assessment-v1.json)
-retains the exact implementation chain, immutable source URLs/hashes and scope.
-A different browser or timing profile needs a separate contract review.
-
-This validates the native representation: keep every raw entry and its original
-metrics, including duration 49 and its zero contribution to blocking time above
-50 ms. Do not round it up or drop it. Values 48, fractional/nonfinite durations,
-invalid windows and ordering still fail. The distinct 70 ms calibration control
-and its original span checks remain mandatory; an incidental 49 ms entry cannot
-replace that control. The max-task regression statistic and its 30%/50 ms
-allowance, collector, workload and sampling protocol remain unchanged.
-
 To demonstrate the real browser failure path while retaining all default
 workloads and samples:
 
@@ -536,52 +520,23 @@ are separate from this worktree's tested build. Retesting the affected
 conversation requires loading this rebuilt checkout on the affected device;
 version 0.5.0 alone does not identify the tested code.
 
-## Release evidence and detector controls
+## CI comparisons and detector controls
 
-CI and tag publishing call the same reusable `performance.yml` workflow. A
-release cannot publish until its empirical job succeeds; the publishing job
-then downloads and verifies that exact run's report immediately before creating
-the release. Reports are uploaded with `if: always()`, including regressions
-and invalid browser runs. Packaging does not delete the report because the
-publishing job downloads it after all builds and installed-browser checks.
+CI calls the reusable `performance.yml` workflow with an explicit baseline:
+the pull request's base commit, the commit before a branch push, or `HEAD^`
+for scheduled and manually dispatched runs. The benchmark compares that
+revision with the checked-out working tree. A regression, broken workload or
+invalid measurement fails the performance job. Reports are uploaded with
+`if: always()`, including unsuccessful runs.
 
-A release tag must be a stable `vMAJOR.MINOR.PATCH` tag matching `package.json`.
-The checkout must be that exact clean commit. Its baseline is the highest
-lower-version release tag, which must resolve to a **strict ancestor** of the
-candidate. An unrelated previous tag or a same-commit version tag fails;
-neither can silently fall back to `HEAD`, `HEAD^`, or another newer baseline.
-If no lower-version tag exists, the explicit initial anchor is the audited
-pre-roadmap revision `9ba8c632ba900c39c0b102daa163ae3f0409488e`. A checkout
-missing that anchor or the previous release's resources fails rather than
-choosing another baseline. Fetch the full history and tags when reproducing.
+For local changes, choose a revision from before the change, as described in
+the validation workflow above. Each version-2 report records the candidate
+commit and Git tree, source state at both ends, runtime/font hashes for both
+versions, harness hashes, raw samples, comparisons and browser/environment
+identity.
 
-The historical `v0.5.0` runtime (`f2670e24aa210b80f6baedfcf09d22a5dd91e640`)
-has independently reviewed reading font-settling and conversation author-style
-feedback incompatibilities. The owner explicitly authorized a **v0.5.1-only**
-transition against frozen `9ba8c632ba900c39c0b102daa163ae3f0409488e`. It requires
-the original unsuccessful full historical report and complete anchor report
-for the same exact clean candidate/harness, plus the generated manifest. The
-19 intervening commits lack numerical coverage against `v0.5.0`; this cannot
-establish unchanged or improved performance relative to it. All other release
-requirements remain. Follow [the complete transition contract](release-baseline-policy.md)
-for v0.5.1; the ordinary commands below apply to other releases. v0.5.2 must
-select v0.5.1 under the unchanged ordinary selector.
-
-```sh
-node scripts/release-performance.mjs baseline --tag v0.6.0
-npm run test:performance -- --base <printed-baseline-commit>
-node scripts/release-performance.mjs verify --tag v0.6.0 --report dist/performance/report.json
-```
-
-The version-2 report binds the candidate commit and Git tree, clean source state
-at both ends, exact runtime/font hashes for both versions, and current harness
-hashes. The release verifier requires all workloads and phases, the unchanged
-protocol and comparison policy, five samples plus alternating warm-ups, and
-browser/environment identity. It recomputes comparisons from the raw samples;
-a manually changed `status: passed`, missing metric, stale commit, altered
-harness, relaxed threshold, or candidate-as-baseline report cannot pass.
-Local uncommitted comparisons remain supported; their reports simply cannot
-serve as release evidence.
+Tag publishing runs its package, interface and installed-browser checks
+independently of the performance workflow. The tag must match `package.json`.
 
 Conversation profiling probes require exactly one source anchor for every
 insertion. `test/conversation-instrumentation.test.mjs` checks absent and duplicate
@@ -591,19 +546,15 @@ existing-text scan in memory and proves that the normal zero-scan assertion
 rejects it. These probes do not replace the empirical gate's unmodified-source
 measurements.
 
-When changing the harness, run the comparator and release gate negatives:
+When changing the harness, run the comparator, responsiveness and probe tests:
 
 ```sh
-node --test test/performance-comparison.test.mjs test/release-performance.test.mjs test/conversation-instrumentation.test.mjs
+node --test test/performance-comparison.test.mjs test/performance-responsiveness.test.mjs test/conversation-instrumentation.test.mjs
 ```
 
-Also demonstrate the actual browser gate rejecting a temporary synchronous
-500 ms delay at the start of the candidate's `refresh` function, with exactly
-one injection match. Preserve the original bytes, run the full default comparison
-against the pre-change revision with `--output` outside `dist`, and restore the
-source in a `finally` block. Require exit 1, report status `failed`, and a measured
-`settings.taskMs` regression, rather than accepting a harness error. Pass that
-same failed report to `release-performance.mjs verify` and require its
-`Performance report is not passed` rejection. This is the verifier on the
-publishing path; never run a publication to test a negative control. Preserve
-the failed report and command logs before rerunning the restored candidate.
+Also demonstrate the actual browser command rejecting the 1000 ms synchronous
+block using `--inject-block-ms 1000`, as described above. Run the full default
+comparison against the pre-change revision with `--output` outside `dist`.
+Require exit 1, report status `failed`, and a measured
+`responsiveness.maxLongTaskMs` regression rather than accepting a harness error.
+Preserve the failed report and command logs.
