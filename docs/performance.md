@@ -171,11 +171,13 @@ and disposal; this measurement change does not narrow runtime invalidation.
 
 ## Runtime design and previous measurements
 
-Font conversion now runs separately from layout repair on settled, visible
-pages. Native typography and layout are captured together, then Lexend is
-applied immediately. The browser receives a rendering frame before the
-geometry repair runs. Each phase preserves the current focus and scroll
-positions, including scrolling performed between the two phases.
+Startup and explicit preference changes separate font conversion from layout
+repair on visible pages. Native typography and layout are captured together,
+then Lexend is applied immediately. The browser receives a rendering frame
+before geometry repair runs. Automatic recaptures after startup finish both
+phases before painting, so continuing page animations cannot expose an
+unrepaired layout between passes. Each phase preserves focus and scroll,
+including scrolling performed between a preference change's two phases.
 
 New preferences cancel the previous pending repair. Content and geometry mutations
 invalidate its baseline and make the next refresh complete capture and repair
@@ -194,6 +196,14 @@ pause/site preferences are respected, and a newer storage event wins over an
 initial read or font preload. A bundled font completing while a repair is
 pending uses that repair rather than starting another full conversion. Late
 author fonts still require a new native baseline.
+
+Native capture restores owned typography and layout before measuring; it leaves
+the extension's now-inert stylesheet enabled. Toggling that stylesheet's cascade
+layer can recreate author font registrations in Chromium and produce repeated
+font-loading notifications, even for unchanged cached sources. Keeping it active
+avoids that feedback without suppressing genuinely late fonts or same-descriptor
+CSS and JavaScript font replacements. Real-font and per-frame geometry controls
+are in `test/font-loading-browser.test.mjs`.
 
 Local Chromium measurements at 1280 × 800 compared the previous implementation
 with this one on 80- and 400-card pages, each with 500 protected code tokens.
@@ -221,7 +231,7 @@ bounded fallback, font failures, preference races, cancellation, and intervening
 scrolling:
 
 ```sh
-node --test test/typography-startup.test.mjs test/typography-performance.test.mjs
+node --test test/typography-startup.test.mjs test/typography-performance.test.mjs test/font-loading-browser.test.mjs
 ```
 
 ## Earlier measurement optimizations

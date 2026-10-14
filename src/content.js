@@ -685,26 +685,6 @@
     eligibleTextRoots.clear();
     transitionRules.clear();
   };
-  const withExtensionStylesDisabled = (callback) => {
-    const styles = [...styledRoots].map((root) => root.querySelector(`#${STYLE_ID}`)).filter(Boolean);
-    const states = styles.map((style) => style.sheet?.disabled ?? false);
-    styles.forEach((style) => { if (style.sheet) style.sheet.disabled = true; });
-    const inline = [];
-    managedElements.forEach((state, element) => state.properties.forEach((property, name) => {
-      if (name.startsWith("--")) return;
-      inline.push({ element, name, value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) });
-      if (property.value) element.style.setProperty(name, property.value, property.priority);
-      else element.style.removeProperty(name);
-    }));
-    try { return callback(); }
-    finally {
-      inline.forEach(({ element, name, value, priority }) => {
-        if (value) element.style.setProperty(name, value, priority);
-        else element.style.removeProperty(name);
-      });
-      styles.forEach((style, index) => { if (style.sheet) style.sheet.disabled = states[index]; });
-    }
-  };
   const typographyTransitionProperties = new Set([
     "font", "font-family", "font-size", "line-height", "letter-spacing", "font-stretch", "font-variation-settings"
   ]);
@@ -1169,15 +1149,19 @@
       visitShadowRoots(document.documentElement);
       if (isActive()) {
         const roots = [...styledRoots];
-        let measurements;
-        withExtensionStylesDisabled(() => {
-          measurements = measureTypography(roots);
-          layout?.capture(roots, { preserveHidden });
-        });
+        // Layout and typography ownership have already been restored above.
+        // Keep the now-inert stylesheet active: toggling its cascade layer
+        // recreates author FontFaces in Chromium, whose loadingdone events
+        // would schedule another capture indefinitely.
+        const measurements = measureTypography(roots);
+        layout?.capture(roots, { preserveHidden });
         applyTypography(measurements);
-        // Focused repaired controls must retain their wrapper and scroll range
-        // within the same task. Hidden tabs cannot depend on animation frames.
-        if (repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
+        // Automatic recaptures must restore existing repairs before painting,
+        // so ordinary site animations cannot alternate between repaired and
+        // unrepaired layouts. Startup and explicit preference changes keep
+        // their early font paint. Hidden tabs cannot depend on frames either.
+        const keepLayoutStable = preserveHidden && refreshRevision > 0;
+        if (keepLayoutStable || repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
         else deferred = true;
       }
     });
@@ -1446,7 +1430,7 @@
       coalescible ? needsRefresh.filter(mutation => !["style", "aria-hidden"].includes(mutation.attributeName)) : null);
   });
   const start = async () => {
-    layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
+    layout = globalThis.LexendLayout?.create({ getTextElements: collectTextElements }) ?? null;
     window.addEventListener("pageshow", async (event) => {
       if (!event.persisted || initializing) return;
       // Cached documents may miss storage events while frozen. Read current

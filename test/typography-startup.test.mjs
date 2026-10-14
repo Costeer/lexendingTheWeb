@@ -86,9 +86,8 @@ const prepare = async (context, saved = { enabled: true, scope: "all", textScale
         requestAnimationFrame(() => {
           fontFrameBeforeRepair = getComputedStyle(document.querySelector("#text")).fontFamily.includes("Lexend") && state().pending;
         });
-        // Native capture temporarily disables conversion CSS. Chromium can
-        // recreate unloaded FontFace wrappers for already decoded sources at
-        // that boundary; record the real preload's completion instead.
+        // Record the actual preload promises, rather than inferring their
+        // completion from whichever font faces this capture currently uses.
         if (startupDeadline) startupDeadlineEvents.push({ kind: "capture" });
         fontReadyAtCapture.push(preloadedReadingWeights.has(400) && preloadedReadingWeights.has(700));
         return layout.capture(...args);
