@@ -123,7 +123,8 @@
   };
 
   const create = ({ withStylesDisabled = (callback) => callback(), getTextElements = defaultTextElements,
-    beginAttributeMutation = () => NO_ATTRIBUTE_MUTATION } = {}) => {
+    beginAttributeMutation = () => NO_ATTRIBUTE_MUTATION,
+    getStylePresence = (element) => element.hasAttribute("style") } = {}) => {
     let baseline = new Map();
     let textElements = new Set();
     let descendants = new Map();
@@ -251,7 +252,7 @@
       let properties = edits.get(element);
       if (!properties) {
         edits.set(element, properties = new Map());
-        originalStylePresence.set(element, element.hasAttribute("style"));
+        originalStylePresence.set(element, getStylePresence(element));
       }
       if (!properties.has(property)) properties.set(property, {
         value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property)
@@ -1727,6 +1728,7 @@
     const capture = (roots, options) => withMeasurements(() => captureBaseline(roots, options));
     const repair = () => withMeasurements(repairLayout);
     return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, canRefreshRegion, withRegion, adoptAuthorChanges,
+      getStylePresence: (element) => originalStylePresence.get(element),
       refresh: (roots) => { capture(roots); repair(); } });
   };
 

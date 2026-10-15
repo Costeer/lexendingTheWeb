@@ -74,10 +74,23 @@
   let layout = null;
   const NO_ATTRIBUTE_MUTATION = () => null;
   let regionalMutationWitness = null;
-  const beginAttributeMutation = (element, name) => regionalMutationWitness?.begin(element, name) ?? NO_ATTRIBUTE_MUTATION;
+  let viewportStyleWitness = null;
+  const viewportStyleGuards = new Map();
+  const pendingStyleWrites = new Set();
+  const beginAttributeMutation = (element, name) => {
+    if (name === "style") pendingStyleWrites.add(element);
+    const regional = regionalMutationWitness?.begin(element, name);
+    const viewport = viewportStyleWitness?.begin(element, name);
+    if (!regional && !viewport) return NO_ATTRIBUTE_MUTATION;
+    return () => { const mutation = regional?.(); return viewport?.() ?? mutation ?? null; };
+  };
   const mutateAttribute = (element, name, callback) => {
     const finish = beginAttributeMutation(element, name);
     try { return callback(); } finally { finish(); }
+  };
+  const disconnectObserver = () => {
+    adoptStyleMutations(observer.takeRecords());
+    observer.disconnect();
   };
   const mutationStyle = document.createElement("span").style;
   let lastRefreshError = null;
@@ -91,10 +104,24 @@
   const FRAME_MESSAGE = "lexend-measured-frame-height";
   const FRAME_RUNTIME_REQUEST = "LEXEND_FRAME_REQUIREMENT";
   const FRAME_RUNTIME_APPLY = "LEXEND_APPLY_FRAME_REQUIREMENT";
+  // Presence belongs to the author, even while another Lexend owner supplies
+  // the only declarations. In particular a recapture can acquire new owners
+  // while the temporary scroll-anchor declaration is still installed.
+  const getStylePresence = (element) => {
+    viewportStyleWitness?.flush();
+    const owned = viewportStyleGuards.get(element)?.hadStyle
+      ?? managedElements.get(element)?.hadStyle ?? layout?.getStylePresence(element);
+    if (owned !== undefined) return owned;
+    for (const [frame, state] of resizedFrames) {
+      if (frame === element) return state.hadStyle;
+      if (state.elements.has(element)) return state.elements.get(element).hadStyle;
+    }
+    return element.hasAttribute("style");
+  };
   const writeFrameProperty = (state, element, name, value) => {
     if (protection.editorOwned(element)) return;
     let properties = state.elements.get(element);
-    if (!properties) state.elements.set(element, properties = { hadStyle: element.hasAttribute("style"), values: new Map() });
+    if (!properties) state.elements.set(element, properties = { hadStyle: getStylePresence(element), values: new Map() });
     let original = properties.values.get(name);
     if (!original) {
       original = { value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) };
@@ -104,7 +131,7 @@
       original.priority = element.style.getPropertyPriority(name);
     }
     original.applied = value;
-    if (element.style.getPropertyValue(name) !== value || element.style.getPropertyPriority(name) !== "important") element.style.setProperty(name, value, "important");
+    if (element.style.getPropertyValue(name) !== value || element.style.getPropertyPriority(name) !== "important") mutateAttribute(element, "style", () => element.style.setProperty(name, value, "important"));
   };
   const restoreFrame = (frame) => {
     const state = resizedFrames.get(frame);
@@ -112,17 +139,21 @@
     for (const [name, original] of state.properties) {
       if (frame.style.getPropertyValue(name) !== original.applied
           || frame.style.getPropertyPriority(name) !== "important") continue;
-      if (original.value) frame.style.setProperty(name, original.value, original.priority);
-      else frame.style.removeProperty(name);
+      mutateAttribute(frame, "style", () => {
+        if (original.value) frame.style.setProperty(name, original.value, original.priority);
+        else frame.style.removeProperty(name);
+      });
     }
-    if (!state.hadStyle && !frame.getAttribute("style")) frame.removeAttribute("style");
+    if (!state.hadStyle && !frame.getAttribute("style")) mutateAttribute(frame, "style", () => frame.removeAttribute("style"));
     for (const [element, properties] of state.elements) {
       for (const [name, original] of properties.values) {
         if (element.style.getPropertyValue(name) !== original.applied || element.style.getPropertyPriority(name) !== "important") continue;
-        if (original.value) element.style.setProperty(name, original.value, original.priority);
-        else element.style.removeProperty(name);
+        mutateAttribute(element, "style", () => {
+          if (original.value) element.style.setProperty(name, original.value, original.priority);
+          else element.style.removeProperty(name);
+        });
       }
-      if (!properties.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+      if (!properties.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
     }
     resizedFrames.delete(frame);
   };
@@ -153,7 +184,7 @@
   };
   const applyFrameRequirement = (frame, requirement) => {
     if (!isActive() || requirement === null || frameTouchesEditor(frame)) {
-      observer.disconnect();
+      disconnectObserver();
       try { restoreFrame(frame); } finally { if (!refreshing) observeRoots(); }
       return;
     }
@@ -187,10 +218,10 @@
     }
     let state = resizedFrames.get(frame);
     if (!state && Math.abs(box.height - viewportHeight) > 4) return;
-    observer.disconnect();
+    disconnectObserver();
     try {
       if (!state) {
-        state = { hadStyle: frame.hasAttribute("style"), properties: new Map(), elements: new Map() };
+        state = { hadStyle: getStylePresence(frame), properties: new Map(), elements: new Map() };
         resizedFrames.set(frame, state);
       }
       const shortAncestors = [];
@@ -212,7 +243,7 @@
           original.priority = frame.style.getPropertyPriority(name);
         }
         original.applied = value;
-        if (frame.style.getPropertyValue(name) !== value || frame.style.getPropertyPriority(name) !== "important") frame.style.setProperty(name, value, "important");
+        if (frame.style.getPropertyValue(name) !== value || frame.style.getPropertyPriority(name) !== "important") mutateAttribute(frame, "style", () => frame.style.setProperty(name, value, "important"));
       }
       for (const parent of shortAncestors) {
         const frameBox = frame.getBoundingClientRect(), parentBox = parent.element.getBoundingClientRect();
@@ -460,7 +491,7 @@
   const manage = (element) => {
     let state = managedElements.get(element);
     if (!state) {
-      state = { attributes: new Map(), properties: new Map(), hadStyle: element.hasAttribute("style") };
+      state = { attributes: new Map(), properties: new Map(), hadStyle: getStylePresence(element) };
       managedElements.set(element, state);
     }
     return state;
@@ -566,8 +597,10 @@
       // typography before the browser paints the intervening native font.
       property.value = value;
       property.priority = priority;
-      if (property.appliedValue) element.style.setProperty(name, property.appliedValue, property.appliedPriority);
-      else element.style.removeProperty(name);
+      mutateAttribute(element, "style", () => {
+        if (property.appliedValue) element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+        else element.style.removeProperty(name);
+      });
       overwritten = true;
     });
     if (overwritten) {
@@ -603,8 +636,10 @@
         const original = JSON.parse(element.getAttribute("data-lexend-original-typography"));
         for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", "data-lexend-retained"]) element.removeAttribute(attribute);
         original.properties.filter(([name]) => name !== "transition-property").forEach(([name, value, priority]) => {
-          if (value) element.style.setProperty(name, value, priority);
-          else element.style.removeProperty(name);
+          mutateAttribute(element, "style", () => {
+            if (value) element.style.setProperty(name, value, priority);
+            else element.style.removeProperty(name);
+          });
         });
         clones.push({ element, original });
       } catch { /* Do not trust unrelated malformed page attributes. */ }
@@ -621,11 +656,13 @@
       try {
         const transition = original.properties.find(([name]) => name === "transition-property");
         if (transition) {
-          if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
-          else element.style.removeProperty(transition[0]);
+          mutateAttribute(element, "style", () => {
+            if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
+            else element.style.removeProperty(transition[0]);
+          });
         }
         for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
-        if (!original.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+        if (!original.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
       } catch { /* Do not trust unrelated malformed page attributes. */ }
     }
   };
@@ -958,6 +995,11 @@
   });
   const observedAttributes = Object.keys(observedAttributeKinds);
   const observeRoots = () => {
+    // Blink can keep CSSOM-only styles physically absent until serialization.
+    // Materialize each written attribute once before returning it to authors;
+    // otherwise their later removeAttribute can recreate style="" natively.
+    for (const element of pendingStyleWrites) element.getAttribute("style");
+    pendingStyleWrites.clear();
     if (!isActive() || protection.editorDocument()) return;
     observer.observe(document, { childList: true, subtree: true, characterData: true, characterDataOldValue: true,
       attributes: true, attributeOldValue: true, attributeFilter: observedAttributes });
@@ -979,6 +1021,7 @@
   };
   const applyIncomingFonts = (branches, fontOnly = true) => {
     if (!isActive() || !document.documentElement || !branches.size) return;
+    adoptStyleMutations(observer.takeRecords());
     observer.disconnect();
     try {
       applyToRoot(document.documentElement);
@@ -1012,9 +1055,37 @@
     pendingRepair = null;
     return pending;
   };
+  const createViewportStyleWitness = (guards) => {
+    const records = [], expected = new WeakSet();
+    const witness = new MutationObserver((batch) => records.push(...batch));
+    for (const element of guards.keys()) witness.observe(element, { attributes: true, attributeOldValue: true, attributeFilter: ["style"] });
+    const drain = () => records.push(...witness.takeRecords());
+    const flush = () => {
+      drain();
+      adoptStyleMutations(records.splice(0), expected);
+    };
+    return {
+      flush,
+      begin(element, name) {
+        if (name !== "style" || !guards.has(element)) return null;
+        flush();
+        const oldValue = element.getAttribute("style");
+        return () => {
+          drain();
+          const first = records[0];
+          if (first?.target === element && first.oldValue === oldValue) expected.add(first);
+          const next = records.slice(1).find((record) => record.target === element);
+          const applied = { value: next ? next.oldValue : element.getAttribute("style") };
+          flush();
+          return applied;
+        };
+      },
+      stop() { try { flush(); } finally { witness.disconnect(); } }
+    };
+  };
   const withViewportPreserved = (callback) => {
     refreshing = true;
-    observer.disconnect();
+    disconnectObserver();
     let focusedElement = document.activeElement;
     while (focusedElement?.shadowRoot?.activeElement) focusedElement = focusedElement.shadowRoot.activeElement;
     const ownedTableChild = (element) => element?.matches?.("[data-lexend-layout-repair~='scroll-table']")
@@ -1022,14 +1093,14 @@
     const focusedTable = ownedTableChild(focusedElement);
     const scrollPosition = { x: scrollX, y: scrollY };
     const rootStyle = document.documentElement.style;
-    const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: document.documentElement.hasAttribute("style") };
+    const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: getStylePresence(document.documentElement) };
     const body = document.body;
     const primaryBodyScroller = body && !protection.editorOwned(body) && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
       && body.clientHeight >= innerHeight * 0.8 && body.clientHeight <= innerHeight + 64
       && body.scrollHeight > body.clientHeight + 2;
     const bodyScroll = primaryBodyScroller ? { x: body.scrollLeft, y: body.scrollTop,
       value: body.style.getPropertyValue("overflow-anchor"), priority: body.style.getPropertyPriority("overflow-anchor"),
-      hadStyle: body.hasAttribute("style") } : null;
+      hadStyle: getStylePresence(body) } : null;
     const nestedScrollers = new Map();
     for (const root of new Set([document.documentElement, ...styledRoots])) {
       if (protection.editorDocument()) break;
@@ -1039,11 +1110,26 @@
         if ((!x && !y) || protection.editorOwned(element)) return;
         nestedScrollers.set(element, { x, y,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
-          hadStyle: element.hasAttribute("style"), table: ownedTableChild(element) });
+          hadStyle: getStylePresence(element), table: ownedTableChild(element) });
       });
     }
     // Read every scroll offset before changing styles; interleaving these
     // writes with geometry reads forces layout repeatedly on dashboard pages.
+    if (!protection.editorOwned(document.documentElement)) viewportStyleGuards.set(document.documentElement, anchor);
+    if (bodyScroll) viewportStyleGuards.set(body, bodyScroll);
+    for (const [element, position] of nestedScrollers) viewportStyleGuards.set(element, position);
+    viewportStyleWitness = createViewportStyleWitness(viewportStyleGuards);
+    const restoreAnchor = (element, position) => {
+      viewportStyleWitness.flush();
+      if (element.style.getPropertyValue("overflow-anchor") === "none"
+          && element.style.getPropertyPriority("overflow-anchor") === "important") {
+        mutateAttribute(element, "style", () => {
+          if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
+          else element.style.removeProperty("overflow-anchor");
+        });
+      }
+      if (!position.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
+    };
     if (!protection.editorOwned(document.documentElement)) mutateAttribute(document.documentElement, "style", () => rootStyle.setProperty("overflow-anchor", "none", "important"));
     if (bodyScroll) mutateAttribute(body, "style", () => body.style.setProperty("overflow-anchor", "none", "important"));
     for (const element of nestedScrollers.keys()) mutateAttribute(element, "style", () => element.style.setProperty("overflow-anchor", "none", "important"));
@@ -1067,27 +1153,16 @@
           const element = originalElement.isConnected ? originalElement : position.table?.parentElement;
           if (!element?.isConnected || (position.table && !element.matches("[data-lexend-layout-repair~='scroll-table']"))) return;
           element.scrollTo({ left: position.x, top: position.y, behavior: "instant" });
-          mutateAttribute(element, "style", () => {
-            if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
-            else element.style.removeProperty("overflow-anchor");
-          });
-          if (!position.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
+          // A replacement table wrapper never received the old guard write.
+          if (element === originalElement) restoreAnchor(element, position);
         });
         window.scrollTo({ left: scrollPosition.x, top: scrollPosition.y, behavior: "instant" });
         if (bodyScroll && body.isConnected) {
           body.scrollTo({ left: bodyScroll.x, top: bodyScroll.y, behavior: "instant" });
-          mutateAttribute(body, "style", () => {
-            if (bodyScroll.value) body.style.setProperty("overflow-anchor", bodyScroll.value, bodyScroll.priority);
-            else body.style.removeProperty("overflow-anchor");
-          });
-          if (!bodyScroll.hadStyle && !body.getAttribute("style")) mutateAttribute(body, "style", () => body.removeAttribute("style"));
+          restoreAnchor(body, bodyScroll);
         }
         if (!protection.editorOwned(document.documentElement)) {
-          mutateAttribute(document.documentElement, "style", () => {
-            if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
-            else rootStyle.removeProperty("overflow-anchor");
-          });
-          if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) mutateAttribute(document.documentElement, "style", () => document.documentElement.removeAttribute("style"));
+          restoreAnchor(document.documentElement, anchor);
         }
         // An already focused action does not emit focusin again when its pane
         // grows. Recheck its repaired vertical viewport after restoring saved
@@ -1095,6 +1170,9 @@
         if (!refreshError && isActive() && focusTarget?.isConnected && !protection.editorOwned(focusTarget)) globalThis.LexendControls?.revealFocused?.(focusTarget);
       } catch (error) { refreshError ??= error; }
       finally {
+        try { viewportStyleWitness.stop(); }
+        catch (error) { refreshError ??= error; }
+        finally { viewportStyleWitness = null; viewportStyleGuards.clear(); }
         refreshing = false;
         try { observeRoots(); }
         catch (error) { refreshError ??= error; }
@@ -1478,18 +1556,71 @@
       stop() { try { drain(); } finally { witness.disconnect(); } }
     };
   };
-  const adoptAuthoredChanges = (changes) => {
+  const adoptAuthoredChanges = (changes, typographyProperties = true) => {
     for (const [element, change] of changes) {
       const state = managedElements.get(element);
       if (!state) continue;
       if (change.stylePresent !== undefined) state.hadStyle = change.stylePresent;
       for (const [name, value] of change.properties) {
         const property = state.properties.get(name);
-        if (property) { property.value = value.value; property.priority = value.priority; }
+        if (property && (typographyProperties || value.value === property.appliedValue
+            && value.priority === property.appliedPriority)) {
+          property.value = value.value; property.priority = value.priority;
+        }
       }
       for (const [name, value] of change.attributes) if (state.attributes.has(name)) state.attributes.set(name, value);
     }
     layout.adoptAuthorChanges(changes);
+  };
+  // Read every transition's actual after-value, including synchronous custom
+  // element reactions that run before a CSSOM operation returns. Only the
+  // mutation produced by our own operation is excluded by the guard witness.
+  const adoptStyleMutations = (records, expected = null, typographyProperties = true) => {
+    const styles = records.filter((record) => record.type === "attributes" && record.attributeName === "style"
+      && record.attributeNamespace === null);
+    if (!styles.length) return;
+    const after = new Map(), tails = new Map(), changes = new Map();
+    for (let index = styles.length - 1; index >= 0; index--) {
+      const record = styles[index], element = record.target;
+      after.set(record, tails.has(element) ? tails.get(element) : element.getAttribute("style"));
+      tails.set(element, record.oldValue);
+    }
+    let beforeStyle, afterStyle;
+    for (const record of styles) {
+      if (expected?.has(record)) continue;
+      const element = record.target, value = after.get(record);
+      let change = changes.get(element);
+      if (!change) changes.set(element, change = { properties: new Map(), attributes: new Map() });
+      change.stylePresent = value !== null;
+      beforeStyle ??= document.createElement("span").style;
+      afterStyle ??= document.createElement("span").style;
+      beforeStyle.cssText = record.oldValue ?? "";
+      afterStyle.cssText = value ?? "";
+      for (const name of new Set([...beforeStyle, ...afterStyle])) {
+        const next = { value: afterStyle.getPropertyValue(name), priority: afterStyle.getPropertyPriority(name) };
+        if (beforeStyle.getPropertyValue(name) !== next.value || beforeStyle.getPropertyPriority(name) !== next.priority) change.properties.set(name, next);
+      }
+    }
+    if (!changes.size) return;
+    adoptAuthoredChanges(changes, typographyProperties);
+    for (const [element, change] of changes) {
+      const guard = viewportStyleGuards.get(element);
+      if (guard) {
+        guard.hadStyle = change.stylePresent;
+        const anchor = change.properties.get("overflow-anchor");
+        if (anchor) { guard.value = anchor.value; guard.priority = anchor.priority; }
+      }
+      for (const [frame, state] of resizedFrames) {
+        const properties = frame === element ? state.properties : state.elements.get(element)?.values;
+        const owner = frame === element ? state : state.elements.get(element);
+        if (!owner) continue;
+        owner.hadStyle = change.stylePresent;
+        for (const [name, value] of change.properties) {
+          const property = properties.get(name);
+          if (property) { property.value = value.value; property.priority = value.priority; }
+        }
+      }
+    }
   };
   const preserveWitnessAuthorChanges = (witness) => {
     let { changes } = witness.inspect();
@@ -1751,6 +1882,10 @@
     // Frameworks frequently assign the same class/style again or change it
     // and restore it within one task. Compare the first old value with the
     // final value, rather than rebuilding the page for each notification.
+    // Retention needs previous author values for declarations that differ from
+    // our applied typography. Observable edits ending at the applied value can
+    // already adopt that author baseline without reapplying any typography.
+    adoptStyleMutations(mutations, null, false);
     const attributes = new Map();
     const authored = mutations.filter((mutation) => {
       if (!mutation.target.isConnected || ownStyleIds.includes(mutation.target.id)
@@ -1814,7 +1949,7 @@
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
     if (changedStyles.size) {
-      observer.disconnect();
+      disconnectObserver();
       try { changedStyles.forEach(retainOverwrittenTypography); }
       finally { observeRoots(); }
     }
@@ -1839,7 +1974,7 @@
       coalescible ? needsRefresh.filter(mutation => !["style", "aria-hidden"].includes(mutation.attributeName)) : null);
   });
   const start = async () => {
-    layout = globalThis.LexendLayout?.create({ getTextElements: collectTextElements, beginAttributeMutation }) ?? null;
+    layout = globalThis.LexendLayout?.create({ getTextElements: collectTextElements, beginAttributeMutation, getStylePresence }) ?? null;
     window.addEventListener("pageshow", async (event) => {
       if (!event.persisted || initializing) return;
       // Cached documents may miss storage events while frozen. Read current

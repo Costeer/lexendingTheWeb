@@ -198,10 +198,13 @@ native-state and mutation checks.
 Viewport preservation still scans document and discovered shadow descendants,
 but checks editor ancestry only for nonzero scroll offsets. Editable documents
 skip that collection. Regression coverage includes native clamping, restoration,
-author priorities and editor exclusion. A separate pre-existing issue remains:
-pausing an originally unstyled protected scroller at a nonzero offset can leave
-an empty `style` attribute. This can affect author `[style]` selectors and needs
-an ownership-aware restoration fix; the scroll-scan optimization does not fix it.
+author priorities and editor exclusion. Viewport guards share author style-presence provenance
+with typography, layout and frame ownership, including owners created during
+active recapture. Pause preserves absent versus authored-empty attributes and
+later author declarations. Guarded style mutations retain synchronous page
+reactions; observer disconnects first adopt queued author changes. Each changed
+style attribute is serialized once before returning control to authors, so a
+later native removal cannot recreate an empty attribute from dirty CSSOM state.
 
 A temporary mutation witness distinguishes Lexend's own attribute writes from
 synchronous page reactions. Unexpected mutations, changes to native form
