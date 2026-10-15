@@ -1606,8 +1606,9 @@
       // Controls and flex repairs can narrow an action after the first text
       // pass. Recheck only short action words against their settled geometry.
       for (const element of textElements) {
+        if (!element.closest("a[href],button,[role=button]")) continue;
         const before = baseline.get(element), now = snapshot(element);
-        if (before && now && element.closest("a[href],button,[role=button]")) fitHeading(element, before, now);
+        if (before && now) fitHeading(element, before, now);
       }
     };
     const getFrameRequirement = (originalViewportHeight = innerHeight) => {

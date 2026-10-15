@@ -760,3 +760,84 @@ test("an originally whole Hangul token keeps its boundary only when every token 
  for(let i=0;i<4;i++){await page.evaluate(()=>{layout.capture();layout.repair()});assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.copy p')).wordBreak),'keep-all')}
  await page.evaluate(()=>layout.restore());assert.equal(await page.evaluate(()=>document.querySelector('.copy p').getAttribute('style')),null);await page.close();
 });
+
+test("late action fitting preserves whole reachable words without remeasuring unrelated prose", async () => {
+  const page = await browser.newPage({ viewport: { width: 600, height: 800 } });
+  try {
+    await page.setContent(`<style>
+      body{margin:16px;font:16px/20px Arial;background:white;color:black}
+      .row{width:360px}button{font:inherit;width:240px;padding:0;border:0;overflow:hidden;overflow-wrap:anywhere;background:white;color:black}
+      .prose{width:480px;margin:4px 0}
+    </style><div class="row"><button style="color: rgb(13, 21, 34);">Continue</button></div>
+      ${Array.from({ length: 12 }, (_, i) => `<p class="prose">Unrelated paragraph ${i} remains ordinary readable prose throughout the action repair.</p>`).join("")}`);
+    await page.addScriptTag({ content: source });
+    const result = await page.evaluate(() => {
+      const authorMarkup = document.body.innerHTML;
+      const typography = document.createElement("style");
+      typography.media = "not all";
+      typography.textContent = "p,button{font-size:24px!important;line-height:1.6!important}";
+      document.head.append(typography);
+      const layout = LexendLayout.create({ withStylesDisabled(callback) {
+        const media = typography.media;
+        typography.media = "not all";
+        try { return callback(); } finally { typography.media = media; }
+      } });
+      layout.capture();
+      typography.media = "all";
+      const controls = LexendControls;
+      const nativeRects = Range.prototype.getClientRects;
+      const nativeStyle = window.getComputedStyle;
+      const reads = { proseRanges: 0, proseStyles: 0 };
+      let afterLateWrite = false, lateWrites = 0, narrowedFragments = 0, narrowedWidth = 0;
+      Range.prototype.getClientRects = function (...args) {
+        const element = this.startContainer.nodeType === Node.TEXT_NODE ? this.startContainer.parentElement : this.startContainer;
+        if (afterLateWrite && element.closest?.("p.prose")) reads.proseRanges++;
+        return Reflect.apply(nativeRects, this, args);
+      };
+      window.getComputedStyle = function (element, ...args) {
+        if (afterLateWrite && element.matches?.("p.prose")) reads.proseStyles++;
+        return Reflect.apply(nativeStyle, window, [element, ...args]);
+      };
+      // A genuine final control repair changes geometry after the first text
+      // pass. The following action-word pass must still fit that narrowed word.
+      window.LexendControls = { ...controls, finalizeIconLabels(args) {
+        controls.finalizeIconLabels(args);
+        const action = document.querySelector("button"), word = document.createRange();
+        word.selectNodeContents(action);
+        narrowedWidth = Math.floor(word.getBoundingClientRect().width * 0.6);
+        args.write(action, "width", `${narrowedWidth}px`, "test-late-action");
+        lateWrites++;
+        narrowedFragments = word.getClientRects().length;
+        afterLateWrite = true;
+      } };
+      try { layout.repair(); }
+      finally {
+        afterLateWrite = false;
+        Range.prototype.getClientRects = nativeRects;
+        window.getComputedStyle = nativeStyle;
+        window.LexendControls = controls;
+      }
+      const action = document.querySelector("button"), box = action.getBoundingClientRect();
+      const word = document.createRange(); word.selectNodeContents(action);
+      const fragments = [...word.getClientRects()].map(rect => rect.toJSON());
+      const state = { ...reads, lateWrites, narrowedFragments, narrowedWidth, fragments, box: box.toJSON(),
+        repair: action.getAttribute("data-lexend-layout-repair"),
+        hit: document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) === action };
+      layout.restore();
+      state.restoredMarkup = document.body.innerHTML;
+      state.authorMarkup = authorMarkup;
+      return state;
+    });
+    assert.equal(result.lateWrites, 1, JSON.stringify(result));
+    assert.ok(result.narrowedFragments > 1, "the real late width write must split the action word before its final repair");
+    assert.equal(result.fragments.length, 1, JSON.stringify(result));
+    assert.ok(result.box.width > result.narrowedWidth, JSON.stringify(result));
+    assert.ok(result.fragments.every(rect => rect.left >= result.box.left - 1 && rect.right <= result.box.right + 1
+      && rect.top >= result.box.top - 1 && rect.bottom <= result.box.bottom + 1), JSON.stringify(result));
+    assert.match(result.repair, /whole-action-word/);
+    assert.equal(result.hit, true, JSON.stringify(result));
+    assert.equal(result.restoredMarkup, result.authorMarkup);
+    assert.equal(result.proseRanges, 0, "the final action-only pass must not measure unrelated prose ranges after the late write");
+    assert.equal(result.proseStyles, 0, "the final action-only pass must not read unrelated prose styles after the late write");
+  } finally { await page.close(); }
+});
