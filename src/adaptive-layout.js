@@ -4,6 +4,7 @@
   // Adapt only constraints that become unsafe after typography changes. No site
   // identities or author class names are involved. Every write is reversible.
   const EPSILON = 2;
+  const NO_ATTRIBUTE_MUTATION = () => null;
   const protection = globalThis.LexendProtection;
   const heading = (element) => /^H[1-6]$/.test(element.tagName) || element.getAttribute("role") === "heading";
   const control = (element) => element.matches("button,input,select,textarea,a[href],[role='button']");
@@ -121,7 +122,8 @@
     return values?.length >= 3 && (values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722) > 180;
   };
 
-  const create = ({ withStylesDisabled = (callback) => callback(), getTextElements = defaultTextElements } = {}) => {
+  const create = ({ withStylesDisabled = (callback) => callback(), getTextElements = defaultTextElements,
+    beginAttributeMutation = () => NO_ATTRIBUTE_MUTATION } = {}) => {
     let baseline = new Map();
     let textElements = new Set();
     let descendants = new Map();
@@ -137,6 +139,13 @@
     const maskedScrollOffsets = new Map();
     const originalStylePresence = new Map();
     let canvas;
+    let appliedStyle;
+    const appliedProperty = (element, property, mutation) => {
+      if (mutation === null) return element.style.getPropertyValue(property);
+      appliedStyle ??= document.createElement("span").style;
+      appliedStyle.cssText = mutation.value ?? "";
+      return appliedStyle.getPropertyValue(property);
+    };
     let region = null;
     const regionOwns = (element) => region === null || element?.getRootNode() === region.root;
     const requireRegionOwnership = (element) => {
@@ -248,11 +257,14 @@
         value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property)
       });
       const original = properties.get(property);
+      let mutation = null;
       if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== "important") {
+        const finishMutation = beginAttributeMutation(element, "style");
         element.style.setProperty(property, value, "important");
         invalidateMeasurements();
+        mutation = finishMutation();
       }
-      original.applied = element.style.getPropertyValue(property);
+      original.applied = appliedProperty(element, property, mutation);
       original.appliedPriority = "important";
       mark(element, "data-lexend-layout-repair", category);
       // Shadow ::slotted typography rules read these variables. A measured
@@ -289,8 +301,10 @@
       const previous = element.getAttribute(name);
       const next = name === "data-lexend-layout-repair" ? [...new Set([...(previous?.split(" ") ?? []), value])].join(" ") : value;
       if (previous !== next) {
+        const finishMutation = beginAttributeMutation(element, name);
         element.setAttribute(name, next);
         invalidateMeasurements();
+        finishMutation();
       }
       values.get(name).applied = next;
     };
@@ -317,8 +331,10 @@
         const restoreProperty = (property, original) => {
           // The site may have changed its inline style since our last pass.
           if (element.style.getPropertyValue(property) !== original.applied || element.style.getPropertyPriority(property) !== original.appliedPriority) return;
+          const finishMutation = beginAttributeMutation(element, "style");
           if (original.value) element.style.setProperty(property, original.value, original.priority);
           else element.style.removeProperty(property);
+          finishMutation();
         };
         const transitions = [...properties].filter(([property]) => property.startsWith("transition-"));
         for (const [property, original] of properties) if (!property.startsWith("transition-")) restoreProperty(property, original);
@@ -327,14 +343,20 @@
         // repair back toward the author height and contaminate a recapture.
         if (transitions.length) void styleFor(element).height;
         for (const [property, original] of transitions) restoreProperty(property, original);
-        if (!element.getAttribute("style") && !originalStylePresence.get(element)) element.removeAttribute("style");
+        if (!element.getAttribute("style") && !originalStylePresence.get(element)) {
+          const finishMutation = beginAttributeMutation(element, "style");
+          element.removeAttribute("style");
+          finishMutation();
+        }
       }
       for (const [element, values] of attributes) {
         if (!regionOwns(element) || retained.has(element)) continue;
         for (const [name, original] of values) {
           if (element.getAttribute(name) !== original.applied) continue;
+          const finishMutation = beginAttributeMutation(element, name);
           if (original.value === null) element.removeAttribute(name);
           else element.setAttribute(name, original.value);
+          finishMutation();
         }
       }
       for (const element of edits.keys()) if (regionOwns(element) && !retained.has(element)) edits.delete(element);
@@ -1684,9 +1706,26 @@
         region = null;
       }
     };
+    const adoptAuthorChanges = (changes) => {
+      // A page reaction can replace an owned declaration during a local pass.
+      // Preserve its actual authored value before full fallback restores edits.
+      for (const [element, change] of changes) {
+        for (const [property, value] of change.properties) {
+          const original = edits.get(element)?.get(property);
+          if (original) { original.value = value.value; original.priority = value.priority; }
+        }
+        for (const [name, value] of change.attributes) {
+          const original = attributes.get(element)?.get(name);
+          if (original) original.value = value;
+        }
+        if (change.stylePresent !== undefined && originalStylePresence.has(element)) {
+          originalStylePresence.set(element, change.stylePresent);
+        }
+      }
+    };
     const capture = (roots, options) => withMeasurements(() => captureBaseline(roots, options));
     const repair = () => withMeasurements(repairLayout);
-    return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, canRefreshRegion, withRegion,
+    return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, canRefreshRegion, withRegion, adoptAuthorChanges,
       refresh: (roots) => { capture(roots); repair(); } });
   };
 

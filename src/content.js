@@ -66,11 +66,20 @@
   let pendingRegions = null;
   let queuedGlobalRefresh = false;
   let authorStylesheetSnapshot = null;
+  let nativeStateSnapshot = null;
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
   let counterContext = null;
   let layout = null;
+  const NO_ATTRIBUTE_MUTATION = () => null;
+  let regionalMutationWitness = null;
+  const beginAttributeMutation = (element, name) => regionalMutationWitness?.begin(element, name) ?? NO_ATTRIBUTE_MUTATION;
+  const mutateAttribute = (element, name, callback) => {
+    const finish = beginAttributeMutation(element, name);
+    try { return callback(); } finally { finish(); }
+  };
+  const mutationStyle = document.createElement("span").style;
   let lastRefreshError = null;
   let warnedRefreshError = null;
   let revealedAutoContent = new WeakSet();
@@ -459,17 +468,27 @@
   const setAttribute = (element, name, value) => {
     const state = manage(element);
     if (!state.attributes.has(name)) state.attributes.set(name, element.getAttribute(name));
+    const finish = beginAttributeMutation(element, name);
     element.setAttribute(name, value);
+    finish();
   };
   const setProperty = (element, name, value, priority = "") => {
     const state = manage(element);
     if (!state.properties.has(name)) state.properties.set(name, {
       value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name)
     });
+    const finish = beginAttributeMutation(element, "style");
     element.style.setProperty(name, value, priority);
+    const applied = finish();
     const property = state.properties.get(name);
-    property.appliedValue = element.style.getPropertyValue(name);
-    property.appliedPriority = element.style.getPropertyPriority(name);
+    if (applied === null) {
+      property.appliedValue = element.style.getPropertyValue(name);
+      property.appliedPriority = element.style.getPropertyPriority(name);
+    } else {
+      mutationStyle.cssText = applied.value ?? "";
+      property.appliedValue = mutationStyle.getPropertyValue(name);
+      property.appliedPriority = mutationStyle.getPropertyPriority(name);
+    }
   };
   // Compare author declarations, not the temporary typography overrides a
   // framework may remove when it reapplies its style prop. Restoring an
@@ -625,7 +644,7 @@
           property.value = value;
           property.priority = priority;
         }
-        element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+        mutateAttribute(element, "style", () => element.style.setProperty(name, property.appliedValue, property.appliedPriority));
       }
     }
     for (const [sheet, indices] of retainedStyleRules) {
@@ -637,8 +656,10 @@
     managedElements.forEach((state, element) => {
       if (!ownsElement(element)) return;
       const restoreAttribute = (value, name) => {
-        if (value === null) element.removeAttribute(name);
-        else element.setAttribute(name, value);
+        mutateAttribute(element, name, () => {
+          if (value === null) element.removeAttribute(name);
+          else element.setAttribute(name, value);
+        });
       };
       state.attributes.forEach((value, name) => {
         if (!transitionAttributes.includes(name)) restoreAttribute(value, name);
@@ -652,8 +673,10 @@
           property.priority = element.style.getPropertyPriority(name);
         }
         const { value, priority } = property;
-        if (value) element.style.setProperty(name, value, priority);
-        else element.style.removeProperty(name);
+        mutateAttribute(element, "style", () => {
+          if (value) element.style.setProperty(name, value, priority);
+          else element.style.removeProperty(name);
+        });
       };
       state.properties.forEach((property, name) => {
         if (name !== "transition-property") restoreProperty(property, name);
@@ -685,7 +708,7 @@
       for (const name of transitionAttributes) {
         if (state.attributes.has(name)) restoreAttribute(state.attributes.get(name), name);
       }
-      if (!state.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+      if (!state.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
     }
     for (const { element } of restorations) managedElements.delete(element);
     if (scope === null) {
@@ -1019,9 +1042,9 @@
     }
     // Read every scroll offset before changing styles; interleaving these
     // writes with geometry reads forces layout repeatedly on dashboard pages.
-    if (!protection.editorOwned(document.documentElement)) rootStyle.setProperty("overflow-anchor", "none", "important");
-    if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
-    for (const element of nestedScrollers.keys()) element.style.setProperty("overflow-anchor", "none", "important");
+    if (!protection.editorOwned(document.documentElement)) mutateAttribute(document.documentElement, "style", () => rootStyle.setProperty("overflow-anchor", "none", "important"));
+    if (bodyScroll) mutateAttribute(body, "style", () => body.style.setProperty("overflow-anchor", "none", "important"));
+    for (const element of nestedScrollers.keys()) mutateAttribute(element, "style", () => element.style.setProperty("overflow-anchor", "none", "important"));
     let refreshError = null;
     try {
       callback();
@@ -1042,21 +1065,27 @@
           const element = originalElement.isConnected ? originalElement : position.table?.parentElement;
           if (!element?.isConnected || (position.table && !element.matches("[data-lexend-layout-repair~='scroll-table']"))) return;
           element.scrollTo({ left: position.x, top: position.y, behavior: "instant" });
-          if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
-          else element.style.removeProperty("overflow-anchor");
-          if (!position.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+          mutateAttribute(element, "style", () => {
+            if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
+            else element.style.removeProperty("overflow-anchor");
+          });
+          if (!position.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
         });
         window.scrollTo({ left: scrollPosition.x, top: scrollPosition.y, behavior: "instant" });
         if (bodyScroll && body.isConnected) {
           body.scrollTo({ left: bodyScroll.x, top: bodyScroll.y, behavior: "instant" });
-          if (bodyScroll.value) body.style.setProperty("overflow-anchor", bodyScroll.value, bodyScroll.priority);
-          else body.style.removeProperty("overflow-anchor");
-          if (!bodyScroll.hadStyle && !body.getAttribute("style")) body.removeAttribute("style");
+          mutateAttribute(body, "style", () => {
+            if (bodyScroll.value) body.style.setProperty("overflow-anchor", bodyScroll.value, bodyScroll.priority);
+            else body.style.removeProperty("overflow-anchor");
+          });
+          if (!bodyScroll.hadStyle && !body.getAttribute("style")) mutateAttribute(body, "style", () => body.removeAttribute("style"));
         }
         if (!protection.editorOwned(document.documentElement)) {
-          if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
-          else rootStyle.removeProperty("overflow-anchor");
-          if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) document.documentElement.removeAttribute("style");
+          mutateAttribute(document.documentElement, "style", () => {
+            if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
+            else rootStyle.removeProperty("overflow-anchor");
+          });
+          if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) mutateAttribute(document.documentElement, "style", () => document.documentElement.removeAttribute("style"));
         }
         // An already focused action does not emit focusin again when its pane
         // grows. Recheck its repaired vertical viewport after restoring saved
@@ -1087,12 +1116,44 @@
   const snapshotAuthorStylesheets = () => {
     try {
       const records = [];
+      const staticPseudos = new Set(["root", "scope", "empty", "first-child", "last-child", "only-child",
+        "first-of-type", "last-of-type", "only-of-type", "nth-child", "nth-last-child", "nth-of-type", "nth-last-of-type",
+        "is", "where", "not", "has", "host", "host-context"]);
+      const staticElements = new Set(["before", "after", "slotted"]);
+      const staticSelector = (selector) => {
+        if (selector.includes("\\") || selector.includes("&")) return false;
+        let known = true;
+        const rest = selector.replace(/(::?)([-a-zA-Z_][-a-zA-Z_0-9]*)/g, (token, prefix, name) => {
+          const allowed = prefix === "::" ? staticElements : staticPseudos;
+          if (!allowed.has(name.toLowerCase())) known = false;
+          return "";
+        });
+        return known && !rest.includes(":");
+      };
+      const staticDeclarations = (cssText) => {
+        if (cssText.includes("\\")) return false;
+        for (const match of cssText.matchAll(/\bvar\s*\(\s*([^,\s)]+)/gi)) {
+          if (!/^--lexend-[a-zA-Z0-9_-]+$/.test(match[1])) return false;
+        }
+        return true;
+      };
       const serializeRules = (rules) => [...rules].map((rule) => {
-        if (rule.type === 3) throw new Error("Imported stylesheets require a full capture.");
+        const layer = ["CSSLayerBlockRule", "CSSLayerStatementRule"].includes(rule.constructor.name);
+        if (![1, 4, 5, 12].includes(rule.type) && !layer) throw new Error("Unsupported stylesheet rules require a full capture.");
+        if (rule.type === 1 && !staticSelector(rule.selectorText)) throw new Error("Stateful selectors require a full capture.");
+        if (rule.style && !staticDeclarations(rule.style.cssText)) throw new Error("Author variables require a full capture.");
         const media = rule.type === 4 ? String(matchMedia(rule.conditionText).matches) : "";
-        return [rule.cssText, media, rule.cssRules ? serializeRules(rule.cssRules) : ""];
+        const supports = rule.type === 12 ? String(CSS.supports(rule.conditionText)) : "";
+        return [rule.cssText, media, supports, rule.cssRules ? serializeRules(rule.cssRules) : ""];
       });
       for (const root of new Set([document, ...[...styledRoots].filter((root) => root instanceof ShadowRoot)])) {
+        // Manual slot assignment can change another component's composed tree
+        // without a DOM mutation. Keep pages containing slots on full capture.
+        if (root instanceof ShadowRoot && root.querySelector("slot")) return null;
+        for (const element of root.querySelectorAll("[style]")) {
+          const declarations = JSON.parse(authorStyleSignature(element, element.getAttribute("style")));
+          if (declarations.some(([, value]) => !staticDeclarations(value))) return null;
+        }
         const sheets = root === document ? [...document.styleSheets]
           : [...root.querySelectorAll("style,link[rel~='stylesheet']")].map((element) => element.sheet);
         sheets.push(...(root.adoptedStyleSheets ?? []));
@@ -1107,6 +1168,44 @@
       }
       return records;
     } catch { return null; }
+  };
+  const snapshotNativeState = () => {
+    try {
+      const focus = [];
+      for (let element = document.activeElement; element; element = element.shadowRoot?.activeElement) focus.push(element);
+      const controls = [], topLayer = [];
+      const validityFlags = ["badInput", "customError", "patternMismatch", "rangeOverflow", "rangeUnderflow", "stepMismatch",
+        "tooLong", "tooShort", "typeMismatch", "valid", "valueMissing"];
+      for (const root of new Set([document, ...[...styledRoots].filter((root) => root instanceof ShadowRoot)])) {
+        for (const element of root.querySelectorAll(":popover-open,:modal,:fullscreen")) topLayer.push(element);
+        for (const element of root.querySelectorAll("input,textarea,select,option,button,fieldset,output")) {
+          controls.push({ element, form: element.form, value: JSON.stringify([
+            element.value, element.defaultValue, element.checked, element.defaultChecked, element.indeterminate,
+            element.selected, element.defaultSelected, element.selectedIndex, element.disabled, element.readOnly,
+            element.required, element.multiple, element.type, element.willValidate, element.selectionStart,
+            element.selectionEnd, element.selectionDirection,
+            element.validity ? validityFlags.map((name) => element.validity[name]) : null
+          ]) });
+        }
+      }
+      if (!document.fonts?.[Symbol.iterator]) return null;
+      const fontDescriptors = ["family", "style", "weight", "stretch", "unicodeRange", "variant", "featureSettings",
+        "variationSettings", "display", "ascentOverride", "descentOverride", "lineGapOverride", "sizeAdjust", "status"];
+      const fonts = [...document.fonts].map((face) => ({ face, value: JSON.stringify(fontDescriptors.map((name) => face[name])) }));
+      return { url: location.href, focus, topLayer, controls, fonts, fontStatus: document.fonts.status };
+    } catch { return null; }
+  };
+  const nativeStateUnchanged = () => {
+    if (nativeStateSnapshot === null) return false;
+    const current = snapshotNativeState(), previous = nativeStateSnapshot;
+    return current !== null && current.url === previous.url && current.fontStatus === previous.fontStatus
+      && current.focus.length === previous.focus.length && current.focus.every((element, index) => element === previous.focus[index])
+      && current.topLayer.length === previous.topLayer.length && current.topLayer.every((element, index) => element === previous.topLayer[index])
+      && current.controls.length === previous.controls.length && current.controls.every((record, index) =>
+        record.element === previous.controls[index].element && record.form === previous.controls[index].form
+          && record.value === previous.controls[index].value)
+      && current.fonts.length === previous.fonts.length && current.fonts.every((record, index) =>
+        record.face === previous.fonts[index].face && record.value === previous.fonts[index].value);
   };
   const authorStylesheetsUnchanged = () => {
     if (authorStylesheetSnapshot === null) return false;
@@ -1165,6 +1264,7 @@
       if (!regional) {
         authorStylesheetSnapshot = [...styledRoots].some((root) => root instanceof ShadowRoot && canRefreshRegion(root))
           ? snapshotAuthorStylesheets() : null;
+        nativeStateSnapshot = authorStylesheetSnapshot === null ? null : snapshotNativeState();
         revealedAutoContent = new WeakSet();
         for (const [target, skipped] of knownAutoContent) {
           if (!target.isConnected) { knownAutoContent.delete(target); continue; }
@@ -1191,6 +1291,7 @@
     pendingStateChanges.clear();
     clearPendingRegions();
     authorStylesheetSnapshot = null;
+    nativeStateSnapshot = null;
     if (refreshing || !document.documentElement) return;
     const started = performance.now();
     cancelPendingRepair();
@@ -1270,11 +1371,156 @@
       repairFrame = requestAnimationFrame(() => pendingRepair?.());
     });
   };
+  const createRegionalMutationWitness = (roots) => {
+    const records = [], expected = new WeakSet(), changes = new Map();
+    const outsideAttributes = new Map(), outsideText = new Map();
+    const scopes = new Set(roots);
+    let processed = 0, unexpectedInternal = false, outsideStructure = false;
+    const append = (batch) => { for (const record of batch) records.push(record); };
+    const witness = new MutationObserver(append);
+    const options = { subtree: true, childList: true, characterData: true,
+      characterDataOldValue: true, attributes: true, attributeOldValue: true };
+    witness.observe(document, options);
+    for (const root of styledRoots) if (root instanceof ShadowRoot) witness.observe(root, options);
+    const drain = () => append(witness.takeRecords());
+    const attributeValue = (record) => record.attributeNamespace === null
+      ? record.target.getAttribute(record.attributeName)
+      : record.target.getAttributeNS(record.attributeNamespace, record.attributeName);
+    const attributeKey = (record) => `${record.attributeNamespace ?? ""}\u0000${record.attributeName}`;
+    const changeFor = (element) => {
+      if (!changes.has(element)) changes.set(element, { properties: new Map(), attributes: new Map(), stylePresent: undefined });
+      return changes.get(element);
+    };
+    const beforeStyle = document.createElement("span").style;
+    const afterStyle = document.createElement("span").style;
+    const process = () => {
+      drain();
+      const batch = records.slice(processed), after = new Map(), tails = new Map();
+      for (let index = batch.length - 1; index >= 0; index--) {
+        const record = batch[index];
+        if (record.type !== "attributes" && record.type !== "characterData") continue;
+        let values = tails.get(record.target);
+        if (!values) tails.set(record.target, values = new Map());
+        const key = record.type === "attributes" ? attributeKey(record) : "text";
+        after.set(record, values.has(key) ? values.get(key)
+          : record.type === "attributes" ? attributeValue(record) : record.target.data);
+        values.set(key, record.oldValue);
+      }
+      for (const record of batch) {
+        if (expected.has(record)) continue;
+        const internal = scopes.has(record.target.getRootNode());
+        if (internal) unexpectedInternal = true;
+        else if (record.type === "childList") outsideStructure = true;
+        if (record.type === "attributes") {
+          const value = after.get(record);
+          if (!internal) {
+            let attributes = outsideAttributes.get(record.target);
+            if (!attributes) outsideAttributes.set(record.target, attributes = new Map());
+            const key = attributeKey(record);
+            if (!attributes.has(key)) attributes.set(key, { record, before: record.oldValue, after: value });
+            else attributes.get(key).after = value;
+          }
+          if (record.attributeNamespace !== null) continue;
+          const change = changeFor(record.target);
+          if (record.attributeName !== "style") change.attributes.set(record.attributeName, value);
+          else {
+            beforeStyle.cssText = record.oldValue ?? "";
+            afterStyle.cssText = value ?? "";
+            for (const name of new Set([...beforeStyle, ...afterStyle])) {
+              const next = { value: afterStyle.getPropertyValue(name), priority: afterStyle.getPropertyPriority(name) };
+              if (beforeStyle.getPropertyValue(name) !== next.value || beforeStyle.getPropertyPriority(name) !== next.priority) {
+                change.properties.set(name, next);
+              }
+            }
+            change.stylePresent = value !== null;
+          }
+        } else if (record.type === "characterData" && !internal) {
+          if (!outsideText.has(record.target)) outsideText.set(record.target, { before: record.oldValue, after: after.get(record) });
+          else outsideText.get(record.target).after = after.get(record);
+        }
+      }
+      processed = records.length;
+    };
+    const inspect = () => {
+      process();
+      const changedAttributes = [...outsideAttributes.values()].some((attributes) => [...attributes.values()].some(({ before, after }) =>
+        before !== after));
+      return { changes, unexpected: unexpectedInternal || outsideStructure || changedAttributes
+        || [...outsideText.values()].some(({ before, after }) => before !== after) };
+    };
+    return {
+      begin(element, name) {
+        drain();
+        const index = records.length, oldValue = element.getAttribute(name);
+        return () => {
+          drain();
+          const first = records[index];
+          if (first?.type === "attributes" && first.target === element && first.attributeNamespace === null
+              && first.attributeName === name && first.oldValue === oldValue) expected.add(first);
+          const next = records.slice(index + 1).find((record) => record.type === "attributes" && record.target === element
+            && record.attributeNamespace === null && record.attributeName === name);
+          return { value: next ? next.oldValue : element.getAttribute(name) };
+        };
+      },
+      inspect,
+      stop() { try { drain(); } finally { witness.disconnect(); } }
+    };
+  };
+  const adoptAuthoredChanges = (changes) => {
+    for (const [element, change] of changes) {
+      const state = managedElements.get(element);
+      if (!state) continue;
+      if (change.stylePresent !== undefined) state.hadStyle = change.stylePresent;
+      for (const [name, value] of change.properties) {
+        const property = state.properties.get(name);
+        if (property) { property.value = value.value; property.priority = value.priority; }
+      }
+      for (const [name, value] of change.attributes) if (state.attributes.has(name)) state.attributes.set(name, value);
+    }
+    layout.adoptAuthorChanges(changes);
+  };
+  const preserveWitnessAuthorChanges = (witness) => {
+    let { changes } = witness.inspect();
+    adoptAuthoredChanges(changes);
+    // Replay declaration deltas rather than whole historical cssText, retaining
+    // unrelated current declarations and any newer callback writes. New keys
+    // produced by replay callbacks already exist in the live DOM; ownership is
+    // updated again below before the full restore can remove those values.
+    const targets = [...changes].map(([element, change]) => ({ element,
+      properties: [...change.properties.keys()], attributes: [...change.attributes.keys()] }));
+    try {
+      for (const { element, properties, attributes } of targets) {
+        for (const name of properties) {
+          ({ changes } = witness.inspect());
+          const value = changes.get(element).properties.get(name);
+          if (element.style.getPropertyValue(name) === value.value && element.style.getPropertyPriority(name) === value.priority) continue;
+          mutateAttribute(element, "style", () => {
+            if (value.value) element.style.setProperty(name, value.value, value.priority);
+            else element.style.removeProperty(name);
+          });
+        }
+        for (const name of attributes) {
+          ({ changes } = witness.inspect());
+          const value = changes.get(element).attributes.get(name);
+          if (element.getAttribute(name) === value) continue;
+          mutateAttribute(element, name, () => {
+            if (value === null) element.removeAttribute(name);
+            else element.setAttribute(name, value);
+          });
+        }
+        ({ changes } = witness.inspect());
+        const present = changes.get(element).stylePresent;
+        if (present === true && !element.hasAttribute("style")) mutateAttribute(element, "style", () => element.setAttribute("style", ""));
+        else if (present === false && !element.getAttribute("style") && element.hasAttribute("style")) {
+          mutateAttribute(element, "style", () => element.removeAttribute("style"));
+        }
+      }
+    } finally { adoptAuthoredChanges(witness.inspect().changes); }
+  };
   const refreshChangedRegions = (roots) => {
     const started = performance.now();
-    const eligible = () => document.getAnimations && !document.getAnimations().some((animation) =>
-      animation.playState !== "finished" && animation.playState !== "idle")
-      && authorStylesheetsUnchanged() && roots.every(canRefreshRegion);
+    const eligible = () => document.getAnimations && document.getAnimations().length === 0
+      && authorStylesheetsUnchanged() && nativeStateUnchanged() && roots.every(canRefreshRegion);
     if (!eligible()) { refresh(true, performance.now() - started); return; }
     refreshTimer = null;
     refreshUrgent = false;
@@ -1283,26 +1529,39 @@
     pendingStyleChanges.clear();
     pendingStateChanges.clear();
     clearPendingRegions();
-    const error = withViewportPreserved(() => {
-      // A queued deadline may follow another page task. Recheck every boundary
-      // immediately before restoring any ownership, not merely at delivery.
-      if (!eligible()) throw new Error("The changed region no longer has an isolated layout boundary.");
-      for (const root of roots) {
-        const host = root.host, before = host.getBoundingClientRect();
-        layout.withRegion(root, () => {
-          layout.restore({ preserveHidden: true });
-          clearTypography(root);
-          const measurements = measureTypography([root]);
-          layout.capture([root], { preserveHidden: true });
-          applyTypography(measurements, false, [root]);
-          layout.repair(settings);
-        });
-        const after = host.getBoundingClientRect();
-        if (["left", "top", "width", "height"].some((name) => Math.abs(after[name] - before[name]) > 0.01)) {
-          throw new Error("A changed region altered its outer layout boundary.");
+    const witness = createRegionalMutationWitness(roots);
+    regionalMutationWitness = witness;
+    let error;
+    try {
+      error = withViewportPreserved(() => {
+        // A queued deadline may follow another page task. Recheck every boundary
+        // immediately before restoring any ownership, not merely at delivery.
+        if (!eligible()) throw new Error("The changed region no longer has an isolated layout boundary.");
+        for (const root of roots) {
+          const host = root.host, before = host.getBoundingClientRect();
+          layout.withRegion(root, () => {
+            layout.restore({ preserveHidden: true });
+            clearTypography(root);
+            const measurements = measureTypography([root]);
+            layout.capture([root], { preserveHidden: true });
+            applyTypography(measurements, false, [root]);
+            layout.repair(settings);
+          });
+          const after = host.getBoundingClientRect();
+          if (["left", "top", "width", "height"].some((name) => Math.abs(after[name] - before[name]) > 0.01)) {
+            throw new Error("A changed region altered its outer layout boundary.");
+          }
         }
+      });
+      if (!error && (witness.inspect().unexpected || !eligible())) {
+        error = new Error("Author callbacks changed the regional transaction.");
       }
-    });
+      if (error) preserveWitnessAuthorChanges(witness);
+    } catch (failure) { error = failure; }
+    finally {
+      try { witness.stop(); } catch (failure) { error ??= failure; }
+      finally { regionalMutationWitness = null; }
+    }
     // Scoped state is kept in the shared layout owner even when repair throws,
     // so the ordinary transaction can restore it and recapture the full page.
     if (error) { refresh(true, performance.now() - started); return; }
@@ -1559,7 +1818,8 @@
       return;
     }
     const regionalRoots = regionalMutationRoots(needsRefresh);
-    if (regionalRoots) { queueRefresh(true, null, null, null, regionalRoots); return; }
+    // Coalesce tokens on a fixed deadline even when each local repair is cheap.
+    if (regionalRoots) { queueRefresh(false, null, null, null, regionalRoots); return; }
     const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes");
     invalidateAutoContent(needsRefresh.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
       coalescible ? needsRefresh.filter(mutation => mutation.attributeName === "aria-hidden") : null,
@@ -1567,7 +1827,7 @@
       coalescible ? needsRefresh.filter(mutation => !["style", "aria-hidden"].includes(mutation.attributeName)) : null);
   });
   const start = async () => {
-    layout = globalThis.LexendLayout?.create({ getTextElements: collectTextElements }) ?? null;
+    layout = globalThis.LexendLayout?.create({ getTextElements: collectTextElements, beginAttributeMutation }) ?? null;
     window.addEventListener("pageshow", async (event) => {
       if (!event.persisted || initializing) return;
       // Cached documents may miss storage events while frozen. Read current

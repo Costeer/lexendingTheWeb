@@ -174,15 +174,29 @@ and owns no converted ancestor typography or layout constraints. This first
 regional path accepts only edits to existing nonempty text nodes. It retains
 the other regions' typography and repairs, and restores only the changed
 component before measuring and repairing it again.
+Regional text updates share the existing fixed 100 ms coalescing deadline.
+Later edits do not postpone it, and urgent global changes can replace it with
+an immediate full-page pass.
 
-Slots, light children, nested shadow trees, editing/protected surfaces and
-automatic directionality disqualify the component. Structural and attribute
+Slots in any discovered shadow tree, light children, nested shadow trees,
+editing/protected surfaces and automatic directionality disqualify the
+component. Structural and attribute
 changes, preferences, fonts, viewport and lifecycle events retain full-page
-invalidation. Unreadable or changed author stylesheets and active animations
-also require a full pass. The boundary is checked again at execution; a repair
-that attempts to write outside it or changes its outer geometry immediately
-falls back to a full capture before painting. Pause and disposal still restore
-all ownership groups.
+invalidation. Unreadable or changed stylesheets and animations, including
+finished filled effects, also require a full pass. Stateful or unsupported
+selectors and stylesheet rules disqualify regional repair; author custom
+property dependencies also retain full capture. This is deliberately narrower
+than CSS containment alone.
+
+A temporary mutation witness distinguishes Lexend's own attribute writes from
+synchronous page reactions. Unexpected mutations, changes to native form
+values, focus, URL or font state, an outside write or changed host geometry
+immediately return to full capture before painting. Author declaration changes
+are reconciled with both ownership ledgers before fallback, including priority
+and empty style-attribute presence. Pause and disposal still restore all
+ownership groups. This certificate covers the supported DOM, stylesheet and
+native-state dependencies; it is not an isolation mechanism for arbitrary page
+JavaScript.
 
 Ordinary document subtrees and shadow roots without these isolation guarantees
 continue to use full-page repair. The standard reading and conversation
