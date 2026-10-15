@@ -1140,9 +1140,14 @@
     };
     const repairPanels = () => {
       for (const [panel, before] of baseline) {
+        if (editorOwned(panel)) continue;
+        const modal = panel.matches("dialog,[role='dialog'],[aria-modal='true']");
+        // Most captured text belongs to ordinary flow, not a viewport panel.
+        // Earlier repairs can change position through author :has() rules.
+        const position = styleFor(panel).position;
+        if (!modal && position !== "fixed" && !(window !== window.top && position === "absolute")) continue;
         const now = snapshot(panel, true);
         if (!now) continue;
-        const modal = panel.matches("dialog,[role='dialog'],[aria-modal='true']");
         if (!modal && before.box.width >= innerWidth * 0.9 && before.box.height >= innerHeight * 0.9
             && !before.texts.length && panel.querySelector("dialog,[role='dialog'],[aria-modal='true']")) continue;
         // Embedded consent applications often mount an absolute panel without
