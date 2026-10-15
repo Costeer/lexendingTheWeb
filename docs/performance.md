@@ -166,8 +166,28 @@ gate or prove a latency improvement.
 Any region or scroll-owner cache must retain global fallback when selector,
 geometry, font, or lifecycle dependencies are uncertain. CSS containment alone
 does not rule out ancestor selectors or a protected subtree moving neighboring
-content. A production optimization depends on complete lifecycle invalidation
-and disposal; this measurement change does not narrow runtime invalidation.
+content.
+
+Automatic repairs can stay inside an existing open shadow component when its
+host has size, layout, style and paint containment, scrolls overflowing content,
+and owns no converted ancestor typography or layout constraints. This first
+regional path accepts only edits to existing nonempty text nodes. It retains
+the other regions' typography and repairs, and restores only the changed
+component before measuring and repairing it again.
+
+Slots, light children, nested shadow trees, editing/protected surfaces and
+automatic directionality disqualify the component. Structural and attribute
+changes, preferences, fonts, viewport and lifecycle events retain full-page
+invalidation. Unreadable or changed author stylesheets and active animations
+also require a full pass. The boundary is checked again at execution; a repair
+that attempts to write outside it or changes its outer geometry immediately
+falls back to a full capture before painting. Pause and disposal still restore
+all ownership groups.
+
+Ordinary document subtrees and shadow roots without these isolation guarantees
+continue to use full-page repair. The standard reading and conversation
+benchmarks exercise that fallback; a separate isolated-component measurement
+is needed to assess the narrower regional benefit.
 
 ## Runtime design and previous measurements
 

@@ -63,6 +63,9 @@
   const pendingAriaChanges = new Map();
   const pendingStyleChanges = new Map();
   const pendingStateChanges = new Map();
+  let pendingRegions = null;
+  let queuedGlobalRefresh = false;
+  let authorStylesheetSnapshot = null;
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
@@ -607,11 +610,13 @@
       } catch { /* Do not trust unrelated malformed page attributes. */ }
     }
   };
-  const clearTypography = () => {
+  const clearTypography = (scope = null) => {
+    const ownsElement = (element) => scope === null || element.getRootNode() === scope;
     // Preserve font-transition guards while removing a contested element's
     // stylesheet fallback. Otherwise releasing that rule can animate toward
     // the native font and make the next capture measure an intermediate size.
     if (retainedStyleRules.size) for (const [element, state] of managedElements) {
+      if (!ownsElement(element)) continue;
       if (!state.retainedStyle) continue;
       for (const [name, property] of state.properties) {
         if (!name.startsWith("transition-")) continue;
@@ -624,11 +629,13 @@
       }
     }
     for (const [sheet, indices] of retainedStyleRules) {
+      if (scope !== null && sheet !== scope.querySelector(`#${STYLE_ID}`)?.sheet) continue;
       for (const index of indices.reverse()) sheet.deleteRule(index);
+      retainedStyleRules.delete(sheet);
     }
-    retainedStyleRules.clear();
     const restorations = [];
     managedElements.forEach((state, element) => {
+      if (!ownsElement(element)) return;
       const restoreAttribute = (value, name) => {
         if (value === null) element.removeAttribute(name);
         else element.setAttribute(name, value);
@@ -680,10 +687,12 @@
       }
       if (!state.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
     }
-    managedElements.clear();
-    authorFontFamilies.clear();
-    eligibleTextRoots.clear();
-    transitionRules.clear();
+    for (const { element } of restorations) managedElements.delete(element);
+    if (scope === null) {
+      authorFontFamilies.clear();
+      eligibleTextRoots.clear();
+      transitionRules.clear();
+    } else eligibleTextRoots.delete(scope);
   };
   const typographyTransitionProperties = new Set([
     "font", "font-family", "font-size", "line-height", "letter-spacing", "font-stretch", "font-variation-settings"
@@ -779,7 +788,7 @@
     }
     return measurements;
   };
-  const applyTypography = (measurements, fontOnly = false) => {
+  const applyTypography = (measurements, fontOnly = false, roots = styledRoots) => {
     measurements.forEach(({ typography, pseudos }) => {
       for (const values of [typography, ...pseudos.map(({ typography }) => typography)]) {
         if (values.transition !== null && !transitionRules.has(values.transition.property)) {
@@ -798,7 +807,7 @@
     `).join("\n");
     // These declarations stay enabled during baseline measurement so temporary
     // typography removal cannot restart the page's original font transitions.
-    styledRoots.forEach((root) => {
+    roots.forEach((root) => {
       let style = root.querySelector(`#${TRANSITION_STYLE_ID}`);
       if (!style) { style = document.createElement("style"); style.id = TRANSITION_STYLE_ID; root.append(style); }
       if (style.textContent !== transitionCss) style.textContent = transitionCss;
@@ -1068,7 +1077,77 @@
     const finished = performance.now();
     nextRefreshTime = finished + (duration > 50 ? duration * 4 : 0);
   };
-  const completeRefresh = (refreshError, completedConversion = true, duration = 0) => {
+  const clearPendingRegions = () => {
+    pendingRegions = null;
+    queuedGlobalRefresh = false;
+  };
+  // CSS containment does not isolate selectors. Only a closed layout surface
+  // inside an open shadow tree can qualify, and any unobservable stylesheet
+  // change must first return the page to the normal full capture.
+  const snapshotAuthorStylesheets = () => {
+    try {
+      const records = [];
+      const serializeRules = (rules) => [...rules].map((rule) => {
+        if (rule.type === 3) throw new Error("Imported stylesheets require a full capture.");
+        const media = rule.type === 4 ? String(matchMedia(rule.conditionText).matches) : "";
+        return [rule.cssText, media, rule.cssRules ? serializeRules(rule.cssRules) : ""];
+      });
+      for (const root of new Set([document, ...[...styledRoots].filter((root) => root instanceof ShadowRoot)])) {
+        const sheets = root === document ? [...document.styleSheets]
+          : [...root.querySelectorAll("style,link[rel~='stylesheet']")].map((element) => element.sheet);
+        sheets.push(...(root.adoptedStyleSheets ?? []));
+        for (const sheet of sheets) {
+          // The page can mutate our sheets too; an element ID is not an
+          // ownership guarantee and must never exempt CSSOM from this check.
+          if (!sheet) return null;
+          const media = sheet.media?.mediaText ?? "";
+          records.push({ root, sheet, value: JSON.stringify([sheet.disabled, media,
+            media ? matchMedia(media).matches : true, serializeRules(sheet.cssRules)]) });
+        }
+      }
+      return records;
+    } catch { return null; }
+  };
+  const authorStylesheetsUnchanged = () => {
+    if (authorStylesheetSnapshot === null) return false;
+    const current = snapshotAuthorStylesheets();
+    return current !== null && current.length === authorStylesheetSnapshot.length
+      && current.every((record, index) => record.root === authorStylesheetSnapshot[index].root
+        && record.sheet === authorStylesheetSnapshot[index].sheet && record.value === authorStylesheetSnapshot[index].value);
+  };
+  const canRefreshRegion = (root) => {
+    if (!(root instanceof ShadowRoot) || root.host.shadowRoot !== root || !styledRoots.has(root)
+        || !root.host.isConnected || window !== window.top) return false;
+    const host = root.host;
+    if (host.childNodes.length || protection.editorOwned(host) || protection.protected(host)) return false;
+    const css = getComputedStyle(host), containment = new Set(css.contain.split(/\s+/));
+    if (!(containment.has("strict") || ["size", "layout", "style", "paint"].every((value) => containment.has(value)))
+        || !["block", "flow-root"].includes(css.display) || !["static", "relative"].includes(css.position)
+        || ![css.overflowX, css.overflowY].every((value) => ["auto", "scroll"].includes(value))
+        || css.display === "none" || css.visibility !== "visible" || Number(css.opacity) === 0
+        || !host.getClientRects().length || host.checkVisibility && !host.checkVisibility({ contentVisibilityAuto: true })) return false;
+    for (let current = host; current; current = composedParent(current)) {
+      if (managedElements.has(current) || current.matches("[dir='auto' i],bdi")) return false;
+    }
+    if (root.querySelector(`slot,iframe,frame,bdi,[dir='auto' i],${protection.editorSelector},${protection.semanticSelector}`)) return false;
+    for (const element of root.querySelectorAll("*")) if (element.shadowRoot) return false;
+    return layout?.canRefreshRegion?.(root) === true;
+  };
+  const regionalMutationRoots = (mutations) => {
+    if (!mutations.length || initializing || refreshing || restoringChanges !== null || pendingRepair !== null
+        || repairFrame !== null || refreshRevision === 0 || lastRefreshError !== null || !settingsLoaded) return null;
+    const roots = new Set();
+    for (const mutation of mutations) {
+      if (mutation.type !== "characterData" || !mutation.oldValue?.trim() || !mutation.target.data.trim()
+          || !managedElements.has(mutation.target.parentElement)) return null;
+      const root = mutation.target.getRootNode();
+      if (!(root instanceof ShadowRoot) || !styledRoots.has(root)) return null;
+      roots.add(root);
+    }
+    return roots;
+  };
+  const completeRefresh = (refreshError, completedConversion = true, duration = 0, regional = false) => {
+    const completionStarted = performance.now();
     if (refreshError) {
       lastRefreshError = refreshError instanceof Error ? refreshError.message : String(refreshError);
       if (warnedRefreshError !== lastRefreshError) {
@@ -1083,29 +1162,35 @@
       // to a subtree that has since been skipped. Only painted subtrees have
       // a valid baseline from this refresh; returning to an omitted subtree
       // must trigger another capture even without an author mutation/resize.
-      revealedAutoContent = new WeakSet();
-      for (const [target, skipped] of knownAutoContent) {
-        if (!target.isConnected) { knownAutoContent.delete(target); continue; }
-        const child = target.firstElementChild;
-        const painted = child?.checkVisibility
-          ? child.checkVisibility({ contentVisibilityAuto: true }) : !skipped;
-        if (painted) revealedAutoContent.add(target);
+      if (!regional) {
+        authorStylesheetSnapshot = [...styledRoots].some((root) => root instanceof ShadowRoot && canRefreshRegion(root))
+          ? snapshotAuthorStylesheets() : null;
+        revealedAutoContent = new WeakSet();
+        for (const [target, skipped] of knownAutoContent) {
+          if (!target.isConnected) { knownAutoContent.delete(target); continue; }
+          const child = target.firstElementChild;
+          const painted = child?.checkVisibility
+            ? child.checkVisibility({ contentVisibilityAuto: true }) : !skipped;
+          if (painted) revealedAutoContent.add(target);
+        }
       }
       notifyFrameRequirement();
     }
     // Large pages can spend hundreds of milliseconds in a full repair. Give
     // the site four times that duration to handle input and paint before the
     // next automatic pass. Incoming text receives its font independently.
-    budgetRefresh(duration);
+    budgetRefresh(duration + performance.now() - completionStarted);
     notifyState();
   };
-  const refresh = (preserveHidden = false) => {
+  const refresh = (preserveHidden = false, priorDuration = 0) => {
     refreshTimer = null;
     refreshUrgent = false;
     refreshRequired = false;
     pendingAriaChanges.clear();
     pendingStyleChanges.clear();
     pendingStateChanges.clear();
+    clearPendingRegions();
+    authorStylesheetSnapshot = null;
     if (refreshing || !document.documentElement) return;
     const started = performance.now();
     cancelPendingRepair();
@@ -1165,7 +1250,7 @@
         else deferred = true;
       }
     });
-    const duration = performance.now() - started;
+    const duration = priorDuration + performance.now() - started;
     repairSynchronously = false;
     if (error || !deferred) { completeRefresh(error, true, duration); return; }
     refreshRevision++;
@@ -1185,6 +1270,44 @@
       repairFrame = requestAnimationFrame(() => pendingRepair?.());
     });
   };
+  const refreshChangedRegions = (roots) => {
+    const started = performance.now();
+    const eligible = () => document.getAnimations && !document.getAnimations().some((animation) =>
+      animation.playState !== "finished" && animation.playState !== "idle")
+      && authorStylesheetsUnchanged() && roots.every(canRefreshRegion);
+    if (!eligible()) { refresh(true, performance.now() - started); return; }
+    refreshTimer = null;
+    refreshUrgent = false;
+    refreshRequired = false;
+    pendingAriaChanges.clear();
+    pendingStyleChanges.clear();
+    pendingStateChanges.clear();
+    clearPendingRegions();
+    const error = withViewportPreserved(() => {
+      // A queued deadline may follow another page task. Recheck every boundary
+      // immediately before restoring any ownership, not merely at delivery.
+      if (!eligible()) throw new Error("The changed region no longer has an isolated layout boundary.");
+      for (const root of roots) {
+        const host = root.host, before = host.getBoundingClientRect();
+        layout.withRegion(root, () => {
+          layout.restore({ preserveHidden: true });
+          clearTypography(root);
+          const measurements = measureTypography([root]);
+          layout.capture([root], { preserveHidden: true });
+          applyTypography(measurements, false, [root]);
+          layout.repair(settings);
+        });
+        const after = host.getBoundingClientRect();
+        if (["left", "top", "width", "height"].some((name) => Math.abs(after[name] - before[name]) > 0.01)) {
+          throw new Error("A changed region altered its outer layout boundary.");
+        }
+      }
+    });
+    // Scoped state is kept in the shared layout owner even when repair throws,
+    // so the ordinary transaction can restore it and recapture the full page.
+    if (error) { refresh(true, performance.now() - started); return; }
+    completeRefresh(null, true, performance.now() - started, true);
+  };
   const runQueuedRefresh = () => {
     // Responsive navigation can temporarily hide and reveal the same links
     // across separate observer deliveries while measuring them. Restoring
@@ -1197,18 +1320,23 @@
         && authorStyleSignature(element, element.getAttribute("style")) !== value)
       || [...pendingStateChanges].some(([element, names]) => element.isConnected
         && [...names].some(([name, value]) => element.getAttribute(name) !== value)));
-    if (refreshRequired || changed) { refresh(true); return; }
+    if (refreshRequired || changed) {
+      if (!changed && !queuedGlobalRefresh && pendingRegions?.size) refreshChangedRegions([...pendingRegions]);
+      else refresh(true);
+      return;
+    }
     refreshTimer = null;
     refreshUrgent = false;
     pendingAriaChanges.clear();
     pendingStyleChanges.clear();
     pendingStateChanges.clear();
+    clearPendingRegions();
     // A reverted temporary style/accessibility change leaves the saved native
     // baseline valid. Finish its suspended repair without another conversion.
     repairSynchronously = false;
     pendingRepair?.();
   };
-  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null) => {
+  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null, regions = null) => {
     urgent = urgent === true;
     if (refreshing || !settingsLoaded || !isActive()) return;
     if (pendingRepair !== null) {
@@ -1218,6 +1346,13 @@
       // Content/geometry changes invalidate the baseline outright. Temporary
       // author styles can settle back before the queued deadline instead.
       if (!ariaChanges && !styleChanges && !stateChanges) pendingRepair = null;
+    }
+    if (regions && !queuedGlobalRefresh && !ariaChanges && !styleChanges && !stateChanges) {
+      pendingRegions ??= new Set();
+      for (const root of regions) pendingRegions.add(root);
+    } else {
+      queuedGlobalRefresh = true;
+      pendingRegions = null;
     }
     if (ariaChanges) {
       for (const mutation of ariaChanges) {
@@ -1423,6 +1558,8 @@
       refresh();
       return;
     }
+    const regionalRoots = regionalMutationRoots(needsRefresh);
+    if (regionalRoots) { queueRefresh(true, null, null, null, regionalRoots); return; }
     const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes");
     invalidateAutoContent(needsRefresh.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
       coalescible ? needsRefresh.filter(mutation => mutation.attributeName === "aria-hidden") : null,

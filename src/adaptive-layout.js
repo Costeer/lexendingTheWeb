@@ -137,6 +137,35 @@
     const maskedScrollOffsets = new Map();
     const originalStylePresence = new Map();
     let canvas;
+    let region = null;
+    const regionOwns = (element) => region === null || element?.getRootNode() === region.root;
+    const requireRegionOwnership = (element) => {
+      if (!regionOwns(element)) throw new Error("Regional layout repair escaped its shadow root");
+    };
+    // Iteration stays local while geometry helpers retain their existing
+    // read-only ancestor context. In particular, a missing host baseline must
+    // not silently turn an otherwise necessary outer repair into a no-op.
+    const regionalBaseline = (entries = []) => {
+      const scope = region;
+      return new class extends Map {
+        constructor() { super(entries); }
+        get(element) {
+          if (super.has(element)) return super.get(element);
+          if (element === scope.root.host) return scope.hostBaseline;
+          if (element?.getRootNode() === scope.root) return undefined;
+          return scope.previous.baseline.get(element);
+        }
+        has(element) {
+          return super.has(element) || (element === scope.root.host && scope.hostBaseline !== null)
+            || element?.getRootNode() !== scope.root && scope.previous.baseline.has(element);
+        }
+        set(element, state) {
+          if (element === scope.root.host) { scope.hostBaseline = state; return this; }
+          requireRegionOwnership(element);
+          return super.set(element, state);
+        }
+      }();
+    };
     // Repeated repair stages read the same boxes and ancestor styles. Reuse
     // them only within this synchronous pass, and discard every measurement
     // after any write: a child can change its siblings or a :has() ancestor.
@@ -208,6 +237,7 @@
       return cache.get(element);
     };
     const write = (element, property, value, category) => {
+      requireRegionOwnership(element);
       if (editorOwned(element)) return;
       let properties = edits.get(element);
       if (!properties) {
@@ -251,6 +281,7 @@
       write(element, property, value, "bounded-panel");
     };
     const mark = (element, name, value) => {
+      requireRegionOwnership(element);
       if (editorOwned(element)) return;
       let values = attributes.get(element);
       if (!values) attributes.set(element, values = new Map());
@@ -271,16 +302,18 @@
       // measurement and makes the site alternate between two layouts forever.
       const retained = new Set();
       if (preserveHidden) for (const element of edits.keys()) {
+        if (!regionOwns(element)) continue;
         if (element.isConnected && getComputedStyle(element).visibility === "hidden"
             && element.getClientRects().length) retained.add(element);
       }
       for (const [element, offset] of maskedScrollOffsets) {
+        if (!regionOwns(element)) continue;
         const owned = edits.get(element)?.get("overflow-x");
         if (owned && element.style.getPropertyValue("overflow-x") === owned.applied) element.scrollLeft = offset;
+        maskedScrollOffsets.delete(element);
       }
-      maskedScrollOffsets.clear();
       for (const [element, properties] of edits) {
-        if (retained.has(element)) continue;
+        if (!regionOwns(element) || retained.has(element)) continue;
         const restoreProperty = (property, original) => {
           // The site may have changed its inline style since our last pass.
           if (element.style.getPropertyValue(property) !== original.applied || element.style.getPropertyPriority(property) !== original.appliedPriority) return;
@@ -297,17 +330,18 @@
         if (!element.getAttribute("style") && !originalStylePresence.get(element)) element.removeAttribute("style");
       }
       for (const [element, values] of attributes) {
-        if (retained.has(element)) continue;
+        if (!regionOwns(element) || retained.has(element)) continue;
         for (const [name, original] of values) {
           if (element.getAttribute(name) !== original.applied) continue;
           if (original.value === null) element.removeAttribute(name);
           else element.setAttribute(name, original.value);
         }
       }
-      for (const element of edits.keys()) if (!retained.has(element)) edits.delete(element);
-      for (const element of attributes.keys()) if (!retained.has(element)) attributes.delete(element);
-      for (const element of originalStylePresence.keys()) if (!retained.has(element)) originalStylePresence.delete(element);
+      for (const element of edits.keys()) if (regionOwns(element) && !retained.has(element)) edits.delete(element);
+      for (const element of attributes.keys()) if (regionOwns(element) && !retained.has(element)) attributes.delete(element);
+      for (const element of originalStylePresence.keys()) if (regionOwns(element) && !retained.has(element)) originalStylePresence.delete(element);
       for (const [table, wrapper] of tableWrappers) {
+        if (!regionOwns(table) || !regionOwns(wrapper)) continue;
         if (retained.has(wrapper)) continue;
         if (table.parentNode === wrapper && wrapper.parentNode) wrapper.parentNode.insertBefore(table, wrapper);
         if (!wrapper.childNodes.length) wrapper.remove();
@@ -315,6 +349,7 @@
       }
     };
     const dispose = () => {
+      if (region) throw new Error("Cannot dispose layout during a regional repair");
       restore();
       baseline.clear(); textElements.clear(); descendants.clear();
       visualContainers = new WeakMap(); pseudoBaseline.clear(); maskedTickers.clear();
@@ -322,12 +357,14 @@
       measurements = null; editorOwnership = new WeakMap(); canvas = null;
     };
     const captureBaseline = (roots = [document.documentElement], options) => {
+      const sources = roots instanceof Set || Array.isArray(roots) ? roots : [roots];
+      if (region && (sources.length !== undefined ? sources.length !== 1 || sources[0] !== region.root
+        : sources.size !== 1 || !sources.has(region.root))) throw new Error("Regional capture requires its exact shadow root");
       restore(options);
-      baseline = new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
+      baseline = region ? regionalBaseline() : new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
       return withStylesDisabled(() => {
         panelReservations = new Map();
         viewportScrollOwners = new Set();
-        const sources = roots instanceof Set || Array.isArray(roots) ? roots : [roots];
         for (const root of sources) {
           if (!root) continue;
           const candidates = new Set(getTextElements(root));
@@ -350,12 +387,14 @@
             let parent = ancestor(element);
             // Include containing panels and siblings, even when they have no
             // direct text. Stop before document-wide reflow constraints.
-            for (let depth = 0; parent && depth < 8 && parent !== document.documentElement && parent !== document.body; depth++, parent = ancestor(parent)) {
+            for (let depth = 0; parent && depth < 8 && parent !== document.documentElement && parent !== document.body;
+              depth++, parent = region && parent === region.root.host ? null : ancestor(parent)) {
               if (!descendants.has(parent)) descendants.set(parent, []);
               descendants.get(parent).push(element);
-              if (!baseline.has(parent)) {
+              if (!baseline.has(parent) || region && parent === region.root.host) {
                 const parentState = snapshot(parent);
                 if (parentState) baseline.set(parent, parentState);
+                if (region && parent === region.root.host) continue;
                 if (parent.children.length <= 16) for (const sibling of parent.children) {
                   if (!(sibling instanceof HTMLElement || sibling instanceof SVGElement) || baseline.has(sibling)) continue;
                   const siblingState = snapshot(sibling);
@@ -380,8 +419,9 @@
             if (!state || state.box.width < 40 || state.box.height < 40) continue;
             if (!baseline.has(media)) baseline.set(media, state);
             let parent = ancestor(media);
-            for (let depth = 0; parent && depth < 10 && parent !== document.body && parent !== document.documentElement; depth++, parent = ancestor(parent)) {
-              if (baseline.has(parent)) continue;
+            for (let depth = 0; parent && depth < 10 && parent !== document.body && parent !== document.documentElement;
+              depth++, parent = region && parent === region.root.host ? null : ancestor(parent)) {
+              if (baseline.has(parent) && !(region && parent === region.root.host)) continue;
               const parentState = snapshot(parent);
               if (parentState) baseline.set(parent, parentState);
             }
@@ -443,6 +483,7 @@
           }
           state.contentBounds = bounds(containedRects(element, true));
         }
+        if (region?.hostBaseline) region.hostBaseline.contentBounds = bounds(containedRects(region.root.host, true));
       });
     };
     const pseudoBox = (element, name) => {
@@ -1586,9 +1627,67 @@
       if (requiredHeight > limit) return null;
       return { baselineHeight: frameQualification.baselineHeight, requiredHeight, viewportHeight };
     };
+    const canRefreshRegion = (root) => {
+      if (region || measurements || !(root instanceof ShadowRoot) || !root.host.isConnected
+          || !baseline.has(root.host) || ![...textElements].some((element) => element.getRootNode() === root)) return false;
+      // A local pass cannot replace an outer ownership group. Its host and
+      // ancestors must retain their authored constraints and typography.
+      for (let element = root.host; element; element = ancestor(element)) {
+        if (edits.has(element) || attributes.has(element) || originalStylePresence.has(element)
+            || maskedScrollOffsets.has(element) || tableWrappers.has(element)
+            || [...tableWrappers.values()].includes(element)) return false;
+      }
+      return true;
+    };
+    const withRegion = (root, callback) => {
+      if (!canRefreshRegion(root)) throw new Error("Shadow root is not eligible for regional layout ownership");
+      const previous = { baseline, textElements, descendants, pseudoBaseline, maskedTickers,
+        panelReservations, viewportScrollOwners, frameQualification };
+      const owns = (element) => element?.getRootNode() === root;
+      const localMap = (map) => new Map([...map].filter(([element]) => owns(element)));
+      const localSet = (set) => new Set([...set].filter(owns));
+      const mergeMap = (target, updated) => {
+        for (const element of target.keys()) if (owns(element)) target.delete(element);
+        for (const [element, value] of updated) if (owns(element)) target.set(element, value);
+        return target;
+      };
+      const mergeSet = (target, updated) => {
+        for (const element of target) if (owns(element)) target.delete(element);
+        for (const element of updated) target.add(element);
+        return target;
+      };
+      region = { root, previous, hostBaseline: previous.baseline.get(root.host) };
+      baseline = regionalBaseline([...previous.baseline].filter(([element]) => owns(element)));
+      textElements = localSet(previous.textElements);
+      descendants = localMap(previous.descendants);
+      descendants.set(root.host, [...textElements]);
+      pseudoBaseline = localMap(previous.pseudoBaseline);
+      maskedTickers = localMap(previous.maskedTickers);
+      panelReservations = localMap(previous.panelReservations);
+      viewportScrollOwners = localSet(previous.viewportScrollOwners);
+      visualContainers = new WeakMap();
+      try { return callback(); }
+      finally {
+        // Central write ownership stays global throughout the transaction.
+        // Merge even an interrupted recapture so the immediate full fallback
+        // can restore every partial edit, without losing unrelated groups.
+        baseline = mergeMap(previous.baseline, baseline);
+        textElements = mergeSet(previous.textElements, textElements);
+        descendants = mergeMap(previous.descendants, descendants);
+        pseudoBaseline = mergeMap(previous.pseudoBaseline, pseudoBaseline);
+        maskedTickers = mergeMap(previous.maskedTickers, maskedTickers);
+        panelReservations = mergeMap(previous.panelReservations, panelReservations);
+        viewportScrollOwners = mergeSet(previous.viewportScrollOwners, viewportScrollOwners);
+        frameQualification = previous.frameQualification;
+        visualContainers = new WeakMap();
+        editorOwnership = new WeakMap();
+        region = null;
+      }
+    };
     const capture = (roots, options) => withMeasurements(() => captureBaseline(roots, options));
     const repair = () => withMeasurements(repairLayout);
-    return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, refresh: (roots) => { capture(roots); repair(); } });
+    return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, canRefreshRegion, withRegion,
+      refresh: (roots) => { capture(roots); repair(); } });
   };
 
   globalThis.LexendLayout = Object.freeze({ create });
