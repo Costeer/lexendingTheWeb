@@ -175,8 +175,8 @@ regional path accepts only edits to existing nonempty text nodes. It retains
 the other regions' typography and repairs, and restores only the changed
 component before measuring and repairing it again.
 Regional text updates share the existing fixed 100 ms coalescing deadline.
-Later edits do not postpone it, and urgent global changes can replace it with
-an immediate full-page pass.
+Later edits do not postpone it, and urgent global changes can advance the
+full-page pass while respecting the measured work budget.
 
 Slots in any discovered shadow tree, light children, nested shadow trees,
 editing/protected surfaces and automatic directionality disqualify the
@@ -187,6 +187,21 @@ finished filled effects, also require a full pass. Stateful or unsupported
 selectors and stylesheet rules disqualify regional repair; author custom
 property dependencies also retain full capture. This is deliberately narrower
 than CSS containment alone.
+
+Simple inline declarations are checked from their current text and saved author
+values, avoiding a CSSOM normalization and JSON round trip for each element.
+Comments, escapes, control characters and single-quoted values use the existing
+canonical check. Saved values are included because applied pixels can hide an
+author's variable. Every regional transaction retains its stylesheet,
+native-state and mutation checks.
+
+Viewport preservation still scans document and discovered shadow descendants,
+but checks editor ancestry only for nonzero scroll offsets. Editable documents
+skip that collection. Regression coverage includes native clamping, restoration,
+author priorities and editor exclusion. A separate pre-existing issue remains:
+pausing an originally unstyled protected scroller at a nonzero offset can leave
+an empty `style` attribute. This can affect author `[style]` selectors and needs
+an ownership-aware restoration fix; the scroll-scan optimization does not fix it.
 
 A temporary mutation witness distinguishes Lexend's own attribute writes from
 synchronous page reactions. Unexpected mutations, changes to native form
@@ -339,6 +354,8 @@ than 50 ms, automatic updates leave four times that duration for the website
 before another pass. Text insertions can still accelerate a pending style
 update, but layout repairs cannot bypass this cooldown. The deadline stays
 fixed during a burst, so incoming updates cannot postpone repairs indefinitely.
+Successful regional repairs retain the same four-times-work budget below
+50 ms as well; the existing 100 ms coalescing floor still applies.
 Explicit preference changes, including pause and resume, still apply immediately.
 
 Font application runs separately from that budget. Startup applies typography

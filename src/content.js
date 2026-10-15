@@ -1032,10 +1032,12 @@
       hadStyle: body.hasAttribute("style") } : null;
     const nestedScrollers = new Map();
     for (const root of new Set([document.documentElement, ...styledRoots])) {
+      if (protection.editorDocument()) break;
       root.querySelectorAll("*").forEach((element) => {
-        if (!element.style || element === body || element === document.documentElement || protection.editorOwned(element)
-            || (!element.scrollLeft && !element.scrollTop)) return;
-        nestedScrollers.set(element, { x: element.scrollLeft, y: element.scrollTop,
+        if (!element.style || element === body || element === document.documentElement) return;
+        const x = element.scrollLeft, y = element.scrollTop;
+        if ((!x && !y) || protection.editorOwned(element)) return;
+        nestedScrollers.set(element, { x, y,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
           hadStyle: element.hasAttribute("style"), table: ownedTableChild(element) });
       });
@@ -1100,11 +1102,12 @@
     }
     return refreshError;
   };
-  const budgetRefresh = (duration) => {
+  const budgetRefresh = (duration, regional = false) => {
     // Count synchronous work in both phases, excluding time spent waiting for
     // a rendering frame or coalescing author changes.
+    // A cheaper regional pass still consumes the same share of a busy stream.
     const finished = performance.now();
-    nextRefreshTime = finished + (duration > 50 ? duration * 4 : 0);
+    nextRefreshTime = finished + (regional || duration > 50 ? duration * 4 : 0);
   };
   const clearPendingRegions = () => {
     pendingRegions = null;
@@ -1151,7 +1154,16 @@
         // without a DOM mutation. Keep pages containing slots on full capture.
         if (root instanceof ShadowRoot && root.querySelector("slot")) return null;
         for (const element of root.querySelectorAll("[style]")) {
-          const declarations = JSON.parse(authorStyleSignature(element, element.getAttribute("style")));
+          const cssText = element.getAttribute("style") ?? "";
+          // Most declarations and saved author values contain no dynamic
+          // variables. They need no canonical CSS parsing or JSON round trip.
+          // Inspect originals too: our applied pixels may mask an author var().
+          let staticInline = !/[\u0000-\u001f\u007f']/.test(cssText) && !cssText.includes("/*") && staticDeclarations(cssText);
+          if (staticInline) for (const property of managedElements.get(element)?.properties.values() ?? []) {
+            if (property.value && (/[\u0000-\u001f\u007f']/.test(property.value) || property.value.includes("/*") || !staticDeclarations(property.value))) { staticInline = false; break; }
+          }
+          if (staticInline) continue;
+          const declarations = JSON.parse(authorStyleSignature(element, cssText));
           if (declarations.some(([, value]) => !staticDeclarations(value))) return null;
         }
         const sheets = root === document ? [...document.styleSheets]
@@ -1279,7 +1291,7 @@
     // Large pages can spend hundreds of milliseconds in a full repair. Give
     // the site four times that duration to handle input and paint before the
     // next automatic pass. Incoming text receives its font independently.
-    budgetRefresh(duration + performance.now() - completionStarted);
+    budgetRefresh(duration + performance.now() - completionStarted, regional);
     notifyState();
   };
   const refresh = (preserveHidden = false, priorDuration = 0) => {

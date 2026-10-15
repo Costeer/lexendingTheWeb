@@ -868,3 +868,149 @@ test("native checkbox, value and target state changes cannot escape a page react
     } finally { await page.close(); }
   }
 });
+
+const controlledBudgetCase = async (page, duration, forceFull) => page.evaluate(async ({ duration, forceFull, addition }) => {
+  const nativeTimeout = setTimeout.bind(globalThis), nativeClear = clearTimeout.bind(globalThis);
+  const nativeNow = performance.now.bind(performance), controls = LexendControls;
+  let clock = nativeNow() + 10_000, nextId = 200_000, repairs = 0;
+  const tasks = new Map(), canceled = [];
+  const describe = (task) => ({ id: task.id, delay: task.delay, due: task.due });
+  const pending = () => [...tasks.values()].map(describe);
+  const state = () => ({ reads: { ...__reads }, roots: __roots.map((_, i) => __inspectRoot(i)), state: __state() });
+  performance.now = () => clock;
+  globalThis.setTimeout = (callback, delay = 0, ...args) => {
+    const task = { id: ++nextId, delay, due: clock + delay, callback: () => callback(...args) };
+    tasks.set(task.id, task); return task.id;
+  };
+  globalThis.clearTimeout = (id) => { canceled.push(id); tasks.delete(id); };
+  globalThis.LexendControls = { ...controls, repair(context) {
+    controls.repair(context);
+    // Execute all real repair work and then attribute a controlled elapsed
+    // duration to that actual call. No budget/scheduling function is exposed.
+    repairs++;
+    clock += duration;
+  } };
+  const runNext = async () => {
+    const task = [...tasks.values()].sort((a, b) => a.due - b.due)[0];
+    if (!task) throw new Error("The actual runtime scheduled no callback");
+    tasks.delete(task.id);
+    clock = Math.max(clock, task.due);
+    const started = clock, before = repairs;
+    task.callback();
+    await Promise.resolve();
+    return { task: describe(task), started, finished: clock, repairs: repairs - before };
+  };
+  try {
+    __append(0, addition);
+    await Promise.resolve();
+    const initialTasks = pending(), firstRun = await runNext(), first = state();
+    const firstRegions = __regionalCalls.length;
+    __resetReads();
+    __append(0, " More words. ");
+    await Promise.resolve();
+    const following = pending();
+    if (forceFull) {
+      const secondRun = await runNext();
+      return { duration, initialTasks, firstRun, first, firstRegions, following, secondRun,
+        final: state(), finalRegions: __regionalCalls.length, remaining: tasks.size };
+    }
+    const observations = [];
+    for (let i = 0; i < 5; i++) {
+      clock++;
+      __append(0, " Extra words. ");
+      await Promise.resolve();
+      observations.push(pending());
+    }
+    const upgradedAt = clock;
+    const html = '<section class="distant-clip"><p class="distant-text" id="budget-new">New global reading content</p></section>';
+    document.querySelector("#distant").insertAdjacentHTML("beforeend", html);
+    __authorBody.querySelector("#distant").insertAdjacentHTML("beforeend", html);
+    await Promise.resolve();
+    const upgraded = pending(), globalRun = await runNext(), afterGlobal = state();
+    const globalRegions = __regionalCalls.length;
+    __append(0, " Final words. ");
+    await Promise.resolve();
+    const afterGlobalTasks = pending(), finalRun = await runNext();
+    return { duration, initialTasks, firstRun, first, firstRegions, following, observations,
+      upgradedAt, upgraded, canceled, globalRun, afterGlobal, globalRegions, afterGlobalTasks, finalRun,
+      final: state(), finalRegions: __regionalCalls.length, remaining: tasks.size,
+      insertedFont: __native.style(document.querySelector("#budget-new")).fontFamily };
+  } finally {
+    globalThis.setTimeout = nativeTimeout;
+    globalThis.clearTimeout = nativeClear;
+    performance.now = nativeNow;
+    globalThis.LexendControls = controls;
+  }
+}, { duration, forceFull, addition });
+
+const assertBudgetTime = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 0.001,
+  `${label}: expected ${expected}ms, got ${actual}ms`);
+
+test("successful regional repairs retain four times their measured work below and across 50 ms", async () => {
+  for (const duration of [20, 40, 49, 50, 51]) {
+    const { page, initial } = await prepare({ traceRegions: true });
+    try {
+      const result = await controlledBudgetCase(page, duration, false);
+      assert.equal(result.firstRegions, 1, `${duration}ms: an actual regional ownership transaction completed`);
+      assert.equal(result.firstRun.repairs, 1);
+      assert.equal(result.globalRun.repairs, 1);
+      assert.equal(result.finalRun.repairs, 1);
+      assert.equal(result.globalRegions, 1, "the urgent callback really routes through global ownership");
+      assert.equal(result.finalRegions, 2, "a real regional repair resumes after the global transaction");
+      assertLocalWork(result.first);
+      assertExpanded(result.first.roots[0], initial.roots[0]);
+      assertExpanded(result.final.roots[0], initial.roots[0]);
+      assert.equal(result.final.roots[0].content, text + addition + " More words. " + " Extra words. ".repeat(5) + " Final words. ");
+      assert.ok(result.afterGlobal.reads.styles > 0 && result.afterGlobal.reads.ranges > 0);
+      assert.match(result.insertedFont, /Lexend/);
+      assert.equal(result.final.state.healthy, true);
+      assert.equal(result.final.state.pending, false);
+      assert.equal(result.remaining, 0);
+      await assertRestored(page);
+      assert.equal(result.initialTasks.length, 1);
+      assert.equal(result.initialTasks[0].delay, 100);
+      assert.equal(result.following.length, 1);
+      assertBudgetTime(result.following[0].delay, Math.max(100, duration * 4), `${duration}ms regional cooldown`);
+      for (const observation of result.observations) assert.deepEqual(observation, result.following,
+        `${duration}ms: incoming edits cannot postpone the fixed regional deadline`);
+      assert.equal(result.upgraded.length, 1);
+      assert.notEqual(result.upgraded[0].id, result.following[0].id);
+      assert.ok(result.canceled.includes(result.following[0].id));
+      assertBudgetTime(result.upgraded[0].due, result.firstRun.finished + duration * 4,
+        `${duration}ms: urgent global work honors the regional cooldown`);
+      assert.ok(result.upgraded[0].due <= result.following[0].due, "urgent work may advance, never postpone, the deadline");
+      assertBudgetTime(result.globalRun.started, result.upgraded[0].due, "the actual global callback runs at the retained budget deadline");
+      assert.equal(result.afterGlobalTasks.length, 1);
+      assertBudgetTime(result.afterGlobalTasks[0].delay, Math.max(100, duration > 50 ? duration * 4 : 0),
+        `${duration}ms: completing global work restores the unchanged global threshold rule`);
+    } finally { await page.close(); }
+  }
+});
+
+test("full repairs preserve the existing zero-through-50 ms and four-times-above-50 ms budget", async () => {
+  for (const duration of [20, 40, 49, 50, 51]) {
+    const { page, initial } = await prepare({ traceRegions: true, forceFull: true });
+    try {
+      const result = await controlledBudgetCase(page, duration, true);
+      assert.equal(result.firstRegions, 0);
+      assert.equal(result.finalRegions, 0);
+      assert.equal(result.firstRun.repairs, 1);
+      assert.equal(result.secondRun.repairs, 1);
+      assert.ok(result.first.reads.styles > 0 && result.first.reads.ranges > 0, "the control actually repairs the full document");
+      assertExpanded(result.first.roots[0], initial.roots[0]);
+      assertExpanded(result.final.roots[0], initial.roots[0]);
+      assert.equal(result.final.roots[0].content, text + addition + " More words. ");
+      assert.equal(result.final.state.healthy, true);
+      assert.equal(result.final.state.pending, false);
+      assert.equal(result.remaining, 0);
+      await assertRestored(page);
+      assert.equal(result.initialTasks.length, 1);
+      assert.equal(result.initialTasks[0].delay, 0, "existing full character-data work remains urgent");
+      assert.equal(result.following.length, 1);
+      const expected = duration > 50 ? duration * 4 : 0;
+      assertBudgetTime(result.following[0].delay, expected, `${duration}ms unchanged full-repair cooldown`);
+      assertBudgetTime(result.secondRun.started, result.firstRun.finished + expected,
+        `${duration}ms actual full callback uses the unchanged threshold`);
+    } finally { await page.close(); }
+  }
+});
