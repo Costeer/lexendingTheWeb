@@ -47,10 +47,17 @@
   };
   const ancestor = (element) => element.parentElement ?? element.getRootNode()?.host ?? null;
   const intersection = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-  const bounds = (rects) => rects.length ? {
-    left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)),
-    top: Math.min(...rects.map((r) => r.top)), bottom: Math.max(...rects.map((r) => r.bottom))
-  } : null;
+  const bounds = (rects) => {
+    if (!rects.length) return null;
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (const box of rects) {
+      left = Math.min(left, box.left);
+      right = Math.max(right, box.right);
+      top = Math.min(top, box.top);
+      bottom = Math.max(bottom, box.bottom);
+    }
+    return { left, right, top, bottom };
+  };
   const measureTextRects = (element) => {
     const result = [];
     for (const node of element.childNodes) {
