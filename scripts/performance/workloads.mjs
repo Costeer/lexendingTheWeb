@@ -6,6 +6,7 @@ export const protocol = {
   version: 2,
   viewport: { width: 1280, height: 800 },
   settingsChanges: 6,
+  layoutRepair: 'explicitly enabled in both versions',
   idleMs: 4000,
   streamEdits: 100,
   replacements: 6,
@@ -34,7 +35,7 @@ function installHarness() {
   const nativeStyle = globalThis.getComputedStyle;
   const nativeBox = Element.prototype.getBoundingClientRect;
   const bench = globalThis.__bench = {
-    settings: { enabled: true, scope: 'all', textScale: 120, lineHeight: 0, letterSpacing: 0, siteRules: [] },
+    settings: { enabled: true, scope: 'all', layoutRepair: true, textScale: 120, lineHeight: 0, letterSpacing: 0, siteRules: [] },
     styleReads: 0, boxReads: 0
   };
   globalThis.chrome = {
@@ -68,6 +69,9 @@ function installHarness() {
       bench.failure = { kind: 'final-check', state, requestedSize: size,
         fontsStatus: document.fonts.status, capturedAt: performance.now() };
       throw new Error('Runtime did not finish healthy and active');
+    }
+    if (Object.hasOwn(LexendSettings.defaults, 'layoutRepair') && state.layoutRepair !== true) {
+      throw new Error('Benchmark requires layout repair explicitly enabled');
     }
     for (const element of document.querySelectorAll('main p, main h2, main button, #author-label')) {
       const text = nativeStyle(element);

@@ -139,6 +139,19 @@
   });
 
   extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === "LEXEND_RECHECK_FRAME_REQUIREMENTS") {
+      if (sender.id !== extension.runtime.id || !Number.isInteger(sender.tab?.id)
+          || !Number.isInteger(sender.frameId) || sender.frameId < 0) return undefined;
+      try {
+        if (!["http:", "https:", "about:", "blob:"].includes(new URL(sender.url).protocol)) return undefined;
+      } catch { return undefined; }
+      // Activation only: opted-in children resend their measured requirement;
+      // paused/default-off children ignore this before reading any geometry.
+      extension.tabs.sendMessage(sender.tab.id, {
+        type: "LEXEND_RECHECK_FRAME_REQUIREMENT"
+      }).then(() => sendResponse({ relayed: true }), () => sendResponse({ relayed: false }));
+      return true;
+    }
     if (message?.type === "LEXEND_FRAME_REQUIREMENT") {
       // Runtime sender metadata identifies the actual extension/frame. Page
       // postMessage events can lose their source in an isolated content world.
@@ -196,7 +209,7 @@
   });
 
   extension.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "sync" && (changes.enabled || changes.siteRules || changes.disabledSites)) {
+    if (areaName === "sync" && (changes.enabled || changes.layoutRepair || changes.siteRules || changes.disabledSites)) {
       updateAllTabs().catch(() => {});
     }
   });

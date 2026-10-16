@@ -16,6 +16,7 @@ import { installTemporaryFirefoxAddon } from "./firefox-installation.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { browserName, browserVersion, output } = parseBrowserArguments(process.argv.slice(2));
+const headlessFirefox = browserName === "firefox" && process.env.MOZ_HEADLESS === "1";
 const fixture = await readFile(join(root, "scripts/fixtures/compatibility.html"), "utf8");
 const historyFixture = await readFile(join(root, "scripts/fixtures/history.html"), "utf8");
 const oldRuleFixtureBytes = await readFile(join(root, "scripts/fixtures/rule-format-v0.5.0.json"));
@@ -37,9 +38,10 @@ const historicalRuleFactory = new Function("globalThis", oldRuleSources["src/set
   + oldRuleSources["src/preferences.js"]
   + "\nreturn { settings: globalThis.LexendSettings, preferences: globalThis.LexendPreferences };").toString();
 const frameFixture = '<!doctype html><style>html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}</style><p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
+const repairFrameFixture = '<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>';
 const server = createServer((request, response) => {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
-  response.end(request.url === "/frame" ? frameFixture : request.url.startsWith("/history-") ? historyFixture : fixture);
+  response.end(request.url === "/frame" ? frameFixture : request.url === "/repair-caption" ? repairFrameFixture : request.url.startsWith("/history-") ? historyFixture : fixture);
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
@@ -54,7 +56,8 @@ const checks = [];
 const report = {
   schemaVersion: 1, browserName, requestedBrowserVersion: browserVersion,
   startedAt: new Date().toISOString(), status: "running", installedExtension: false,
-  environment: { node: process.version, platform: platform(), release: release(), arch: arch() },
+  environment: { node: process.version, platform: platform(), release: release(), arch: arch(),
+    headlessFirefox, firefoxPointerPreset: headlessFirefox ? "fine-hover" : null },
   browser: null, artifact: null, checks,
   limitations: ["No Android add-on surface is exercised by this desktop command.", "Keyboard and layout checks are not manual screen-reader verification."]
 };
@@ -131,7 +134,13 @@ const createDriver = () => {
     );
     builder.setChromeOptions(options);
   } else {
-    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion(browserVersion));
+    const options = new firefox.Options().setBrowserVersion(browserVersion);
+    // This desktop suite requires a mouse. Headless Linux Firefox otherwise
+    // reports no pointer, selecting touch layouts even at desktop widths.
+    // Record the emulated input preset above; keep every interaction/assertion.
+    if (headlessFirefox) options.setPreference("ui.primaryPointerCapabilities", 6)
+      .setPreference("ui.allPointerCapabilities", 6);
+    builder.setFirefoxOptions(options);
     builder.setFirefoxService(new firefox.ServiceBuilder().addArguments("--allow-system-access"));
   }
   return builder.build();
@@ -219,6 +228,132 @@ try {
   const optionsTab = await driver.getWindowHandle();
   await navigateExtension(`${origin}options.html`);
   await wait("!document.querySelector('#dark-theme').disabled", "Settings must initialize");
+  await wait("matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches", "The installed desktop suite requires a wide viewport and mouse");
+
+  await check("layout repair is opt-in, persists per site, and the all-sites control preserves rules", async () => {
+    const original = await saved();
+    assert.equal(original.layoutRepair, false, "Fresh installs default to font conversion without layout repair");
+    assert.deepEqual(original.siteRules, []);
+    const state = () => extensionCall(async () => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      // The extension deliberately has no tabs permission. Identify the
+      // content responder without relying on a privileged tab.url field.
+      for (const tab of await api.tabs.query({})) {
+        let current;
+        try { current = await api.tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 }); } catch { continue; }
+        if (current?.hostname === "127.0.0.1") return current;
+      }
+      throw new Error("Fixture content responder not found");
+    });
+    const settled = (expected) => driver.wait(async () => {
+      const current = await state();
+      return current?.ready && current.healthy && current.active && !current.pending && current.layoutRepair === expected;
+    }, 15000, `Runtime layout repair settles ${expected ? "on" : "off"}`, 100);
+    const rule = (value) => extensionCall(async (value) => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE",
+        operation: { type: "setSiteLayoutRepair", hostname: "127.0.0.1", value } });
+      if (!result.ok) throw new Error(result.message);
+      return result.settings;
+    }, value);
+    const rawRules = () => extensionCall(async () => {
+      const raw = await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null);
+      return JSON.stringify({ siteRules: raw.siteRules, disabledSites: raw.disabledSites });
+    });
+    const globalToggle = async (expected) => {
+      await wait(`!document.querySelector('#layout-repair').disabled && document.querySelector('#layout-repair').checked === ${!expected}`, "Global control reflects saved state");
+      const before = await rawRules();
+      await driver.findElement(By.id("layout-repair")).click();
+      await driver.wait(async () => (await saved()).layoutRepair === expected, 15000, "Global control saves", 100);
+      assert.equal(await rawRules(), before, "Global toggling must preserve the exact saved rule representation");
+    };
+    await settled(false);
+    const optedIn = await rule(true);
+    assert.equal(optedIn.enabled, original.enabled);
+    assert.equal(optedIn.scope, original.scope);
+    assert.deepEqual(optedIn.siteRules, [{ hostname: "127.0.0.1", includeSubdomains: false, enabled: null, scope: null, layoutRepair: true }]);
+    await settled(true);
+    await driver.navigate().refresh();
+    await wait("!document.querySelector('#layout-repair').disabled", "Reloaded settings initialize");
+    assert.deepEqual((await saved()).siteRules, optedIn.siteRules, "The site decision survives a settings reload");
+    await globalToggle(true);
+    await settled(true);
+    await rule(false);
+    await settled(true); // The all-sites choice takes priority over saved site choices.
+    await globalToggle(false);
+    await settled(false);
+    await rule(true);
+    await settled(true);
+    await globalToggle(true);
+    await globalToggle(false);
+    await settled(true); // Disabling the global choice restores the saved opt-in.
+    await rule(null);
+    await settled(false);
+    assert.deepEqual(await saved(), original);
+    return { defaultRepair: false, siteDecisionPersists: true, globalPreservesRawRules: true, typographyRemainsActive: true };
+  });
+
+  await check("reenabling parent repair renegotiates sizing with the same opted-in cross-origin child", async () => {
+    const original = await saved();
+    const childRule = (value) => extensionCall(async (value) => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE",
+        operation: { type: "setSiteLayoutRepair", hostname: "localhost", value } });
+      if (!result.ok) throw new Error(result.message);
+    }, value);
+    await childRule(true);
+    await patch({ layoutRepair: true, scope: "all", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 });
+    await driver.switchTo().window(websiteTab);
+    await script((url) => {
+      const fixture = document.createElement("section");
+      fixture.id = "repair-frame-fixture";
+      // Group cleanup without adding a clipping/geometry owner around both
+      // the embed and its independent following navigation.
+      fixture.style.display = "contents";
+      fixture.innerHTML = '<style>#repair-frame-clip{position:fixed;top:0;left:0;width:240px;height:30px;max-height:30px;overflow:hidden}#repair-frame{display:block;width:240px;height:30px;max-height:30px;border:0}#repair-frame-nav{position:fixed;top:30px;height:28px;width:240px}</style><div id="repair-frame-clip"><iframe id="repair-frame" title="Opted-in caption"></iframe></div><nav id="repair-frame-nav"><span>Following navigation</span></nav>';
+      fixture.querySelector("iframe").src = url;
+      document.body.append(fixture);
+    }, `http://localhost:${server.address().port}/repair-caption`);
+    const fits = async () => {
+      await wait("document.querySelector('#repair-frame').clientHeight > 30", "Measured cross-origin caption grows");
+      await driver.switchTo().frame(await driver.findElement(By.id("repair-frame")));
+      try {
+        await wait("getComputedStyle(document.querySelector('span')).fontFamily.includes('Lexend')", "Child remains converted");
+        return await script(() => {
+          window.__optinDocument ??= crypto.randomUUID();
+          const span = document.querySelector("span"), range = document.createRange();
+          range.selectNodeContents(span);
+          const glyphs = range.getBoundingClientRect();
+          return { document: __optinDocument, viewport: innerHeight, top: glyphs.top, bottom: glyphs.bottom };
+        });
+      } finally { await driver.switchTo().defaultContent(); }
+    };
+    const before = await fits();
+    assert(before.top >= 0 && before.bottom <= before.viewport, "Initial caption fits");
+    await driver.switchTo().window(optionsTab);
+    await patch({ layoutRepair: false });
+    await driver.switchTo().window(websiteTab);
+    await wait("document.querySelector('#repair-frame').clientHeight === 30", "Disabling parent repair restores its embedding");
+    assert.deepEqual(await script(() => ["repair-frame", "repair-frame-clip", "repair-frame-nav"].map(id => document.getElementById(id).getAttribute("style"))), [null, null, null]);
+    await driver.switchTo().frame(await driver.findElement(By.id("repair-frame")));
+    try {
+      assert.equal(await script(() => __optinDocument), before.document);
+      assert.match(await script(() => getComputedStyle(document.querySelector("span")).fontFamily), /Lexend/);
+    } finally { await driver.switchTo().defaultContent(); }
+    await driver.switchTo().window(optionsTab);
+    await patch({ layoutRepair: true });
+    await driver.switchTo().window(websiteTab);
+    const after = await fits();
+    assert.equal(after.document, before.document, "The child document must not reload to repair its parent");
+    assert(after.top >= 0 && after.bottom <= after.viewport, "The unchanged opted-in child fits again");
+    assert.equal(await script(() => document.querySelector('#repair-frame-nav').getBoundingClientRect().top >= document.querySelector('#repair-frame-clip').getBoundingClientRect().bottom), true);
+    await script(() => document.querySelector("#repair-frame-fixture").remove());
+    await driver.switchTo().window(optionsTab);
+    await childRule(null);
+    await patch(Object.fromEntries(["layoutRepair", "scope", "textScale", "lineHeight", "letterSpacing"].map(key => [key, original[key]])));
+    assert.deepEqual(await saved(), original);
+    return { before, after, exactFootprintRestoration: true };
+  });
 
   await check("real background serializes concurrent preferences and rule changes", async () => {
     const result = await extensionCall(async () => {
@@ -227,7 +362,7 @@ try {
       const second = LexendPreferences.createClient(api);
       await Promise.all([first.load(), second.load()]);
       await Promise.all([
-        first.mutate({ type: "patch", changes: { textScale: 110, scope: "all" } }),
+        first.mutate({ type: "patch", changes: { textScale: 110, scope: "all", layoutRepair: true } }),
         second.mutate({ type: "patch", changes: { theme: "dark" } }),
         first.mutate({ type: "addRule", rule: { hostname: "keep.example", enabled: false } }),
         second.mutate({ type: "addRule", rule: { hostname: "remove.example", enabled: false } })
@@ -733,7 +868,7 @@ try {
         assert.deepEqual(result.restarted, result.afterDelete);
         assert.equal(result.remainingLegacy, true, "Large exact pause lists retain their older-readable representation");
         assert.equal(result.hasCanonicalRuleKey, false, "No compact or oversized canonical key hides the legacy pauses");
-        assert.deepEqual(result.oldDecoded, result.afterDelete, "The actual published reader retains all rules and preferences");
+        assert.deepEqual({ ...result.oldDecoded, layoutRepair: false }, result.afterDelete, "The actual published reader retains all historical rules and preferences; repair defaults off");
         assert.match(result.oldExpandedWriteError, /quota/i, "The old writer's oversized expansion remains an explicit quota failure");
         assert.equal(result.oldRejectedWritePreservedRaw, true, "An old rejected expansion preserves every stored value");
         assert.equal(result.unsafeEditError?.code, "RULE_CAPACITY", "An unrepresentable rich edit fails before writing");
@@ -800,7 +935,7 @@ try {
           lostRuleCount: afterUnsafeOldWrite.siteRules.length };
       });
       assert.equal(result.compatibleArray, true, "An unrelated new save retains an older-readable array");
-      assert.deepEqual(result.oldRead, result.compatible);
+      assert.deepEqual({ ...result.oldRead, layoutRepair: false }, result.compatible);
       assert.deepEqual(result.afterOld, { ...result.compatible, theme: "dark" });
       assert.equal(result.afterCurrent.theme, "dark");
       assert.deepEqual(result.afterCurrent.siteRules, [result.compatible.siteRules[0]]);

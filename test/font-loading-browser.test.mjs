@@ -52,7 +52,7 @@ const prepare = async (page, { delayed = false, html = fixture } = {}) => {
     globalThis.__authorMarkup = document.querySelector("main").cloneNode(true);
     globalThis.__initialFontLoad = document.fonts.load('400 20px "Author Fixture"', "A");
     const storage = [], runtime = [];
-    globalThis.__settings = { enabled: true, scope: "all", textScale: 120 };
+    globalThis.__settings = { enabled: true, layoutRepair: true, scope: "all", textScale: 120 };
     globalThis.chrome = {
       runtime: {
         getURL: (path) => `http://font-loading.test/${path}`,

@@ -6,7 +6,7 @@
   const createTracker = ({ mutate, getSettings, getConfirmedSettings = getSettings, onChange = () => {} }) => {
     const api = globalThis.LexendSettings;
     const entries = new Set();
-    const fields = ["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
+    const fields = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
     const ruleKey = (operation) => {
       const rule = operation.rule ?? operation;
       const normalized = api.normalizeSettings({ siteRules: [{ ...rule, enabled: false }] }).siteRules[0];
@@ -70,6 +70,10 @@
         const current = api.getDirectRule(settings, operation.rule.hostname, operation.rule.includeSubdomains);
         const desired = api.normalizeSettings({ siteRules: [operation.rule] }).siteRules[0];
         return current && desired && JSON.stringify(current) === JSON.stringify(desired);
+      }
+      if (operation.type === "setSiteLayoutRepair") {
+        const current = api.getDirectRule(settings, operation.hostname);
+        return operation.value === null ? current?.layoutRepair === undefined : current?.layoutRepair === operation.value;
       }
       if (operation.type === "removeRule") return !api.getDirectRule(settings, operation.hostname, operation.includeSubdomains);
       if (operation.type === "updateRule") {

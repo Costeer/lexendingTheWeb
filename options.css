@@ -1880,3 +1880,13 @@ input::placeholder {
 .import-preview ul { padding-left: 22px; overflow-wrap: anywhere; }
 .import-preview li + li { margin-top: 8px; }
 .import-undo { margin-top: 18px; }
+
+.layout-repair-setting {
+  margin: 24px 0;
+  padding: 16px;
+  border: var(--control-border);
+  border-radius: 12px;
+}
+.layout-repair-setting label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.layout-repair-setting input { flex: none; margin-top: 4px; accent-color: var(--accent); }
+.layout-repair-setting p { margin: 8px 0 0 26px; font-size: 14px; line-height: 1.5; color: var(--secondary-text); }

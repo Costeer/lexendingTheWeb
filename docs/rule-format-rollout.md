@@ -16,9 +16,10 @@ or offline-device safety.
 
 ## What changes today
 
-The normalized public model and schema 2 export remain unchanged. Current
-readers accept object-array `siteRules`, legacy `disabledSites`, and `@1` compact
-strings. Unknown or malformed compact strings block reads and mutations, including
+Schema 3 adds the global `layoutRepair` boolean (default false) and optional
+boolean `layoutRepair` fields on site rules. Schema 1 and 2 imports remain readable
+and default a missing global value to false. Current readers accept object-array
+`siteRules`, legacy `disabledSites`, and `@1`/`@2` compact strings. Unknown or malformed compact strings block reads and mutations, including
 replacement imports; they never become an empty rule list.
 
 The background selects the representation from the latest raw storage read:
@@ -175,3 +176,18 @@ showed old readers see zero compact rules and an old Theme-only write erases the
 That remains a real limitation of existing compact profiles. The current default
 policy prevents new automatic exposure; it cannot infer rules already lost or
 resolve browser-sync conflicts across independently writing installations.
+
+## Compact repair decisions
+
+Rules without a repair decision retain their original four-field normalized
+shape. Compact writes retain `@1` when no repair decision exists. A decision
+requires `@2`: its flags add 18 for false or 36 for true to the original 0–17
+flags, with 0 added for inheritance. Values outside 0–53, malformed flags, empty
+rules, and duplicate identities fail closed. Existing `@1` data remains readable.
+A scalar preference edit retains the exact existing compact bytes, arrays, or
+legacy disabled-site list. Repair decisions do not silently opt old rules in.
+
+Readers that support only `@1` must reject `@2`; obsolete readers that discard
+unknown encodings remain unsafe writers for compact profiles. No claim of
+rollback safety extends to versions that cannot preserve repair fields. The
+250-rule and 8,192-byte limits continue to apply without truncation.

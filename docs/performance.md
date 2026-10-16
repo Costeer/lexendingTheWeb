@@ -19,6 +19,12 @@ browser errors, unloaded fonts, unhealthy runtimes, incomplete workloads, and
 timeouts fail the command. The installed-extension suites remain necessary for
 real storage, background workers, document-start injection, and Firefox.
 
+These repair workloads explicitly enable layout repair in both versions. The
+candidate must report that repair is active when it supports the setting. A
+default-off candidate therefore cannot pass by skipping the baseline's repair
+work. Separate runtime and installed-extension tests cover the default-off mode,
+per-site choices, and the all-sites control.
+
 Each version gets one discarded warm-up and five measured runs per workload,
 in fresh browser contexts at 1280 × 800. Versions alternate execution order;
 no measured workloads run concurrently. Six settings updates within a context

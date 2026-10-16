@@ -181,7 +181,7 @@ const prepare = async ({ components = 1, unsupported = null, forceFull = false, 
         return fragment;
       });
       const storage = [], runtime = [];
-      globalThis.__settings = { enabled: true, scope: "all", textScale: 120 };
+      globalThis.__settings = { enabled: true, layoutRepair: true, scope: "all", textScale: 120 };
       globalThis.chrome = {
         runtime: { getURL: (path) => `${location.protocol === "http:" ? location.origin : "http://regional-repair.test"}/${path}`,
           sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },

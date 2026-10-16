@@ -4,14 +4,14 @@
   const api = globalThis.LexendSettings;
   const messageType = "LEXEND_SETTINGS_MUTATE";
   const connectionName = "lexend-settings";
-  const preferenceKeys = new Set(["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const preferenceKeys = new Set(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
   const legacyKeys = ["disabledSites", "spacing", "uiStyle"];
   const requireSnapshot = (value) => {
     const normalized = api.normalizeSettings(value);
     if (!value || typeof value !== "object" || Array.isArray(value)
         || [...preferenceKeys].some((key) => value[key] !== normalized[key])
         || !Array.isArray(value.siteRules) || value.siteRules.length !== normalized.siteRules.length
-        || value.siteRules.some((rule, index) => ["hostname", "includeSubdomains", "enabled", "scope"]
+        || value.siteRules.some((rule, index) => ["hostname", "includeSubdomains", "enabled", "scope", "layoutRepair"]
           .some((key) => rule?.[key] !== normalized.siteRules[index]?.[key]))) {
       throw api.settingsError("INVALID_OPERATION", "The saved import snapshot is incomplete. Preview the file again.");
     }
@@ -37,6 +37,9 @@
         return api.removeSiteRule(settings, operation.hostname, operation.includeSubdomains);
       case "updateRule":
         return api.updateSiteRule(settings, operation.hostname, operation.includeSubdomains, operation.changes);
+      case "setSiteLayoutRepair":
+        if (!api.validHostname(operation.hostname) || (operation.value !== null && typeof operation.value !== "boolean")) throw api.settingsError("INVALID_RULE", "Choose valid layout repair settings for this site.");
+        return api.setSiteRule(settings, { hostname: operation.hostname, includeSubdomains: false, layoutRepair: operation.value });
       case "toggleSite":
         if (!api.validHostname(operation.hostname)) throw api.settingsError("INVALID_RULE", "This page cannot have a site rule.");
         return api.toggleSite(settings, operation.hostname);
@@ -44,7 +47,8 @@
         if (Object.hasOwn(operation, "expected") && !api.settingsEqual(settings, requireSnapshot(operation.expected))) {
           throw api.settingsError("STALE_IMPORT", "Settings changed after this preview. Preview the file again before replacing them.");
         }
-        return api.validateImport({ schemaVersion: 2, settings: operation.settings });
+        api.validateImport({ schemaVersion: 3, settings: operation.settings });
+        return api.validateCapacity(requireSnapshot(operation.settings));
       case "undoImport":
         if (!api.settingsEqual(settings, requireSnapshot(operation.expected))) {
           throw api.settingsError("STALE_UNDO", "Settings changed before undo could finish. Review the current settings before trying undo again.");
@@ -57,7 +61,7 @@
   };
 
   const validateExpected = (settings, operation) => {
-    if (operation?.expected === undefined || !["patch", "replace", "addRule", "removeRule", "updateRule", "toggleSite"].includes(operation.type)) return;
+    if (operation?.expected === undefined || !["patch", "replace", "addRule", "removeRule", "updateRule", "toggleSite", "setSiteLayoutRepair"].includes(operation.type)) return;
     if (!operation.expected || typeof operation.expected !== "object" || Array.isArray(operation.expected)) {
       throw api.settingsError("INVALID_OPERATION", "Invalid expected settings snapshot.");
     }

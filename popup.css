@@ -771,3 +771,15 @@ fieldset:disabled {
 :root .segments .custom-choice { grid-column: 1 / -1; border-left: 0; }
 :root .segments .custom-choice span { border-top: 1px solid var(--ui-border); }
 #adjust-custom-spacing { margin-top: 12px; font-size: 13px; }
+
+.site-layout-control {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.site-layout-control input { flex: none; margin: 3px 0 0; accent-color: var(--accent); }
+.site-layout-control:has(input:disabled) { cursor: default; }

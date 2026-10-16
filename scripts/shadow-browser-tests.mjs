@@ -205,7 +205,7 @@ try {
     } finally { await driver.setContext(firefox.Context.CONTENT); }
   } else await driver.get(`${origin}options.html`);
   await wait("document.querySelector('#dark-theme')?.disabled === false", "Installed settings initialize");
-  await patch({ scope: "all", textScale: 110 });
+  await patch({ scope: "all", layoutRepair: true, textScale: 110 });
   await wait("getComputedStyle(document.querySelector('#prose')).fontSize === '22px'", "110% scale applies");
   await settle();
 

@@ -8,17 +8,19 @@ import { instrumentContent } from "./helpers/conversation.mjs";
 let browser;
 test.before(async () => { browser = await chromium.launch({ headless: true }); });
 test.after(async () => { await browser?.close(); });
-const prepare = async (html, { before, inspect = false } = {}) => {
+const prepare = async (html, { before, inspect = false, layoutRepair = true } = {}) => {
   const page = await browser.newPage();
   await page.route("http://runtime.test/**", async (route) => route.fulfill({
     body: await readFile(resolve(`.${new URL(route.request().url()).pathname}`)), contentType: "font/woff2"
   }));
   await page.setContent(html);
-  await page.evaluate(() => {
+  await page.evaluate((layoutRepair) => {
     const storage = [], runtime = [];
-    globalThis.__settings = { enabled: true, scope: "all", textScale: 110 };
+    globalThis.__settings = { enabled: true, layoutRepair, scope: "all", textScale: 110 };
+    if (layoutRepair === null) delete __settings.layoutRepair;
+    globalThis.__messages = [];
     globalThis.chrome = {
-      runtime: { getURL: (path) => `http://runtime.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
+      runtime: { getURL: (path) => `http://runtime.test/${path}`, sendMessage: async (message) => { __messages.push(message); }, onMessage: { addListener: (fn) => runtime.push(fn) } },
       storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => storage.push(fn) } }
     };
     globalThis.__update = (values) => {
@@ -27,7 +29,7 @@ const prepare = async (html, { before, inspect = false } = {}) => {
       storage.forEach((fn) => fn(changes, "sync"));
     };
     globalThis.__state = () => { let result; runtime.forEach((fn) => fn({ type: "LEXEND_GET_STATE" }, null, (value) => { result = value; })); return result; };
-  });
+  }, layoutRepair);
   await before?.(page);
   for (const name of ["shadow-discovery", "settings", "adaptive-controls", "adaptive-layout", "content"]) {
     let source = await readFile(resolve(`src/${name}.js`), "utf8");
@@ -42,6 +44,18 @@ const prepare = async (html, { before, inspect = false } = {}) => {
         stylePresence: originalStylePresence.size });\n${anchor}`);
     }
     await page.addScriptTag({ content: source });
+    if (name === "adaptive-layout") await page.evaluate(() => {
+      const create = LexendLayout.create;
+      globalThis.__layoutCalls = { capture: 0, repair: 0 };
+      globalThis.LexendLayout = { create: (...args) => {
+        const owner = { ...create(...args) };
+        for (const name of ["capture", "repair"]) {
+          const run = owner[name];
+          owner[name] = (...values) => { __layoutCalls[name]++; return run(...values); };
+        }
+        return owner;
+      } };
+    });
   }
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => __state()?.healthy && !__state().pending);
@@ -269,4 +283,90 @@ test("pause disposes captured and root ownership, skips paused typography reads 
   assert.match(await page.locator("#replacement").evaluate((e) => getComputedStyle(e.shadowRoot.querySelector("p")).fontFamily), /Lexend/);
   assert.equal(await page.evaluate(() => __collections().styledRoots), 2);
   await page.close();
+});
+
+
+test("layout repair defaults off while fonts and late shadow discovery remain active", async () => {
+  const page = await prepare('<style>body{font:20px Arial}#clip{height:20px;max-height:20px;overflow:hidden;width:160px}</style><div id="clip"><span id="reading">Reading words need several full lines</span></div><div id="late"></div>', { layoutRepair: null });
+  try {
+    assert.equal(await page.evaluate(() => __state().layoutRepair), false);
+    assert.deepEqual(await page.evaluate(() => __layoutCalls), { capture: 0, repair: 0 });
+    assert.match(await page.locator('#reading').evaluate(e => getComputedStyle(e).fontFamily), /Lexend for the Web/);
+    assert.equal(await page.locator('#clip').getAttribute('style'), null);
+    await page.evaluate(() => document.querySelector('#late').attachShadow({mode:'open'}).innerHTML = '<span id="late-reading">Late readable words</span>');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#late').shadowRoot.querySelector('span')).fontFamily.includes('Lexend for the Web'));
+    await settled(page);
+    assert.deepEqual(await page.evaluate(() => __layoutCalls), { capture: 0, repair: 0 });
+    await page.evaluate(() => __update({ layoutRepair: true }));
+    await settled(page);
+    const enabled = await page.evaluate(() => ({ ...__layoutCalls, state: __state() }));
+    assert.equal(enabled.state.layoutRepair, true);
+    assert.ok(enabled.capture > 0 && enabled.repair > 0);
+    await page.evaluate(() => __update({ layoutRepair: false }));
+    await settled(page);
+    assert.equal(await page.evaluate(() => __state().layoutRepair), false);
+    assert.equal(await page.locator('#clip').getAttribute('style'), null);
+    assert.equal(await page.locator('#clip').getAttribute('data-lexend-layout-repair'), null);
+    const disabled = await page.evaluate(() => ({ ...__layoutCalls }));
+    assert.deepEqual(disabled, { capture: enabled.capture, repair: enabled.repair });
+    await page.evaluate(() => __update({ layoutRepair: true }));
+    await settled(page);
+    assert.ok(await page.evaluate((before) => __layoutCalls.capture > before, disabled.capture));
+    await page.locator('#clip').evaluate(e => e.style.setProperty('height', '37px', 'important'));
+    await page.evaluate(() => __update({ layoutRepair: false }));
+    await settled(page);
+    assert.equal(await page.locator('#clip').evaluate(e => e.style.getPropertyValue('height')), '37px');
+    assert.equal(await page.locator('#clip').evaluate(e => e.style.getPropertyPriority('height')), 'important');
+  } finally { await page.close(); }
+});
+
+
+test("only the matching logical site opts into repair and equivalent global changes avoid recapture", async () => {
+  const page = await prepare('<p>Readable words on this logical site</p>', {
+    layoutRepair: false,
+    before: page => page.evaluate(() => {
+      Object.defineProperty(document, 'referrer', { value: 'https://runtime.test/source', configurable: true });
+      __settings.siteRules = [{ hostname: 'other.test', layoutRepair: true }];
+    })
+  });
+  try {
+    assert.equal(await page.evaluate(() => __state().hostname), 'runtime.test');
+    assert.equal(await page.evaluate(() => __state().layoutRepair), false);
+    assert.deepEqual(await page.evaluate(() => __layoutCalls), { capture: 0, repair: 0 });
+    await page.evaluate(() => __update({ siteRules: [{ hostname: 'runtime.test', layoutRepair: true }] }));
+    await settled(page);
+    assert.equal(await page.evaluate(() => __state().layoutRepair), true);
+    const capture = await page.evaluate(() => __layoutCalls.capture);
+    assert.ok(capture > 0);
+    await page.evaluate(() => __update({ layoutRepair: true }));
+    await settled(page);
+    assert.equal(await page.evaluate(() => __layoutCalls.capture), capture);
+    await page.evaluate(() => __update({ layoutRepair: false }));
+    await settled(page);
+    assert.equal(await page.evaluate(() => __layoutCalls.capture), capture);
+    await page.evaluate(() => __update({ siteRules: [{ hostname: 'other.test', layoutRepair: true }] }));
+    await settled(page);
+    assert.equal(await page.evaluate(() => __state().layoutRepair), false);
+    assert.equal(await page.evaluate(() => __messages.filter(m => m.type === 'LEXEND_STATE').at(-1).layoutRepair), false);
+  } finally { await page.close(); }
+});
+
+test("default-off repair still reclassifies CSS focus-revealed typography", async () => {
+  const page = await prepare(`<style>
+    #skip{position:absolute;clip:rect(1px,1px,1px,1px);width:40px;height:38px;overflow:hidden;font:18px/1.1 Arial}
+    #skip:focus{clip:auto;width:auto;height:auto;overflow:visible}
+  </style><a href="#reading" id="skip">Skip to readable content</a><p id="reading">Reading content</p>`, { layoutRepair: null });
+  try {
+    assert.equal(await page.locator('#skip').evaluate(e => getComputedStyle(e).fontSize), '18px');
+    await page.locator('#skip').focus();
+    await page.waitForFunction(() => Math.abs(parseFloat(getComputedStyle(document.querySelector('#skip')).fontSize) - 19.8) < 0.02);
+    await settled(page);
+    assert.match(await page.locator('#skip').evaluate(e => getComputedStyle(e).fontFamily), /Lexend/);
+    await page.locator('#skip').evaluate(e => e.blur());
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#skip')).fontSize === '18px');
+    await settled(page);
+    assert.equal(await page.evaluate(() => __state().layoutRepair), false);
+    assert.deepEqual(await page.evaluate(() => __layoutCalls), { capture: 0, repair: 0 });
+    assert.equal(await page.locator('#skip').getAttribute('data-lexend-layout-repair'), null);
+  } finally { await page.close(); }
 });

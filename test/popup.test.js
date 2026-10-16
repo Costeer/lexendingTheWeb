@@ -229,3 +229,42 @@ test("scope-only preferences never expose stale source actions for a missing or 
     assert.notEqual(page.get("#site-status-text").children[0]?.textContent, "Active on ");
   }
 });
+
+test("popup layout opt-in preserves activation and scope and survives reopening", async () => {
+  const initial = { enabled: false, siteRules: [{ hostname: "example.com", enabled: false, scope: "all" }] };
+  const page = await openPopup({ initial });
+  const control = page.get("#site-layout-repair");
+  assert.equal(control.disabled, false);
+  control.checked = true;
+  control.emit("change");
+  await tick();
+  const saved = page.stored();
+  assert.equal(saved.enabled, false);
+  assert.deepEqual(saved.siteRules[0], { hostname: "example.com", includeSubdomains: false, enabled: false, scope: "all", layoutRepair: true });
+  const reopened = await openPopup({ initial: saved });
+  assert.equal(reopened.get("#site-layout-repair").checked, true);
+  assert.equal(reopened.get("#site-layout-repair").disabled, false);
+});
+
+test("global layout repair disables the popup override without creating site rules", async () => {
+  const page = await openPopup({ initial: { layoutRepair: true } });
+  assert.equal(page.get("#site-layout-repair").checked, true);
+  assert.equal(page.get("#site-layout-repair").disabled, true);
+  assert.equal(page.get("#site-layout-repair-help").textContent, "Enabled on all sites in Settings");
+  page.get("#site-layout-repair").checked = false;
+  page.get("#site-layout-repair").emit("change");
+  await tick();
+  assert.equal(page.writes.length, 0);
+  assert.deepEqual(page.stored().siteRules, []);
+});
+
+test("popup can opt out of inherited repair using an independent exact rule", async () => {
+  const page = await openPopup({ initial: { siteRules: [{ hostname: "example.com", includeSubdomains: true, layoutRepair: true }] } });
+  assert.equal(page.get("#site-layout-repair").checked, true);
+  page.get("#site-layout-repair").checked = false;
+  page.get("#site-layout-repair").emit("change");
+  await tick();
+  assert.deepEqual(globalThis.LexendSettings.getDirectRule(page.stored(), "example.com"), {
+    hostname: "example.com", includeSubdomains: false, enabled: null, scope: null, layoutRepair: false
+  });
+});

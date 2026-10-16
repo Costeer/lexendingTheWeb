@@ -55,7 +55,7 @@ const prepare = async ({ masked = false, reaction = false, variant = "candidate"
       globalThis.__expectedRoot = document.createElement("div");
       __expectedRoot.innerHTML = root.innerHTML;
       const storage = [], runtime = [];
-      globalThis.__settings = { enabled: true, scope: "all", textScale: 120 };
+      globalThis.__settings = { enabled: true, scope: "all", layoutRepair: true, textScale: 120 };
       globalThis.chrome = {
         runtime: { getURL: (path) => `http://static-css-guard.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
         storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => storage.push(fn) } }

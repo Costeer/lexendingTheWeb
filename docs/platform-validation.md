@@ -52,6 +52,15 @@ node scripts/shadow-browser-tests.mjs firefox --browser-version 140.0 \
 ```
 
 On Linux without a desktop, prefix each browser command with `xvfb-run -a`.
+The general Firefox desktop runner also supports `MOZ_HEADLESS=1` when no usable
+desktop display is available. In that mode it explicitly sets Firefox's primary
+and available pointer capabilities to fine/hover for this mouse-based suite and
+records `headlessFirefox: true` and `firefoxPointerPreset: "fine-hover"`. It
+asserts the desktop media-query precondition and retains the narrow viewport,
+zoom, keyboard, and other checks. This is emulated desktop input coverage, not
+physical mouse or Firefox Android evidence. Without that preset, Linux headless
+Firefox can report no mouse ([Mozilla bug 2037020](https://bugzilla.mozilla.org/show_bug.cgi?id=2037020)).
+
 Selenium Manager downloads matching browser and driver binaries; its usage
 statistics are disabled. CI provisions the requested engine and driver before
 either installed suite, with up to three download attempts and 5/10-second

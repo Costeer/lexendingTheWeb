@@ -301,6 +301,11 @@
                     </div>
                 </div>
 
+                <div class="layout-repair-setting">
+                    <label><input id="layout-repair" type="checkbox" aria-describedby="layout-repair-help" /> <span>Enable layout repair on all sites</span></label>
+                    <p id="layout-repair-help">Otherwise, enable it for individual sites from the popup or site rules.</p>
+                </div>
+
                 <div class="readability-preview">
                     <div class="preview-heading">
                         <span>Preview</span>
@@ -364,7 +369,7 @@
                 <div class="section-heading">
                     <h2 id="rules-title">Site rules</h2>
                     <p class="helper">
-                        Exact-host rules take priority. Each value then inherits from the most specific matching rule, followed by global settings. The global On/Off switch always applies.
+                        Exact-host rules take priority. Each value then inherits from the most specific matching rule, followed by global settings. The global On/Off switch always applies. Layout repair is optional per site; the all-sites layout repair setting takes priority.
                     </p>
                 </div>
 

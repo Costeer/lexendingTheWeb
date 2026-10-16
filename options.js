@@ -7,6 +7,7 @@
   const preferenceStorage = extension?.storage?.local;
   const ADVANCED_PREFERENCE_KEY = "advancedReadability";
   const PREVIEW_DEFAULT_LINE_HEIGHT = 1.65;
+  const layoutRepairInput = document.querySelector("#layout-repair");
   const darkThemeInput = document.querySelector("#dark-theme");
   const appearanceState = document.querySelector("#appearance-state");
   const advancedModeInput = document.querySelector("#advanced-mode");
@@ -132,7 +133,7 @@
   let pendingRuleDeletion = null;
   const ruleRowData = new WeakMap();
   const quote = quotesApi.random();
-  const mutationControls = [darkThemeInput, advancedModeInput, textScaleSlider,
+  const mutationControls = [layoutRepairInput, darkThemeInput, advancedModeInput, textScaleSlider,
     lineHeightSlider, letterSpacingSlider, resetReadabilityButton, hostnameInput,
     subdomainsInput, exportButton, importButton, importFile,
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
@@ -318,6 +319,7 @@
   };
 
   const renderReadability = () => {
+    layoutRepairInput.checked = settings.layoutRepair;
     setRadioValue(basicTextScaleInputs, settings.textScale);
     setRadioValue(basicLineHeightInputs, settings.lineHeight);
     setRadioValue(basicLetterSpacingInputs, settings.letterSpacing);
@@ -439,7 +441,7 @@
     const effective = settingsApi.resolveSite(settings, hostname);
     const activation = effective.siteEnabled ? "Enabled" : "Paused";
     const gate = settings.enabled ? "" : " Global switch is Off, so Lexend is paused.";
-    return `At ${hostname}: site preference ${activation} from ${effective.enabledRule ? ruleSource(effective.enabledRule) : "default site preference (no activation rule)"}; scope ${effective.scope === "all" ? "Body and headings" : "Body text"} from ${ruleSource(effective.scopeRule)}.${gate}`;
+    return `At ${hostname}: site preference ${activation} from ${effective.enabledRule ? ruleSource(effective.enabledRule) : "default site preference (no activation rule)"}; scope ${effective.scope === "all" ? "Body and headings" : "Body text"} from ${ruleSource(effective.scopeRule)}; layout repair ${effective.layoutRepair ? "on" : "off"} from ${settings.layoutRepair ? "all-sites setting" : effective.layoutRepairRule ? ruleSource(effective.layoutRepairRule) : "default (off)"}.${gate}`;
   };
 
   const makeRuleEditor = (rule) => {
@@ -453,6 +455,7 @@
     const specs = [
       ["enabled", "Activation", [["inherit", "Use global / inherited rule"], ["true", "Active"], ["false", "Paused"]]],
       ["scope", "Scope", [["inherit", "Use global / inherited rule"], ["body", "Body text"], ["all", "Body and headings"]]],
+      ["layoutRepair", "Layout repair", [["inherit", "Use inherited rule (default off)"], ["true", "On"], ["false", "Off"]]],
       ["includeSubdomains", "Match", [["false", "Exact host only"], ["true", "Host and subdomains"]]]
     ];
     for (const [name, title, choices] of specs) {
@@ -468,14 +471,14 @@
         option.textContent = caption;
         select.append(option);
       }
-      select.value = rule[name] === null ? "inherit" : String(rule[name]);
+      select.value = rule[name] == null ? "inherit" : String(rule[name]);
       controls[name] = select;
       label.append(text, select);
       form.append(label);
     }
     const explanation = document.createElement("p");
     explanation.className = "rule-sources";
-    explanation.textContent = `${sourceExplanation(rule.hostname)} Inherited values can come from a broader rule. Inherit both values to remove this rule.${rule.includeSubdomains ? " More specific rules can change the result on subdomains." : ""}`;
+    explanation.textContent = `${sourceExplanation(rule.hostname)} Inherited values can come from a broader rule. Inherit activation, scope, and layout repair to remove this rule. Layout repair adjusts containers to fit enlarged text; the all-sites setting takes priority.${rule.includeSubdomains ? " More specific rules can change the result on subdomains." : ""}`;
     const error = document.createElement("p");
     error.className = "field-error";
     error.setAttribute("role", "alert");
@@ -490,7 +493,7 @@
     cancelButton.className = "inline-link rule-editor-cancel";
     cancelButton.textContent = "Cancel";
     cancelButton.addEventListener("click", () => {
-      for (const [key, select] of Object.entries(controls)) select.value = rule[key] === null ? "inherit" : String(rule[key]);
+      for (const [key, select] of Object.entries(controls)) select.value = rule[key] == null ? "inherit" : String(rule[key]);
       editor.open = false;
       error.textContent = "";
       summary.focus();
@@ -500,10 +503,11 @@
       if (!preferences.loaded || saveButton.disabled) return;
       const draft = {
         enabled: controls.enabled.value === "inherit" ? null : controls.enabled.value === "true",
+        layoutRepair: controls.layoutRepair.value === "inherit" ? null : controls.layoutRepair.value === "true",
         scope: controls.scope.value === "inherit" ? null : controls.scope.value,
         includeSubdomains: controls.includeSubdomains.value === "true"
       };
-      const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => value !== rule[key]));
+      const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => value !== (rule[key] ?? null)));
       if (!Object.keys(changes).length) { editor.open = false; summary.focus(); return; }
       saveButton.disabled = true;
       const ok = await persist({ type: "updateRule", hostname: rule.hostname,
@@ -529,7 +533,7 @@
   const renderRules = () => {
     const query = searchInput.value.trim().toLowerCase();
     const key = JSON.stringify([
-      settings.siteRules, settings.enabled, settings.scope, query, desktopSettingsLayout.matches, rulesExpanded
+      settings.siteRules, settings.enabled, settings.scope, settings.layoutRepair, query, desktopSettingsLayout.matches, rulesExpanded
     ]);
     if (key === renderedRulesKey) return;
     cancelRuleDeletion();
@@ -569,7 +573,7 @@
 
       const status = document.createElement("span");
       status.className = "rule-status";
-      status.textContent = `${rule.enabled === null ? "Inherit activation" : (rule.enabled ? "Active" : "Paused")} · ${rule.scope === null ? "Inherit scope" : (rule.scope === "all" ? "Body and headings" : "Body text")}`;
+      status.textContent = `${rule.enabled === null ? "Inherit activation" : (rule.enabled ? "Active" : "Paused")} · ${rule.scope === null ? "Inherit scope" : (rule.scope === "all" ? "Body and headings" : "Body text")} · ${rule.layoutRepair == null ? "Inherit layout repair" : rule.layoutRepair ? "Layout repair on" : "Layout repair off"}`;
       const { editor, summary } = makeRuleEditor(rule);
       domain.append(editor);
 
@@ -617,7 +621,7 @@
       setSaveState(importSaveStatus.state, importSaveStatus.message);
     } else if (failures.length) {
       const labels = { theme: "appearance", textScale: "text size", lineHeight: "line height",
-        letterSpacing: "letter spacing", enabled: "on/off setting", scope: "scope", siteRules: "site rules" };
+        letterSpacing: "letter spacing", layoutRepair: "all-sites layout repair", enabled: "on/off setting", scope: "scope", siteRules: "site rules" };
       const fields = [...new Set(failures.flatMap((failure) => failure.keys)
         .map((key) => labels[key] ?? "site rule"))].join(", ");
       setSaveState("error", `Not saved: ${fields}. ${failures[0].error.message || "Try again."}`);
@@ -841,6 +845,8 @@
     updateAddRuleState();
   });
 
+  layoutRepairInput.addEventListener("change", () => persist({ type: "patch", changes: { layoutRepair: layoutRepairInput.checked } }));
+
   searchInput.addEventListener("input", renderRules);
 
   toggleRuleListButton.addEventListener("click", () => {
@@ -885,7 +891,7 @@
   exportButton.addEventListener("click", () => {
     if (!preferences.loaded) return;
     const payload = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       exportedAt: new Date().toISOString(),
       settings
     };
@@ -902,6 +908,7 @@
   });
 
   const importValue = (key, value) => {
+    if (key === "layoutRepair") return value ? "On for all sites" : "Per-site opt-in";
     if (key === "enabled") return value ? "On" : "Off";
     if (key === "scope") return value === "all" ? "Body and headings" : "Body text";
     if (key === "textScale") return `${value}%`;
@@ -910,8 +917,8 @@
     return String(value);
   };
   const importKeys = { enabled: "Global switch", scope: "Global scope", theme: "Theme",
-    textScale: "Text size", lineHeight: "Line height", letterSpacing: "Letter spacing" };
-  const ruleDescription = (rule) => `${ruleSource(rule)}: activation ${rule.enabled === null ? "inherit" : rule.enabled ? "active" : "paused"}, scope ${rule.scope === null ? "inherit" : importValue("scope", rule.scope)}`;
+    layoutRepair: "Layout repair", textScale: "Text size", lineHeight: "Line height", letterSpacing: "Letter spacing" };
+  const ruleDescription = (rule) => `${ruleSource(rule)}: activation ${rule.enabled === null ? "inherit" : rule.enabled ? "active" : "paused"}, scope ${rule.scope === null ? "inherit" : importValue("scope", rule.scope)}, layout repair ${rule.layoutRepair == null ? "inherit" : rule.layoutRepair ? "on" : "off"}`;
 
   const showImportPreview = (preview, kind = "import") => {
     importDraft = { preview, kind, operation: kind === "undo"

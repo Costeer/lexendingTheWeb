@@ -102,6 +102,8 @@
   const resizedFrames = new Map();
   let lastFrameRequest = null;
   const FRAME_MESSAGE = "lexend-measured-frame-height";
+  const FRAME_RECHECK = "LEXEND_RECHECK_FRAME_REQUIREMENT";
+  const FRAME_RUNTIME_RECHECK = "LEXEND_RECHECK_FRAME_REQUIREMENTS";
   const FRAME_RUNTIME_REQUEST = "LEXEND_FRAME_REQUIREMENT";
   const FRAME_RUNTIME_APPLY = "LEXEND_APPLY_FRAME_REQUIREMENT";
   // Presence belongs to the author, even while another Lexend owner supplies
@@ -158,13 +160,13 @@
     resizedFrames.delete(frame);
   };
   const notifyFrameRequirement = () => {
-    if (initialFrameHeight === null) return;
+    if (initialFrameHeight === null || (!isLayoutRepairActive() && lastFrameRequest === null)) return;
     // At document_start an embed can still have its default/placeholder size.
     // Follow native viewport changes until our measured request is actually
     // reflected in the child viewport, then retain the pre-repair baseline.
     if (innerHeight > 0 && (requestedFrameHeight === null
         || Math.abs(innerHeight - requestedFrameHeight) > 1)) initialFrameHeight = innerHeight;
-    const requirement = isActive() ? layout?.getFrameRequirement?.(initialFrameHeight) ?? null : null;
+    const requirement = isLayoutRepairActive() ? layout?.getFrameRequirement?.(initialFrameHeight) ?? null : null;
     const serialized = JSON.stringify(requirement);
     if (lastFrameRequest === serialized && (!requirement
         || Math.abs(innerHeight - requirement.requiredHeight) <= 1)) return;
@@ -183,7 +185,7 @@
     return false;
   };
   const applyFrameRequirement = (frame, requirement) => {
-    if (!isActive() || requirement === null || frameTouchesEditor(frame)) {
+    if (!isLayoutRepairActive() || requirement === null || frameTouchesEditor(frame)) {
       disconnectObserver();
       try { restoreFrame(frame); } finally { if (!refreshing) observeRoots(); }
       return;
@@ -269,6 +271,13 @@
     if (event.data?.type !== FRAME_MESSAGE || !event.source) return;
     const frame = [...document.querySelectorAll("iframe")].find((candidate) => candidate.contentWindow === event.source);
     if (frame) applyFrameRequirement(frame, event.data.requirement);
+  };
+  const isBackgroundSender = (sender) => {
+    if (sender?.id !== extension.runtime.id) return false;
+    try {
+      const senderUrl = new URL(sender.url), extensionUrl = new URL(extension.runtime.getURL(""));
+      return senderUrl.protocol === extensionUrl.protocol && senderUrl.host === extensionUrl.host;
+    } catch { return false; }
   };
   const receiveRuntimeFrameRequirement = (message, sender) => {
     if (sender?.id !== extension.runtime.id || !Number.isInteger(message.sourceFrameId) || message.sourceFrameId <= 0) return;
@@ -388,6 +397,7 @@
     return effectiveCache.value;
   };
   const isActive = () => settingsLoaded && getEffectiveSettings().active;
+  const isLayoutRepairActive = () => isActive() && getEffectiveSettings().layoutRepair === true;
   const composedParent = (element) => element.parentElement
     ?? (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
   const hasProtectedAncestor = (element) => protection.protected(element);
@@ -1167,7 +1177,7 @@
         // An already focused action does not emit focusin again when its pane
         // grows. Recheck its repaired vertical viewport after restoring saved
         // offsets; ordinary page/table scrollers remain under native control.
-        if (!refreshError && isActive() && focusTarget?.isConnected && !protection.editorOwned(focusTarget)) globalThis.LexendControls?.revealFocused?.(focusTarget);
+        if (!refreshError && isLayoutRepairActive() && focusTarget?.isConnected && !protection.editorOwned(focusTarget)) globalThis.LexendControls?.revealFocused?.(focusTarget);
       } catch (error) { refreshError ??= error; }
       finally {
         try { viewportStyleWitness.stop(); }
@@ -1323,7 +1333,7 @@
     return layout?.canRefreshRegion?.(root) === true;
   };
   const regionalMutationRoots = (mutations) => {
-    if (!mutations.length || initializing || refreshing || restoringChanges !== null || pendingRepair !== null
+    if (!isLayoutRepairActive() || !mutations.length || initializing || refreshing || restoringChanges !== null || pendingRepair !== null
         || repairFrame !== null || refreshRevision === 0 || lastRefreshError !== null || !settingsLoaded) return null;
     const roots = new Set();
     for (const mutation of mutations) {
@@ -1351,7 +1361,7 @@
       // to a subtree that has since been skipped. Only painted subtrees have
       // a valid baseline from this refresh; returning to an omitted subtree
       // must trigger another capture even without an author mutation/resize.
-      if (!regional) {
+      if (!regional && isLayoutRepairActive()) {
         authorStylesheetSnapshot = [...styledRoots].some((root) => root instanceof ShadowRoot && canRefreshRegion(root))
           ? snapshotAuthorStylesheets() : null;
         nativeStateSnapshot = authorStylesheetSnapshot === null ? null : snapshotNativeState();
@@ -1395,7 +1405,7 @@
       for (const [frame, state] of resizedFrames) {
         // Disposal precedes geometry reads: document editing and a protected
         // member of this independent ownership group cannot retain old repairs.
-        if (!isActive() || frameTouchesEditor(frame, state)) { restoreFrame(frame); continue; }
+        if (!isLayoutRepairActive() || frameTouchesEditor(frame, state)) { restoreFrame(frame); continue; }
         let hidden = !frame.isConnected || !frame.getClientRects().length;
         for (let current = frame; !hidden && current; current = current.parentElement) {
           const css = getComputedStyle(current);
@@ -1406,7 +1416,8 @@
         // close-state mutations, even when typography remains enabled.
         if (hidden) restoreFrame(frame);
       }
-      layout?.restore({ preserveHidden });
+      layout?.restore({ preserveHidden: isLayoutRepairActive() && preserveHidden });
+      if (!isLayoutRepairActive()) layout?.dispose();
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
       knownEditorBoundaries = new WeakSet();
@@ -1430,15 +1441,17 @@
         // recreates author FontFaces in Chromium, whose loadingdone events
         // would schedule another capture indefinitely.
         const measurements = measureTypography(roots);
-        layout?.capture(roots, { preserveHidden });
+        if (isLayoutRepairActive()) layout?.capture(roots, { preserveHidden });
         applyTypography(measurements);
         // Automatic recaptures must restore existing repairs before painting,
         // so ordinary site animations cannot alternate between repaired and
         // unrepaired layouts. Startup and explicit preference changes keep
         // their early font paint. Hidden tabs cannot depend on frames either.
         const keepLayoutStable = preserveHidden && refreshRevision > 0;
-        if (keepLayoutStable || repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
-        else deferred = true;
+        if (isLayoutRepairActive()) {
+          if (keepLayoutStable || repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
+          else deferred = true;
+        }
       }
     });
     const duration = priorDuration + performance.now() - started;
@@ -1450,7 +1463,7 @@
       pendingRepair = null;
       repairFrame = null;
       const started = performance.now();
-      const error = withViewportPreserved(() => layout?.repair(settings));
+      const error = withViewportPreserved(() => { if (isLayoutRepairActive()) layout?.repair(settings); });
       completeRefresh(error, false, duration + performance.now() - started);
     };
     // Let converted text paint before the expensive geometry repair. A second
@@ -1662,7 +1675,7 @@
   };
   const refreshChangedRegions = (roots) => {
     const started = performance.now();
-    const eligible = () => document.getAnimations && document.getAnimations().length === 0
+    const eligible = () => isLayoutRepairActive() && document.getAnimations && document.getAnimations().length === 0
       && authorStylesheetsUnchanged() && nativeStateUnchanged() && roots.every(canRefreshRegion);
     if (!eligible()) { refresh(true, performance.now() - started); return; }
     refreshTimer = null;
@@ -1796,6 +1809,7 @@
     healthy: settingsLoaded && settingsLoadError === null && lastRefreshError === null,
     error: settingsLoadError ?? lastRefreshError,
     active: isActive(),
+    layoutRepair: isLayoutRepairActive(),
     hostname: getEffectiveHostname(),
     scope: getEffectiveSettings().scope
   });
@@ -1803,7 +1817,7 @@
   const notifyState = () => {
     if (window.top !== window) return;
     const state = pageState();
-    const key = [state.ready, state.pending, state.healthy, state.error, state.active].join(";");
+    const key = [state.ready, state.pending, state.healthy, state.error, state.active, state.layoutRepair].join(";");
     if (key === lastNotifiedState) return;
     lastNotifiedState = key;
     extension.runtime.sendMessage({ type: "LEXEND_STATE", ...state }).catch(() => {});
@@ -1816,6 +1830,7 @@
     settings = settingsApi.normalizeSettings(nextSettings);
     const effective = getEffectiveSettings();
     if (refreshRevision > 0 && lastRefreshError === null && previous.active === effective.active
+        && previous.layoutRepair === effective.layoutRepair
         && (!effective.active || previous.scope === effective.scope
           && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) {
       notifyState();
@@ -1829,6 +1844,12 @@
       observeRoots();
       queueRefresh();
     } else refresh();
+    if (isLayoutRepairActive() && (!previous.active || !previous.layoutRepair)) {
+      // A child may have remained opted in while this parent was off. Its
+      // earlier requirement was ignored, and no child preference or viewport
+      // change is guaranteed when the parent turns back on.
+      extension.runtime.sendMessage({ type: FRAME_RUNTIME_RECHECK }).catch(() => {});
+    }
     notifyState();
   };
   const fittingCounterMutation = (mutation) => {
@@ -2027,7 +2048,7 @@
       if (!isActive() || protection.editorOwned(event.target)) return;
       queueRefresh();
       requestAnimationFrame(() => {
-        if (isActive()) globalThis.LexendControls?.revealFocused?.(event.target);
+        if (isLayoutRepairActive()) globalThis.LexendControls?.revealFocused?.(event.target);
       });
     }, true);
     document.addEventListener("focusout", (event) => {
@@ -2154,6 +2175,13 @@
   });
 
   extension.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === FRAME_RECHECK) {
+      if (window !== window.top && isLayoutRepairActive() && isBackgroundSender(_sender)) {
+        lastFrameRequest = null;
+        notifyFrameRequirement();
+      }
+      return undefined;
+    }
     if (message?.type === FRAME_RUNTIME_APPLY) {
       receiveRuntimeFrameRequirement(message, _sender);
       sendResponse({ received: true });

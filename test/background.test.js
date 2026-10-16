@@ -228,3 +228,31 @@ test("toolbar only marks healthy settled responders active", async () => {
   browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
   assert.equal(icons.at(-1).path[16], "assets/icons/icon-16.png");
 });
+
+test("frame recheck relays only authenticated tab content senders without settings writes", async () => {
+  const { browser, messages, writes } = createBackground();
+  const request = { type: "LEXEND_RECHECK_FRAME_REQUIREMENTS", requirement: { requiredHeight: 9999 } };
+  const sender = { id: browser.runtime.id, tab: { id: 42 }, frameId: 0, url: "https://parent.example/page" };
+  for (const invalid of [
+    { ...sender, id: "other-extension" },
+    { ...sender, tab: undefined },
+    { ...sender, tab: { id: "42" } },
+    { ...sender, frameId: -1 },
+    { ...sender, frameId: undefined },
+    { ...sender, url: "extension://test/options.html" },
+    { ...sender, url: "invalid" }
+  ]) {
+    assert.equal(browser.runtime.onMessage.listener(request, invalid, () => assert.fail("Untrusted recheck cannot relay")), undefined);
+  }
+  assert.equal(messages.length, 0);
+  const response = await new Promise(resolve => {
+    assert.equal(browser.runtime.onMessage.listener(request, sender, resolve), true);
+  });
+  assert.equal(response.relayed, true);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].tabId, 42);
+  assert.equal(messages[0].options, undefined);
+  assert.equal(messages[0].message.type, "LEXEND_RECHECK_FRAME_REQUIREMENT");
+  assert.deepEqual(Object.keys(messages[0].message), ["type"], "no page-supplied geometry is forwarded");
+  assert.equal(writes.length, 0, "negotiation never records site rules");
+});

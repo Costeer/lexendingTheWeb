@@ -24,7 +24,7 @@ test("diagnostics exports an allowlist and never page data, URLs, rules, raw UA 
         async query(filter) { calls.push(["query", filter]); return [{ id: 17, url: privateValue, title: privateValue }]; },
         async sendMessage(...args) {
           calls.push(["message", ...args]);
-          return { ready: true, pending: false, healthy: false, active: true, refreshRevision: 45, scope: "body",
+          return { ready: true, pending: false, healthy: false, active: true, layoutRepair: true, refreshRevision: 45, scope: "body",
             error: privateValue, hostname: privateValue, textContent: privateValue, arbitraryCounter: privateValue };
         }
       }
@@ -33,8 +33,8 @@ test("diagnostics exports an allowlist and never page data, URLs, rules, raw UA 
   assert.deepEqual(report, {
     schemaVersion: 1, build: buildIdentity,
     browser: { name: "Chromium", version: "150.0.0.0", source: "user-agent" },
-    settings: { status: "available", enabled: false, scope: "all", theme: "dark", textScale: 140, lineHeight: 1.5, letterSpacing: .03 },
-    runtime: { status: "available", ready: true, pending: false, healthy: false, active: true, refreshRevision: 45, scope: "body", hasError: true }
+    settings: { status: "available", enabled: false, layoutRepair: false, scope: "all", theme: "dark", textScale: 140, lineHeight: 1.5, letterSpacing: .03 },
+    runtime: { status: "available", ready: true, pending: false, healthy: false, active: true, layoutRepair: true, refreshRevision: 45, scope: "body", hasError: true }
   });
   assert.doesNotMatch(JSON.stringify(report), /private|https:|siteRules|disabledSites|textContent|hostname|gitPath|arbitraryCounter/);
   assert.deepEqual(calls.find(([kind]) => kind === "query"), ["query", { active: true, currentWindow: true }]);

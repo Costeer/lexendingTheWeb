@@ -61,7 +61,7 @@ test("typography preserves protected content and refreshes atomic inherited base
     await page.evaluate(() => {
       const shadow = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
       shadow.innerHTML = '<style>p {font:18px/1.4 Arial;letter-spacing:0} code {font:inherit}</style><p id=shadow-text>Shadow prose <code id=shadow-code>code()</code></p>';
-      globalThis.__settings = { enabled: false, scope: "body", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 };
+      globalThis.__settings = { enabled: false, layoutRepair: true, scope: "body", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 };
       globalThis.__listeners = [];
       globalThis.__runtimeListeners = [];
       globalThis.chrome = {
@@ -358,7 +358,7 @@ test("already focused repaired panel actions remain visible after typography set
     await page.route("http://panel.test/**",async route=>route.fulfill({body:await readFile(resolve(`.${new URL(route.request().url()).pathname}`)),contentType:"font/woff2"}));
     await page.setContent(`<!doctype html><style>body{margin:0;font:16px/20px Arial;min-height:5000px}.panel{position:fixed;left:20px;top:40px;width:300px;height:300px;max-height:300px;overflow:hidden;background:white}p{margin:0}button{font:inherit}</style><main>Document content</main><div class=panel role=dialog aria-label="Instructions">${Array.from({length:12},(_,i)=>`<p>Panel instruction ${i+1}</p>`).join("")}<button id=action>Continue</button></div>`);
     await page.evaluate(()=>{
-      globalThis.__settings={enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};globalThis.__listeners=[];
+      globalThis.__settings={enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};globalThis.__listeners=[];
       globalThis.chrome={runtime:{getURL:p=>`http://panel.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
       globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       globalThis.__focusedBounds=()=>{const p=document.querySelector('.panel'),a=document.querySelector('#action'),r=p.getBoundingClientRect(),q=a.getBoundingClientRect();return{repair:p.dataset.lexendLayoutRepair,paneTop:r.top,paneBottom:r.bottom,actionTop:q.top,actionBottom:q.bottom,scrollTop:p.scrollTop,scrollY,focused:document.activeElement===a};};
@@ -391,11 +391,18 @@ test("small cross-origin announcements resize by measured demand and restore", a
       else await route.fulfill({contentType:"text/html",body:`<!doctype html><style>body{margin:0;font:12px/14px Arial}span{display:inline-block;width:160px}button{position:absolute;right:0;top:0;font:12px Arial}${path.includes("centered") ? "html,body{height:100%}body{display:flex;align-items:center}button{top:50%;transform:translateY(-50%)}" : ""}</style><span>Readable bonus announcement</span><button>Close</button>`});
     });
     await page.setContent('<!doctype html><iframe src="http://frame.test/banner" style="height:150px;max-height:150px;width:240px;border:0"></iframe><nav>Following navigation</nav>');
+    await page.exposeFunction("__relayFrameRecheck", async () => {
+      await Promise.all(page.frames().map(frame => frame.evaluate(() => {
+        for (const listener of globalThis.__runtime ?? []) listener({type:"LEXEND_RECHECK_FRAME_REQUIREMENT"}, {id:"frame-test",url:"http://frame.test/background.js"}, () => {});
+      })));
+    });
     const install=async target=>{
       await target.evaluate(()=>{
-        globalThis.__settings={enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
+        globalThis.__settings={enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
         globalThis.__listeners=[];
-        globalThis.chrome={runtime:{getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT")window.parent.postMessage({type:"lexend-measured-frame-height",requirement:message.requirement},"*");},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
+        globalThis.__runtime=[];
+        globalThis.__frameDemandCount=0;
+        globalThis.chrome={runtime:{id:"frame-test",getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT"){__frameDemandCount++;window.parent.postMessage({type:"lexend-measured-frame-height",requirement:message.requirement},"*");}else if(message.type==="LEXEND_RECHECK_FRAME_REQUIREMENTS")await __relayFrameRecheck();},onMessage:{addListener:f=>__runtime.push(f)}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
         globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       });
       for(const path of ["settings","adaptive-controls","adaptive-layout","content"])await target.addScriptTag({path:resolve(`src/${path}.js`)});
@@ -423,10 +430,28 @@ test("small cross-origin announcements resize by measured demand and restore", a
     await page.waitForTimeout(30);
     assert.deepEqual(pageErrors,[],"malformed messages from the actual embedded window do not throw");
     assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded);
-    await child.evaluate(()=>__update({enabled:false}));
+    await child.evaluate(()=>__update({layoutRepair:false}));
     await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
+    assert.match(await child.locator("span").evaluate(element=>getComputedStyle(element).fontFamily),/Lexend/,"repair opt-out keeps typography active");
+    const offDemandCount=await child.evaluate(()=>__frameDemandCount);
+    await child.evaluate(()=>__relayFrameRecheck());
+    await page.waitForTimeout(30);
+    assert.equal(await child.evaluate(()=>__frameDemandCount),offDemandCount,"repair-off child ignores authenticated recheck without measuring or sending demand");
+    await child.evaluate(()=>__update({layoutRepair:true}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
+    await page.evaluate(()=>__update({layoutRepair:false}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
+    await child.evaluate(()=>window.parent.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:60}},"*"));
+    await page.waitForTimeout(30);
+    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),30,"disabled parent ignores a child's valid resize request");
+    await page.evaluate(()=>__update({layoutRepair:true}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
+    const reenabledGeometry=await child.locator("span").evaluate(element=>({bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
+    assert.ok(reenabledGeometry.bottom<=reenabledGeometry.viewport,"parent re-enable renegotiates with its unchanged opted-in child");
+    await child.evaluate(()=>__update({enabled:false}));
     assert.equal(await page.locator("iframe").getAttribute("style"),"height: 30px; max-height: 30px; width: 240px; border: 0px;");
 
+    await page.evaluate(()=>__update({layoutRepair:true}));
     const centeredNavigation=page.waitForEvent("framenavigated",{predicate:frame=>frame.url().includes("centered-banner")});
     await page.evaluate(()=>{
       document.querySelector("iframe").remove();
@@ -486,7 +511,7 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
  try{
   context=await chromium.launchPersistentContext(profile,{channel:"chromium",headless:true,args:[`--disable-extensions-except=${extensionPath}`,`--load-extension=${extensionPath}`]});
   const worker=context.serviceWorkers()[0]??await context.waitForEvent("serviceworker");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true,scope:"all",siteRules:[],textScale:110,lineHeight:1.6,letterSpacing:.02}));
+  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true,layoutRepair:true,scope:"all",siteRules:[],textScale:110,lineHeight:1.6,letterSpacing:.02}));
   const page=await context.newPage();await page.setViewportSize({width:390,height:844});
   await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30,{},{timeout:5000});
@@ -648,7 +673,7 @@ test("newly painted automatic content gets a fresh layout baseline without refre
   await page.evaluate(()=>{
    globalThis.__listeners=[];globalThis.__captureCount=0;globalThis.__reveals=0;
    document.addEventListener('contentvisibilityautostatechange',e=>{if(e.target.id==='lazy'&&!e.skipped)__reveals++;},true);
-   globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({enabled:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
+   globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({enabled:true,layoutRepair:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
   });
   for(const name of ['settings','adaptive-controls','adaptive-layout'])await page.addScriptTag({path:resolve(`src/${name}.js`)});
   await page.evaluate(()=>{const create=LexendLayout.create;globalThis.LexendLayout={create:options=>{const controller=create(options);return{...controller,capture:(...args)=>{__captureCount++;return controller.capture(...args);}};}};});
@@ -705,7 +730,7 @@ test("slotted typography overrides inner important rules and loads exact Latin s
     await page.evaluate(() => {
       const shadow = document.querySelector("#host").attachShadow({ mode: "open" });
       shadow.innerHTML = '<style>@layer component {::slotted([slot="title"]){font-family:Arial!important;font-size:var(--author-size)!important;line-height:28px!important;letter-spacing:-.5px!important}::slotted([slot="body"]){font:14px/24px Arial!important}::slotted([slot="code"]){font:13px/19px monospace!important}}</style><slot name="title"></slot><slot name="body"></slot><slot name="code"></slot>';
-      globalThis.__settings = {enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
+      globalThis.__settings = {enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
       globalThis.__listeners=[];
       globalThis.chrome={runtime:{getURL:path=>`http://slotted.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:listener=>__listeners.push(listener)}}};
       globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(listener=>listener(changes,"sync"));};
@@ -756,7 +781,7 @@ test("incoming feed text outruns coalesced animation updates and exposes pending
     await page.setContent('<!doctype html><style>body{font:16px/24px Arial;margin:0}button{font:inherit}#motion{height:10px;width:10px}#feed{font:14px/20px Arial}#spacer{height:6000px}</style><button id="action"><span>Ordinary action</span></button><div id="motion"></div><div id="feed"><p>Initial feed</p></div><div id="spacer"></div>');
     await page.evaluate(()=>{
       globalThis.__runtime=[];
-      globalThis.chrome={runtime:{getURL:path=>`http://feed.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:listener=>__runtime.push(listener)}},storage:{sync:{get:async()=>({enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:()=>{}}}};
+      globalThis.chrome={runtime:{getURL:path=>`http://feed.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:listener=>__runtime.push(listener)}},storage:{sync:{get:async()=>({enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:()=>{}}}};
       globalThis.__state=()=>{let state;__runtime.forEach(listener=>listener({type:"LEXEND_GET_STATE"},null,value=>state=value));return state;};
     });
     for(const name of ["settings","adaptive-controls","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});

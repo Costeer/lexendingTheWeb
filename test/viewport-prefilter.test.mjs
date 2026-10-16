@@ -47,7 +47,7 @@ const prepare = async (variant, { authoredEmpty = false, ownershipFixture = fals
       globalThis.__scanEditorChecks = [];
       globalThis.__scanOffsetReads = [];
       const runtime = [], storage = [];
-      globalThis.__settings = { enabled: true, scope: "all", textScale: 120 };
+      globalThis.__settings = { enabled: true, scope: "all", layoutRepair: true, textScale: 120 };
       globalThis.chrome = {
         runtime: { getURL: (path) => `http://viewport-prefilter.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
         storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => storage.push(fn) } }

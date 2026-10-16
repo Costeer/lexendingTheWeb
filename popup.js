@@ -36,6 +36,8 @@
   const siteStrip = document.querySelector("#site-strip");
   const siteStatusText = document.querySelector("#site-status-text");
   const siteMessage = document.querySelector("#site-message");
+  const siteLayoutRepair = document.querySelector("#site-layout-repair");
+  const siteLayoutRepairHelp = document.querySelector("#site-layout-repair-help");
   const siteSources = document.querySelector("#site-sources");
   const useInheritedSite = document.querySelector("#use-inherited-site");
   const toggleSiteButton = document.querySelector("#toggle-site");
@@ -47,6 +49,7 @@
 
   let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
   let site = null;
+  let layoutRepairSaving = false;
   let feedbackTimer;
   const quote = quotesApi.random();
   const preferences = globalThis.LexendPreferences.createClient(extension, {
@@ -89,6 +92,7 @@
     );
     masterState.textContent = settings.enabled ? "On" : "Off";
     enabledInput.disabled = !preferences.loaded;
+    siteLayoutRepair.disabled = !preferences.loaded || site?.status !== "ready" || settings.layoutRepair || layoutRepairSaving;
     toggleSiteButton.disabled = !preferences.loaded || site?.status !== "ready";
     useInheritedSite.disabled = !preferences.loaded || site?.status !== "ready";
     scopeFieldset.disabled = !preferences.loaded || !settings.enabled;
@@ -130,10 +134,15 @@
     toggleSiteButton.hidden = false;
 
     const effective = settingsApi.resolveSite(settings, site.hostname);
-    siteSources.textContent = `Site preference: ${effective.siteEnabled ? "Enabled" : "Paused"} from ${effective.enabledRule ? ruleSource(effective.enabledRule) : "default site preference (no activation rule)"}. Scope: ${effective.scope === "all" ? "Body and headings" : "Body text"} from ${ruleSource(effective.scopeRule)}.${settings.enabled ? "" : " The global Off switch takes priority."}`;
+    siteLayoutRepair.checked = effective.layoutRepair;
+    siteLayoutRepairHelp.textContent = settings.layoutRepair
+      ? "Enabled on all sites in Settings"
+      : "Adjust containers to fit enlarged text. Saved even while Lexend is paused.";
+    siteSources.textContent = `Site preference: ${effective.siteEnabled ? "Enabled" : "Paused"} from ${effective.enabledRule ? ruleSource(effective.enabledRule) : "default site preference (no activation rule)"}. Scope: ${effective.scope === "all" ? "Body and headings" : "Body text"} from ${ruleSource(effective.scopeRule)}. Layout repair: ${effective.layoutRepair ? "On" : "Off"} from ${settings.layoutRepair ? "all-sites setting" : effective.layoutRepairRule ? ruleSource(effective.layoutRepairRule) : "default (off)"}.${settings.enabled ? "" : " The global Off switch takes priority."}`;
     useInheritedSite.hidden = !settingsApi.getDirectRule(settings, site.hostname);
     useInheritedSite.setAttribute("aria-label", `Remove exact overrides for ${site.hostname} and use inherited settings`);
-    const confirmed = site.state.active === effective.active && (!effective.active || site.state.scope === effective.scope);
+    const confirmed = site.state.active === effective.active && (!effective.active || site.state.scope === effective.scope)
+      && (!effective.active || typeof site.state.layoutRepair !== "boolean" || site.state.layoutRepair === effective.layoutRepair);
     if (!settings.enabled && confirmed) {
       siteStatusText.textContent = "Off";
       siteMessage.textContent = "Lexend is paused everywhere.";
@@ -290,6 +299,15 @@
     if (await mutate({ type: "removeRule", hostname: site.hostname, includeSubdomains: false })) {
       toggleSiteButton.focus();
     }
+  });
+
+  siteLayoutRepair.addEventListener("change", async () => {
+    if (!site?.supported || site.status !== "ready" || settings.layoutRepair || layoutRepairSaving) return;
+    const value = siteLayoutRepair.checked;
+    layoutRepairSaving = true;
+    render();
+    try { await mutate({ type: "setSiteLayoutRepair", hostname: site.hostname, value }); }
+    finally { layoutRepairSaving = false; render(); }
   });
 
   toggleSiteButton.addEventListener("click", () => {

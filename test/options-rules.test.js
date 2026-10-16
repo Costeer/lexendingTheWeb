@@ -807,7 +807,7 @@ const editorFor = (row) => {
   const form = editor.children[1];
   const fields = Object.fromEntries(form.children.filter((child) => child.children[1]?.name)
     .map((label) => [label.children[1].name, label.children[1]]));
-  return { editor, form, fields, sources: form.children[3] };
+  return { editor, form, fields, sources: form.children.find((child) => child.className === "rule-sources") };
 };
 
 test("scope-only imported rules edit each override and expose the independent inherited sources", async () => {
@@ -1405,4 +1405,36 @@ test("large unmigrated legacy lists reject an unsafe rich edit and import withou
   assert.match(page.get("#import-error").textContent, /room for these site rules/);
   assert.equal(Object.hasOwn(page.rawStored(), "siteRules"), false);
   assert.deepEqual(page.stored().siteRules.map((rule) => rule.hostname), disabledSites);
+});
+
+test("global layout repair changes no rules and turning it off restores opt-ins", async () => {
+  const page = await openSettings({ initial: { siteRules: [
+    { hostname: "yes.example", layoutRepair: true }, { hostname: "no.example", layoutRepair: false }
+  ] } });
+  const before = page.stored().siteRules;
+  page.get("#layout-repair").checked = true;
+  await page.get("#layout-repair").emit("change");
+  assert.deepEqual(page.stored().siteRules, before);
+  assert.equal(globalThis.LexendSettings.resolveSite(page.stored(), "no.example").layoutRepair, true);
+  page.get("#layout-repair").checked = false;
+  await page.get("#layout-repair").emit("change");
+  assert.deepEqual(page.stored().siteRules, before);
+  assert.equal(globalThis.LexendSettings.resolveSite(page.stored(), "yes.example").layoutRepair, true);
+  assert.equal(globalThis.LexendSettings.resolveSite(page.stored(), "no.example").layoutRepair, false);
+});
+
+test("layout repair editor inherits independently and preserves matching and activation", async () => {
+  const page = await openSettings({ initial: { siteRules: [
+    { hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all", layoutRepair: true }
+  ] } });
+  let editor = editorFor(page.rows()[0]);
+  assert.equal(editor.fields.layoutRepair.value, "true");
+  editor.fields.layoutRepair.value = "inherit";
+  await editor.form.emit("submit", { preventDefault() {} });
+  assert.deepEqual(page.stored().siteRules, [{ hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all" }]);
+  editor = editorFor(page.rows()[0]);
+  assert.equal(editor.fields.layoutRepair.value, "inherit");
+  editor.fields.layoutRepair.value = "false";
+  await editor.form.emit("submit", { preventDefault() {} });
+  assert.deepEqual(page.stored().siteRules, [{ hostname: "example.com", includeSubdomains: true, enabled: false, scope: "all", layoutRepair: false }]);
 });

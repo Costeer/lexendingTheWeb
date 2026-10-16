@@ -5,6 +5,7 @@ import test from "node:test";
 import { chromium } from "playwright";
 
 const prepare = async (context, saved = { enabled: true, scope: "all", textScale: 120 }, fontResponse, { startupDeadline = null } = {}) => {
+  saved = { layoutRepair: true, ...saved };
   const page = await context.newPage();
   await page.route("http://startup.test/**", fontResponse ?? (async (route) => {
     await route.fulfill({ body: await readFile(resolve(`.${new URL(route.request().url()).pathname}`)), contentType: "font/woff2" });

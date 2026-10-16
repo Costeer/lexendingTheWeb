@@ -68,7 +68,7 @@ try {
   await page.goto('http://profile.test');
   await page.evaluate(() => {
     const listeners = [], messages = [];
-    globalThis.__settings = { enabled: true, scope: 'all', textScale: 120, lineHeight: 0, letterSpacing: 0, siteRules: [] };
+    globalThis.__settings = { enabled: true, scope: 'all', layoutRepair: true, textScale: 120, lineHeight: 0, letterSpacing: 0, siteRules: [] };
     globalThis.chrome = {
       runtime: { getURL: path => `http://profile.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: fn => messages.push(fn) } },
       storage: { sync: { get: async () => ({ ...__settings }) }, onChanged: { addListener: fn => listeners.push(fn) } }

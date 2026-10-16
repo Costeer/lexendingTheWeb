@@ -4,7 +4,7 @@ import { By, Key } from 'selenium-webdriver';
 // Shared installed-extension checks. The launcher owns browser setup and
 // settings writes; these operations and assertions run against real page DOM.
 export async function runLifecycleChecks({ driver, script, wait, check, setSettings }) {
-  await setSettings({ enabled: true, scope: 'all', textScale: 110, lineHeight: 0, letterSpacing: 0 });
+  await setSettings({ enabled: true, layoutRepair: true, scope: 'all', textScale: 110, lineHeight: 0, letterSpacing: 0 });
   await script(() => {
     const fixture = document.createElement('section');
     fixture.id = 'lifecycle-fixture';

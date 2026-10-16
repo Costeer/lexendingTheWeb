@@ -164,3 +164,57 @@ test("popup identifies the independent winning rules beside global controls", as
   await expect.poll(async () => (await saved(page)).siteRules.length).toBe(1);
   await expect(page.locator("#site-sources")).toContainText("example.org");
 });
+
+test("layout repair global switch preserves per-site choices and editor independence", async ({ page }, testInfo) => {
+  await openInterface(page, "options.html");
+  await setSettings(page, { siteRules: [
+    { hostname: "example.org", includeSubdomains: true, enabled: false, scope: "all", layoutRepair: true },
+    { hostname: "reading.example.org", enabled: null, scope: null, layoutRepair: false }
+  ] });
+  const before = (await saved(page)).siteRules;
+  const globalRepair = page.getByLabel("Enable layout repair on all sites", { exact: true });
+  await globalRepair.focus();
+  await page.keyboard.press("Space");
+  await expect.poll(async () => (await saved(page)).layoutRepair).toBe(true);
+  expect((await saved(page)).siteRules).toEqual(before);
+  await page.locator("#advanced-mode").check();
+  await expect(globalRepair).toBeVisible();
+  await globalRepair.uncheck();
+  await expect.poll(async () => (await saved(page)).layoutRepair).toBe(false);
+  expect((await saved(page)).siteRules).toEqual(before);
+  const rulesNavigation = page.locator('[data-settings-panel="rules-panel"]');
+  if (await rulesNavigation.isVisible()) await rulesNavigation.click();
+  const row = page.locator('.rule-row[data-hostname="reading.example.org"]');
+  await row.locator("summary").click();
+  const repair = row.getByRole("combobox", { name: "Layout repair", exact: true });
+  await expect(repair).toHaveValue("false");
+  await repair.selectOption("inherit");
+  await scanAccessibility(page, testInfo);
+  await row.locator(".rule-editor-save").click();
+  await expect(row).toHaveCount(0);
+  const parent = (await saved(page)).siteRules.find((rule) => rule.hostname === "example.org");
+  expect(parent).toEqual(before[0]);
+});
+
+test("popup layout opt-in persists independently while global repair locks its control", async ({ page }, testInfo) => {
+  await openInterface(page, "popup.html");
+  await setSettings(page, { enabled: false, siteRules: [] });
+  const repair = page.getByLabel("Layout repair on this site", { exact: true });
+  await expect(repair).toBeEnabled();
+  await repair.focus();
+  await page.keyboard.press("Space");
+  await expect.poll(async () => (await saved(page)).siteRules).toEqual([
+    { hostname: "reading.example.org", includeSubdomains: false, enabled: null, scope: null, layoutRepair: true }
+  ]);
+  expect((await saved(page)).enabled).toBe(false);
+  await scanAccessibility(page, testInfo);
+  const before = await saved(page);
+  await page.evaluate(async () => browser.storage.sync.set({ layoutRepair: true }));
+  await expect(repair).toBeChecked();
+  await expect(repair).toBeDisabled();
+  await expect(page.locator("#site-layout-repair-help")).toHaveText("Enabled on all sites in Settings");
+  expect((await saved(page)).siteRules).toEqual(before.siteRules);
+  await page.evaluate(async () => browser.storage.sync.set({ layoutRepair: false }));
+  await expect(repair).toBeEnabled();
+  await expect(repair).toBeChecked();
+});

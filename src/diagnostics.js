@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const settingKeys = Object.freeze(["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const settingKeys = Object.freeze(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
   const numericVersion = (value) => typeof value === "string" && /^\d{1,5}(?:\.\d{1,10}){0,3}$/.test(value) ? value : null;
   const sanitizeBuildIdentity = (value) => {
     if (value?.schemaVersion !== 1 || !numericVersion(value.version)
@@ -39,7 +39,7 @@
       const state = await bounded(() => extension.tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 }));
       if (!state || typeof state.ready !== "boolean") return { status: "unavailable" };
       const result = { status: "available" };
-      for (const key of ["ready", "pending", "healthy", "active"]) {
+      for (const key of ["ready", "pending", "healthy", "active", "layoutRepair"]) {
         if (typeof state[key] === "boolean") result[key] = state[key];
       }
       if (Number.isSafeInteger(state.refreshRevision) && state.refreshRevision >= 0) result.refreshRevision = state.refreshRevision;

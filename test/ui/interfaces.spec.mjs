@@ -74,7 +74,7 @@ for (const surface of ["about", "popup"]) test(`${surface} saves private diagnos
   expect(serialized).not.toMatch(/private-diagnostic-sentinel|siteRules|hostname|previewText/);
   const report = JSON.parse(serialized);
   expect(report.build.sourceHash).toBe("0123456789abcdef".repeat(4));
-  expect(report.settings).toEqual({ status: "available", enabled: true, scope: "all", theme: "dark",
+  expect(report.settings).toEqual({ status: "available", enabled: true, layoutRepair: false, scope: "all", theme: "dark",
     textScale: 125, lineHeight: 1.7, letterSpacing: .05 });
   expect(report.runtime).toEqual(surface === "about" ? { status: "unavailable" } : {
     status: "available", ready: true, pending: false, healthy: false, active: true,

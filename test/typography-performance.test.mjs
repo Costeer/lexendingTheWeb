@@ -12,7 +12,7 @@ const prepare = async (page, html, { settings = {}, beforeStart, settle = true, 
   await page.setContent(html);
   await page.evaluate((settings) => {
     const storage = [], runtime = [];
-    globalThis.__settings = { enabled: true, scope: "all", textScale: 100, ...settings };
+    globalThis.__settings = { enabled: true, scope: "all", layoutRepair: true, textScale: 100, ...settings };
     globalThis.chrome = {
       runtime: { getURL: (path) => `http://performance.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
       storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => storage.push(fn) } }
@@ -363,7 +363,7 @@ test("large pages reuse measurements, preserve protected branches, and rest whil
     <pre id="editor">${Array.from({ length: 500 }, (_, i) => `<span>const value${i} = ${i};</span>\n`).join("")}</pre>`);
     await page.evaluate(() => {
       document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<p style="font-size:1.5em">Protected shadow text</p>';
-      globalThis.__settings = { enabled: false, scope: "all", textScale: 120 };
+      globalThis.__settings = { enabled: false, scope: "all", layoutRepair: true, textScale: 120 };
       const storage = [], runtime = [];
       globalThis.chrome = {
         runtime: { getURL: (path) => `http://performance.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },

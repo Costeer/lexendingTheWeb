@@ -1,8 +1,13 @@
 # Layout adjustments
 
-Lexend can take up more space than a site's original font. The extension
-measures the page before and after changing the text, then makes room where
-that change causes clipping or overlap.
+Lexend can take up more space than a site's original font. Layout repair is off
+by default. Enable **Layout repair on this site** in the popup to save a site
+rule, or **Enable layout repair on all sites** in Settings. The all-sites switch
+leaves saved site choices intact; turning it off restores those choices.
+
+When enabled, repair measures the page before and after changing the text, then
+makes room where that change causes clipping or overlap. Font conversion also
+works with repair off.
 
 It can:
 

@@ -49,3 +49,20 @@ observing the imported values keeps the original recovery available even if an
 unrelated edit follows. Identical concurrent writes cannot be attributed to a
 particular writer without durable receipts. Closing the Settings page discards
 its undo snapshot. Export a backup when recovery must remain available later.
+
+## Optional layout repair
+
+Layout repair starts off for existing and new profiles. Font conversion keeps its
+existing activation and scope settings. Save an exact-site repair decision with
+`{ type: "setSiteLayoutRepair", hostname, value: true }`; `false` saves an explicit
+site refusal and `null` clears only that decision. Rules may also include a
+`layoutRepair` boolean and apply it to subdomains. Matching decisions resolve
+independently from activation and scope, with the nearest matching rule winning.
+
+The `layoutRepair` preference enables repair on all sites while on. It never
+creates site rules or modifies saved site decisions; switching it off restores
+those decisions. The extension master switch still gates page work. Imports and
+exports use schema 3, while schema 1 and 2 backups without this preference load
+with repair off. Undo restores changed fields only when later edits have not
+claimed them. Diagnostics include only the global repair boolean, never rules
+or hostnames.

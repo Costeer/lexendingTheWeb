@@ -78,7 +78,7 @@ test("default rule writes remain readable by the actual old reader and survive i
   const f = fixture({}, { quota: true });
   await f.store.mutate({ type: "replace", settings: { ...api.defaults, siteRules: rules } });
   assert.ok(Array.isArray(f.saved().siteRules));
-  assert.deepEqual(JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), api.decodeSettings(f.saved()));
+  assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false }, api.decodeSettings(f.saved()));
   await oldApi.preferences.createStore(f.storage).mutate({ type: "patch", changes: { theme: "dark" } });
   assert.deepEqual(api.decodeSettings(f.saved()).siteRules, rules);
   await oldApi.preferences.createStore(f.storage).mutate({ type: "addRule", rule: { hostname: "added.example", enabled: false } });
@@ -130,7 +130,7 @@ test("large legacy pause edits stay compatible and rich changes reject before an
   assert.equal(f.saved().enabled, true);
   assert.equal(f.saved().disabledSites.length, 249);
   assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
-  assert.deepEqual(JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), api.decodeSettings(f.saved()));
+  assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false }, api.decodeSettings(f.saved()));
   await f.store.mutate({ type: "replace", settings: api.normalizeSettings({ disabledSites, theme: "dark" }) });
   assert.deepEqual(f.saved().disabledSites, disabledSites);
 });
@@ -383,7 +383,7 @@ test("an over-capacity pause and import fail without changing any saved settings
   const oversized = Array.from({ length: 250 }, (_, index) => ({ hostname: `site${index}.example.com`, enabled: false }));
   const f = fixture(api.encodeSettings({ siteRules: oversized }));
   await assert.rejects(f.store.mutate({ type: "toggleSite", hostname: "new.example.com" }), { code: "RULE_CAPACITY" });
-  await assert.rejects(f.store.mutate({ type: "replace", settings: { ...api.defaults, siteRules: [...oversized, { hostname: "new.example.com", enabled: false }] } }), { code: "RULE_CAPACITY" });
+  await assert.rejects(f.store.mutate({ type: "replace", settings: api.normalizeSettings({ ...api.defaults, siteRules: [...oversized, { hostname: "new.example.com", enabled: false }] }) }), { code: "RULE_CAPACITY" });
   assert.deepEqual(api.decodeSettings(f.saved()).siteRules, api.normalizeSettings({ siteRules: oversized }).siteRules);
   assert.equal(f.writes.length, 0);
   await f.store.mutate({ type: "removeRule", hostname: "site1.example.com" });
@@ -432,7 +432,7 @@ test("authentic 120 and 250 legacy pauses remain compatible and editable under t
     assert.deepEqual(f.saved().disabledSites, disabledSites.filter((_, i) => i !== 1));
     assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
     assert.ok(Buffer.byteLength("disabledSites" + JSON.stringify(f.saved().disabledSites)) <= 8192);
-    assert.deepEqual(JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), saved);
+    assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false }, saved);
     const restarted = preferences.createClient(f.extension);
     await restarted.load();
     assert.deepEqual(restarted.settings, saved);
@@ -472,7 +472,7 @@ test("persisted decoding preserves every rule variant and fails closed for corru
   }
   const settings = { ...api.defaults, siteRules };
   assert.deepEqual(api.decodeSettings(api.encodeSettings(settings)), settings);
-  for (const siteRules of ["@2\none.example", "@1\none.example\t18", "@1\none.example\t6", "@1\none.example\tno", "@1\nbad/domain", "@1\none.example\none.example", "@1\none.example\n"]) {
+  for (const siteRules of ["@3\none.example", "@1\none.example\t18", "@1\none.example\t6", "@1\none.example\tno", "@1\nbad/domain", "@1\none.example\none.example", "@1\none.example\n"]) {
     const f = fixture({ enabled: false, siteRules, disabledSites: ["legacy.example"] });
     const client = preferences.createClient(f.extension);
     await assert.rejects(client.load(), { code: "INVALID_STORAGE" });
@@ -522,7 +522,7 @@ test("capacity checks the encoded item including key bytes at the actual quota b
   const remaining = 8192 - api.ruleStorageBytes({ siteRules: rules }) - 2;
   rules.push({ hostname: hostname(32, remaining), enabled: false });
   assert.equal(api.ruleStorageBytes({ siteRules: rules }), 8192);
-  const full = { ...api.defaults, siteRules: rules };
+  const full = api.normalizeSettings({ ...api.defaults, siteRules: rules });
   const f = fixture(api.encodeSettings({}), { quota: true });
   await f.store.mutate({ type: "replace", settings: full });
   const saved = structuredClone(f.saved());
@@ -810,4 +810,93 @@ test("posting to a disconnected port preserves the synchronous connection error"
   await client.mutate({ type: "patch", changes: { theme: "light" } });
   assert.equal(client.settings.theme, "light");
   assert.equal(ports.length, 2, "the next save opens a fresh connection");
+});
+
+test("layout repair defaults off, resolves independently, and global enablement preserves site intent", async () => {
+  assert.equal(api.normalizeSettings({}).layoutRepair, false);
+  const settings = api.normalizeSettings({ enabled: false, scope: "body", siteRules: [
+    { hostname: "example.com", includeSubdomains: true, layoutRepair: true },
+    { hostname: "child.example.com", includeSubdomains: true, layoutRepair: false },
+    { hostname: "child.example.com", layoutRepair: true, enabled: false, scope: "all" }
+  ] });
+  assert.equal(api.resolveSite(settings, "a.example.com").layoutRepair, true);
+  assert.equal(api.resolveSite(settings, "a.child.example.com").layoutRepair, false);
+  const direct = api.resolveSite(settings, "child.example.com");
+  assert.equal(direct.layoutRepair, true);
+  assert.equal(direct.active, false);
+  assert.equal(direct.scope, "all");
+  for (const raw of [settings, api.encodeSettings(settings), { disabledSites: ["saved.example"] }]) {
+    const f = fixture(raw);
+    const before = structuredClone(f.saved());
+    await f.store.mutate({ type: "patch", changes: { layoutRepair: true } });
+    assert.equal(api.resolveSite(f.saved(), "unknown.example").layoutRepair, true);
+    assert.equal(api.resolveSite(f.saved(), "a.child.example.com").layoutRepair, true);
+    await f.store.mutate({ type: "patch", changes: { layoutRepair: false } });
+    for (const key of ["siteRules", "disabledSites"]) assert.deepEqual(f.saved()[key], before[key]);
+    assert(f.writes.every((patch) => !Object.hasOwn(patch, "siteRules") && !Object.hasOwn(patch, "disabledSites")));
+  }
+});
+
+test("site layout decisions preserve master and other rule fields, clear inheritance, and serialize concurrent changes", async () => {
+  const f = fixture(api.normalizeSettings({ enabled: false, siteRules: [
+    { hostname: "example.com", enabled: false, scope: "all" },
+    { hostname: "example.com", includeSubdomains: true, layoutRepair: false }
+  ] }));
+  await Promise.all([
+    f.store.mutate({ type: "setSiteLayoutRepair", hostname: "example.com", value: true }),
+    f.store.mutate({ type: "patch", changes: { textScale: 125 } })
+  ]);
+  assert.deepEqual(api.getDirectRule(f.saved(), "example.com"), {
+    hostname: "example.com", includeSubdomains: false, enabled: false, scope: "all", layoutRepair: true
+  });
+  assert.equal(f.saved().enabled, false);
+  assert.equal(f.saved().textScale, 125);
+  assert.equal(api.getDirectRule(f.saved(), "example.com", true).layoutRepair, false);
+  await f.store.mutate({ type: "setSiteLayoutRepair", hostname: "example.com", value: null });
+  assert.equal(Object.hasOwn(api.getDirectRule(f.saved(), "example.com"), "layoutRepair"), false);
+  await f.store.mutate({ type: "setSiteLayoutRepair", hostname: "new.example", value: false });
+  await f.store.mutate({ type: "setSiteLayoutRepair", hostname: "new.example", value: null });
+  assert.equal(api.getDirectRule(f.saved(), "new.example"), null);
+  for (const operation of [
+    { hostname: "bad/domain", value: true }, { hostname: "good.example", value: "true" }, { hostname: "good.example" }
+  ]) await assert.rejects(f.store.mutate({ type: "setSiteLayoutRepair", ...operation }), { code: "INVALID_RULE" });
+});
+
+test("repair compact encoding is versioned and strict, preserving old normalized rule shapes", () => {
+  const rules = [];
+  for (const layoutRepair of [undefined, false, true]) for (const includeSubdomains of [false, true]) {
+    for (const enabled of [false, true, null]) for (const scope of [null, "body", "all"]) {
+      if (enabled === null && scope === null && layoutRepair === undefined) continue;
+      rules.push({ hostname: `v${rules.length}.example`, includeSubdomains, enabled, scope,
+        ...(layoutRepair === undefined ? {} : { layoutRepair }) });
+    }
+  }
+  const normalized = api.normalizeSettings({ siteRules: rules });
+  const encoded = api.encodeSettings(normalized);
+  assert(encoded.siteRules.startsWith("@2\n"));
+  assert.deepEqual(api.decodeSettings(encoded), normalized);
+  assert(api.encodeSettings({ siteRules: rules.filter((rule) => rule.layoutRepair === undefined) }).siteRules.startsWith("@1\n"));
+  for (const siteRules of ["@2\na.example\t54", "@2\na.example\t-1", "@2\na.example\t01", "@2\na.example\t6", "@2\na.example\t36\na.example\t36", "@2\na.example\t36\n"]) {
+    assert.throws(() => api.decodeSettings({ siteRules }), { code: "INVALID_STORAGE" });
+  }
+});
+
+test("schema 3 and repair undo preserve later decisions while old backups remain readable", () => {
+  const before = api.normalizeSettings({ siteRules: [{ hostname: "example.com", enabled: false, layoutRepair: false }] });
+  const after = api.normalizeSettings({ ...before, layoutRepair: true, siteRules: [{ hostname: "example.com", enabled: true, layoutRepair: true }] });
+  const later = api.setSiteRule(after, { hostname: "example.com", layoutRepair: false });
+  const restored = api.restoreImport(later, before, after);
+  assert.equal(restored.layoutRepair, false);
+  assert.equal(restored.siteRules[0].layoutRepair, false);
+  assert.equal(restored.siteRules[0].enabled, false);
+  assert.deepEqual(api.validateImport({ schemaVersion: 3, settings: after }), after);
+  const legacy = { ...before }; delete legacy.layoutRepair;
+  assert.equal(api.validateImport({ schemaVersion: 2, settings: legacy }).layoutRepair, false);
+  assert.throws(() => api.validateImport({ schemaVersion: 3, settings: legacy }), { code: "INVALID_IMPORT" });
+  for (const settings of [{ ...after, layoutRepair: null }, { ...after, siteRules: [{ hostname: "example.com", layoutRepair: null }] },
+    { ...after, siteRules: [{ hostname: "example.com", layoutRepair: true, unknown: true }] }]) {
+    assert.throws(() => api.validateImport({ schemaVersion: 3, settings }), { code: "INVALID_IMPORT" });
+  }
+  assert(api.previewImport(before, after).changes.some((change) => change.key === "layoutRepair"));
+  assert.equal(api.previewImport(before, after).rules.changed.length, 1);
 });

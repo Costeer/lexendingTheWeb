@@ -430,3 +430,32 @@ test("new rule intent at either side of a failed rename supersedes that indivisi
     assert.equal(h.tracker.state.failures.length, 0);
   }
 });
+
+test("repair lost acknowledgements retire fulfilled site intent and global retries preserve newer intent", async () => {
+  const h = harness();
+  await assert.rejects(h.tracker.mutate({ type: "setSiteLayoutRepair", hostname: "example.com", value: true }));
+  h.remote({ siteRules: [{ hostname: "example.com", enabled: false, layoutRepair: true }] });
+  const attempts = h.operations.length;
+  h.allow();
+  await h.tracker.retry();
+  assert.equal(h.operations.length, attempts);
+  assert.equal(h.settings().enabled, true);
+  assert.equal(h.settings().siteRules[0].enabled, false);
+  h.reject();
+  await assert.rejects(h.tracker.mutate({ type: "patch", changes: { layoutRepair: true, textScale: 120 } }));
+  h.allow();
+  await h.tracker.mutate({ type: "patch", changes: { layoutRepair: false } });
+  await h.tracker.retry();
+  assert.equal(h.settings().layoutRepair, false);
+  assert.equal(h.settings().textScale, 120);
+});
+
+test("failed repair retries reject newer rule values rather than erasing them", async () => {
+  const h = harness();
+  await assert.rejects(h.tracker.mutate({ type: "setSiteLayoutRepair", hostname: "example.com", value: true }));
+  h.remote({ siteRules: [{ hostname: "example.com", layoutRepair: false }] });
+  h.allow();
+  await h.tracker.retry();
+  assert.equal(h.settings().siteRules[0].layoutRepair, false);
+  assert.equal(h.tracker.state.failures[0].error.code, "STALE_SETTINGS");
+});
