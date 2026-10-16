@@ -9,6 +9,9 @@ const controls = await readFile(new URL("../src/adaptive-controls.js", import.me
 const invalidation = "if (measurements) measurements = freshMeasurements();";
 const exposed = (kind = "candidate") => {
   let value = source;
+  if (kind === "live-snapshot") value = replaceExactlyOnce(value,
+    "fontSize: parseFloat(style.fontSize) || 16, font: style.font,",
+    "get fontSize() { return parseFloat(style.fontSize) || 16; }, font: style.font,", "unsafe live snapshot font");
   if (kind === "same-generation") value = replaceExactlyOnce(value, invalidation,
     "if (measurements) Object.assign(measurements, freshMeasurements());", "unsafe retained generation");
   if (kind === "stale") value = replaceExactlyOnce(value, invalidation, "", "unsafe stale measurements");
@@ -18,7 +21,7 @@ const exposed = (kind = "candidate") => {
   return replaceExactlyOnce(value, "    const capture = (roots, options) =>",
     `    globalThis.__measure = { withMeasurements, snapshot, styleFor, paintStyleFor, boxFor,
       hasBox, directTextRects, containedRects, write, mark, editorOwned, repairTables,
-      generation: () => measurements };
+      generation: () => measurements, baseline: () => baseline };
     const capture = (roots, options) =>`, "test-only measurement closure");
 };
 let browser;
@@ -210,4 +213,52 @@ test("measurement scopes preserve native glyphs, repair geometry and exact resto
   assert.deepEqual(glyphShape(candidate.repaired), glyphShape(candidate.native), "protected native glyphs keep typography and dimensions");
   assert.equal(candidate.repaired[0].size, "24px");
   assert.equal(candidate.exactMarkup, true);
+});
+
+const retainedValues = async (kind) => {
+  const page = await pageFor(`<style>
+    #text{position:relative;top:7px;height:24px;width:240px;font:16px/20px Arial;color:rgb(10,20,30);transform:none}
+  </style><div id="text">Historical snapshot text</div>`, kind);
+  try {
+    return await page.evaluate(() => {
+      const element = document.querySelector("#text"), original = document.body.innerHTML;
+      layout.capture();
+      const baseline = __measure.baseline().get(element);
+      const result = __measure.withMeasurements(() => {
+        const retained = __measure.snapshot(element);
+        const generation = __measure.generation();
+        __measure.write(element, "top", "31px", "history");
+        __measure.write(element, "height", "48px", "history");
+        __measure.write(element, "font-size", "28px", "history");
+        __measure.write(element, "color", "rgb(80, 90, 100)", "history");
+        __measure.write(element, "transform", "translateX(3px)", "history");
+        // Deliberately read historical fields for the first time after writes.
+        // Memoizing live getters on first access must fail these assertions.
+        const historical = (state) => ({ fontSize: state.fontSize, color: state.color, transform: state.transform,
+          height: state.box.height });
+        const fresh = __measure.snapshot(element);
+        return { baseline: { ...historical(baseline), top: baseline.authoredTop, authoredHeight: baseline.authoredHeight },
+          retained: historical(retained), fresh: historical(fresh), newGeneration: generation !== __measure.generation(),
+          freshIdentity: fresh !== retained };
+      });
+      layout.restore();
+      return { ...result, restored: document.body.innerHTML === original };
+    });
+  } finally { await page.close(); }
+};
+const assertRetainedValues = (result) => {
+  const historical = { fontSize: 16, color: "rgb(10, 20, 30)", transform: "none", height: 24 };
+  assert.deepEqual(result.baseline, { ...historical, top: 7, authoredHeight: 24 }, "baseline fields must retain pre-write values");
+  assert.deepEqual(result.retained, historical, "retained current fields must retain pre-write values");
+  assert.deepEqual(result.fresh, { fontSize: 28, color: "rgb(80, 90, 100)", transform: "matrix(1, 0, 0, 1, 3, 0)", height: 48 });
+  assert.equal(result.newGeneration, true);
+  assert.equal(result.freshIdentity, true);
+  assert.equal(result.restored, true);
+};
+test("baseline and retained snapshots preserve unread values across writes while fresh snapshots update", async () => {
+  const candidate = await retainedValues("candidate");
+  assertRetainedValues(candidate);
+  const unsafe = await retainedValues("live-snapshot");
+  assert.throws(() => assertRetainedValues(unsafe), /baseline fields/);
+  assert.throws(() => assertRetainedValues({ ...unsafe, baseline: candidate.baseline }), /retained current fields/);
 });

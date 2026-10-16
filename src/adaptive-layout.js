@@ -95,14 +95,13 @@
       fontSize: parseFloat(style.fontSize) || 16, font: style.font, letterSpacing: parseFloat(style.letterSpacing) || 0,
       display: style.display, position: style.position, whiteSpace: style.whiteSpace,
       overflowX: style.overflowX, overflowY: style.overflowY, lineClamp: style.webkitLineClamp,
-      color: style.color, backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage,
+      color: style.color,
       paddingTop: parseFloat(style.paddingTop) || 0, paddingBottom: parseFloat(style.paddingBottom) || 0,
       paddingLeft: parseFloat(style.paddingLeft) || 0, paddingRight: parseFloat(style.paddingRight) || 0,
       borderTop: parseFloat(style.borderTopWidth) || 0, borderBottom: parseFloat(style.borderBottomWidth) || 0,
       borderLeft: parseFloat(style.borderLeftWidth) || 0, borderRight: parseFloat(style.borderRightWidth) || 0,
-      flexDirection: style.flexDirection, flexWrap: style.flexWrap, gridTemplateColumns: style.gridTemplateColumns,
-      textOverflow: style.textOverflow, transform: style.transform,
-      authoredTop: parseFloat(style.top), authoredHeight: parseFloat(style.height), hangulTokens: hangulTokens(element)
+      flexDirection: style.flexDirection,
+      textOverflow: style.textOverflow, transform: style.transform, hangulTokens: hangulTokens(element)
     };
   };
   const defaultTextElements = (root) => {
@@ -245,6 +244,19 @@
       const cache = measurements.snapshots[Number(allowViewportEscape)];
       if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox));
       return cache.get(element);
+    };
+    // Authored constraints are only consumed from the retained baseline. Capture
+    // them eagerly here: computed styles stay live across later repair writes.
+    // Capture and repair have separate measurement scopes, so current snapshots
+    // need neither these reads nor a deferred getter with a longer lifetime.
+    const captureSnapshot = (element) => {
+      const state = snapshot(element);
+      if (state) {
+        const style = styleFor(element);
+        state.authoredTop = parseFloat(style.top);
+        state.authoredHeight = parseFloat(style.height);
+      }
+      return state;
     };
     const write = (element, property, value, category) => {
       requireRegionOwnership(element);
@@ -396,12 +408,12 @@
           root.querySelectorAll?.("button,[role='button'],input,select,textarea,a[href]").forEach((element) => candidates.add(element));
           for (const element of candidates) {
             if (!(element instanceof HTMLElement) || protection.protected(element)) continue;
-            const state = snapshot(element);
+            const state = captureSnapshot(element);
             if (!state) continue;
             textElements.add(element); baseline.set(element, state);
             if (element.matches("button,[role='button']") && element.children.length <= 4) {
               for (const child of element.children) {
-                const childState = snapshot(child);
+                const childState = captureSnapshot(child);
                 if (childState && !baseline.has(child)) baseline.set(child, childState);
               }
             }
@@ -415,12 +427,12 @@
               if (!descendants.has(parent)) descendants.set(parent, []);
               descendants.get(parent).push(element);
               if (!baseline.has(parent) || region && parent === region.root.host) {
-                const parentState = snapshot(parent);
+                const parentState = captureSnapshot(parent);
                 if (parentState) baseline.set(parent, parentState);
                 if (region && parent === region.root.host) continue;
                 if (parent.children.length <= 16) for (const sibling of parent.children) {
                   if (!(sibling instanceof HTMLElement || sibling instanceof SVGElement) || baseline.has(sibling)) continue;
-                  const siblingState = snapshot(sibling);
+                  const siblingState = captureSnapshot(sibling);
                   if (siblingState) baseline.set(sibling, siblingState);
                 }
                 // A picture wrapper can have no box while its absolutely
@@ -428,7 +440,7 @@
                 // shallow image layers without scanning whole page subtrees.
                 if (parent.children.length <= 16) for (const visual of parent.querySelectorAll(":scope > picture > img")) {
                   if (!baseline.has(visual)) {
-                    const visualState = snapshot(visual);
+                    const visualState = captureSnapshot(visual);
                     if (visualState) baseline.set(visual, visualState);
                   }
                 }
@@ -438,14 +450,14 @@
           // Media-only branches may have no text ancestors near the flex
           // column that owns their width. Retain their measured geometry too.
           for (const media of root.querySelectorAll?.("img,video,canvas") ?? []) {
-            const state = snapshot(media);
+            const state = captureSnapshot(media);
             if (!state || state.box.width < 40 || state.box.height < 40) continue;
             if (!baseline.has(media)) baseline.set(media, state);
             let parent = ancestor(media);
             for (let depth = 0; parent && depth < 10 && parent !== document.body && parent !== document.documentElement;
               depth++, parent = region && parent === region.root.host ? null : ancestor(parent)) {
               if (baseline.has(parent) && !(region && parent === region.root.host)) continue;
-              const parentState = snapshot(parent);
+              const parentState = captureSnapshot(parent);
               if (parentState) baseline.set(parent, parentState);
             }
           }
