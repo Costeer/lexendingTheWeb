@@ -656,6 +656,8 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
   assert.deepEqual(await page.evaluate(()=>({closedFrame:document.querySelector("#closed-caption").clientHeight,closedPane:document.querySelector("#closed").clientHeight,closedStyle:document.querySelector("#closed").style.cssText,hiddenFrame:document.querySelector("#hidden-caption").clientHeight,hiddenStyle:document.querySelector("#hidden").style.cssText})),{closedFrame:100,closedPane:0,closedStyle:"",hiddenFrame:100,hiddenStyle:""},"zero-height closed and transparent ancestor panes retain their authored frame footprints");
   // A later font settlement or settings update can request more height after
   // our first repair has already grown the wrapper beyond the native cutoff.
+  // Scrolling to the below-fold caption left these frames offscreen, where
+  // Chromium can suspend animation-frame polling before settings arrive.
   assert.ok(grownFootprint.parent>160,"the first caption repair exceeds the native ancestor eligibility limit");
   await worker.evaluate(()=>chrome.storage.sync.set({textScale:120}));
   await captionChild.waitForFunction(previousHeight=>{
@@ -663,12 +665,12 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
    range.selectNodeContents(element);
    return document.fonts.status==="loaded" && parseFloat(getComputedStyle(element).fontSize)===19.2
     && innerHeight>previousHeight && range.getBoundingClientRect().bottom<=innerHeight;
-  },grownCaption.viewport,{timeout:5000});
+  },grownCaption.viewport,{timeout:5000,polling:50});
   const regrownFootprint=await page.locator("#caption").evaluate(element=>({frame:element.clientHeight,parent:element.parentElement.clientHeight}));
   assert.ok(regrownFootprint.frame>grownFootprint.frame,"the child issues a larger authenticated sizing request");
   assert.ok(regrownFootprint.parent>=regrownFootprint.frame,"an owned clipping wrapper keeps growing with subsequent caption requests");
   const tallChild=page.frames().find(frame=>frame.url().endsWith("/tall-caption"));
-  await tallChild.waitForFunction(()=>innerHeight>180,{},{timeout:5000});
+  await tallChild.waitForFunction(()=>innerHeight>180,{},{timeout:5000,polling:50});
   assert.deepEqual(await page.locator("#tall").evaluate(element=>({height:element.clientHeight,style:element.style.cssText})),
    {height:180,style:""},"an unowned wrapper above the native eligibility limit retains its authored footprint");
   await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
