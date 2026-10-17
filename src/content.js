@@ -229,7 +229,10 @@
       const shortAncestors = [];
       for (let parent = frame.parentElement; parent && parent !== document.body && shortAncestors.length < 4; parent = parent.parentElement) {
         const style = getComputedStyle(parent), before = parent.getBoundingClientRect();
-        if (before.height > 160 || before.width + 2 < box.width) break;
+        // Our earlier request can grow an eligible wrapper past the native
+        // cutoff. Keep following that owned wrapper when later fonts or
+        // settings require more room; new ancestors still use the cutoff.
+        if ((before.height > 160 && !state.elements.has(parent)) || before.width + 2 < box.width) break;
         shortAncestors.push({ element: parent, box: before, clips: /hidden|clip/.test(style.overflowY) });
       }
       const oldBottom = shortAncestors.at(-1)?.box.bottom ?? box.bottom;
