@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lexend for the Web",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Make websites easier to read with Lexend.",
   "homepage_url": "https://github.com/Costeer/lexendingTheWeb",
   "permissions": [
@@ -59,6 +59,20 @@
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/shadow-discovery.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "world": "MAIN"
     }
   ],
   "web_accessible_resources": [

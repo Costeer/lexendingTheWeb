@@ -34,7 +34,7 @@ test("bundled symbols render missing icons while site glyphs win and pause resto
       const shadow = document.querySelector("#host").attachShadow({ mode: "open" });
       shadow.innerHTML = '<span id="shadow-icon">\uf013</span>';
       globalThis.__listeners = [];
-      globalThis.__settings = { enabled: false, scope: "all" };
+      globalThis.__settings = { enabled: false, layoutRepair: true, scope: "all" };
       globalThis.chrome = {
         runtime: { getURL: (path) => `http://lexend.test/${path}`, sendMessage: async () => {}, onMessage: { addListener() {} } },
         storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => __listeners.push(fn) } }

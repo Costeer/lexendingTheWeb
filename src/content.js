@@ -10,12 +10,27 @@
   const ownStyleIds = [STYLE_ID, FONT_STYLE_ID, TRANSITION_STYLE_ID];
   const styledRoots = new Set();
   let settings = settingsApi.normalizeSettings();
-  let settingsRevision = 0;
+  let settingsReadGeneration = 0;
+  let restoringChanges = null;
   let initializing = true;
   let settingsLoaded = false;
+  let settingsLoadError = null;
+  let rawSettings = {};
+  let startupChanges = {};
+  const mergeStorageChanges = (raw, changes) => {
+    const next = { ...raw };
+    for (const [key, change] of Object.entries(changes)) {
+      if (change.newValue === undefined) delete next[key];
+      else next[key] = change.newValue;
+    }
+    return next;
+  };
 
   // Names such as `with-icon` are often ordinary prose wrappers. Protect actual
   // semantics and computed symbol/code fonts rather than substring class names.
+  const protection = globalThis.LexendProtection;
+  let editingDocument = protection.editorDocument();
+  let knownEditorBoundaries = new WeakSet();
   const protectedSelector = [
     "script", "style", "template", "noscript", "pre", "code", "kbd", "samp",
     "math", "svg", "[data-lexend-ignore]", "[role='img']",
@@ -47,11 +62,37 @@
   let refreshRequired = false;
   const pendingAriaChanges = new Map();
   const pendingStyleChanges = new Map();
+  const pendingStateChanges = new Map();
+  let pendingRegions = null;
+  let queuedGlobalRefresh = false;
+  let authorStylesheetSnapshot = null;
+  let nativeStateSnapshot = null;
   let retainedTypography = new WeakSet();
   let retentionWrites = new WeakMap();
   let retentionTimer = null;
   let counterContext = null;
   let layout = null;
+  const NO_ATTRIBUTE_MUTATION = () => null;
+  let regionalMutationWitness = null;
+  let viewportStyleWitness = null;
+  const viewportStyleGuards = new Map();
+  const pendingStyleWrites = new Set();
+  const beginAttributeMutation = (element, name) => {
+    if (name === "style") pendingStyleWrites.add(element);
+    const regional = regionalMutationWitness?.begin(element, name);
+    const viewport = viewportStyleWitness?.begin(element, name);
+    if (!regional && !viewport) return NO_ATTRIBUTE_MUTATION;
+    return () => { const mutation = regional?.(); return viewport?.() ?? mutation ?? null; };
+  };
+  const mutateAttribute = (element, name, callback) => {
+    const finish = beginAttributeMutation(element, name);
+    try { return callback(); } finally { finish(); }
+  };
+  const disconnectObserver = () => {
+    adoptStyleMutations(observer.takeRecords());
+    observer.disconnect();
+  };
+  const mutationStyle = document.createElement("span").style;
   let lastRefreshError = null;
   let warnedRefreshError = null;
   let revealedAutoContent = new WeakSet();
@@ -61,11 +102,28 @@
   const resizedFrames = new Map();
   let lastFrameRequest = null;
   const FRAME_MESSAGE = "lexend-measured-frame-height";
+  const FRAME_RECHECK = "LEXEND_RECHECK_FRAME_REQUIREMENT";
+  const FRAME_RUNTIME_RECHECK = "LEXEND_RECHECK_FRAME_REQUIREMENTS";
   const FRAME_RUNTIME_REQUEST = "LEXEND_FRAME_REQUIREMENT";
   const FRAME_RUNTIME_APPLY = "LEXEND_APPLY_FRAME_REQUIREMENT";
+  // Presence belongs to the author, even while another Lexend owner supplies
+  // the only declarations. In particular a recapture can acquire new owners
+  // while the temporary scroll-anchor declaration is still installed.
+  const getStylePresence = (element) => {
+    viewportStyleWitness?.flush();
+    const owned = viewportStyleGuards.get(element)?.hadStyle
+      ?? managedElements.get(element)?.hadStyle ?? layout?.getStylePresence(element);
+    if (owned !== undefined) return owned;
+    for (const [frame, state] of resizedFrames) {
+      if (frame === element) return state.hadStyle;
+      if (state.elements.has(element)) return state.elements.get(element).hadStyle;
+    }
+    return element.hasAttribute("style");
+  };
   const writeFrameProperty = (state, element, name, value) => {
+    if (protection.editorOwned(element)) return;
     let properties = state.elements.get(element);
-    if (!properties) state.elements.set(element, properties = { hadStyle: element.hasAttribute("style"), values: new Map() });
+    if (!properties) state.elements.set(element, properties = { hadStyle: getStylePresence(element), values: new Map() });
     let original = properties.values.get(name);
     if (!original) {
       original = { value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) };
@@ -75,7 +133,7 @@
       original.priority = element.style.getPropertyPriority(name);
     }
     original.applied = value;
-    if (element.style.getPropertyValue(name) !== value || element.style.getPropertyPriority(name) !== "important") element.style.setProperty(name, value, "important");
+    if (element.style.getPropertyValue(name) !== value || element.style.getPropertyPriority(name) !== "important") mutateAttribute(element, "style", () => element.style.setProperty(name, value, "important"));
   };
   const restoreFrame = (frame) => {
     const state = resizedFrames.get(frame);
@@ -83,28 +141,32 @@
     for (const [name, original] of state.properties) {
       if (frame.style.getPropertyValue(name) !== original.applied
           || frame.style.getPropertyPriority(name) !== "important") continue;
-      if (original.value) frame.style.setProperty(name, original.value, original.priority);
-      else frame.style.removeProperty(name);
+      mutateAttribute(frame, "style", () => {
+        if (original.value) frame.style.setProperty(name, original.value, original.priority);
+        else frame.style.removeProperty(name);
+      });
     }
-    if (!state.hadStyle && !frame.getAttribute("style")) frame.removeAttribute("style");
+    if (!state.hadStyle && !frame.getAttribute("style")) mutateAttribute(frame, "style", () => frame.removeAttribute("style"));
     for (const [element, properties] of state.elements) {
       for (const [name, original] of properties.values) {
         if (element.style.getPropertyValue(name) !== original.applied || element.style.getPropertyPriority(name) !== "important") continue;
-        if (original.value) element.style.setProperty(name, original.value, original.priority);
-        else element.style.removeProperty(name);
+        mutateAttribute(element, "style", () => {
+          if (original.value) element.style.setProperty(name, original.value, original.priority);
+          else element.style.removeProperty(name);
+        });
       }
-      if (!properties.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+      if (!properties.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
     }
     resizedFrames.delete(frame);
   };
   const notifyFrameRequirement = () => {
-    if (initialFrameHeight === null) return;
+    if (initialFrameHeight === null || (!isLayoutRepairActive() && lastFrameRequest === null)) return;
     // At document_start an embed can still have its default/placeholder size.
     // Follow native viewport changes until our measured request is actually
     // reflected in the child viewport, then retain the pre-repair baseline.
     if (innerHeight > 0 && (requestedFrameHeight === null
         || Math.abs(innerHeight - requestedFrameHeight) > 1)) initialFrameHeight = innerHeight;
-    const requirement = isActive() ? layout?.getFrameRequirement?.(initialFrameHeight) ?? null : null;
+    const requirement = isLayoutRepairActive() ? layout?.getFrameRequirement?.(initialFrameHeight) ?? null : null;
     const serialized = JSON.stringify(requirement);
     if (lastFrameRequest === serialized && (!requirement
         || Math.abs(innerHeight - requirement.requiredHeight) <= 1)) return;
@@ -114,9 +176,17 @@
     // Route measured requirements through authenticated extension messaging.
     extension.runtime.sendMessage({ type: FRAME_RUNTIME_REQUEST, requirement }).catch(() => {});
   };
+  const frameTouchesEditor = (frame, state = resizedFrames.get(frame)) => {
+    if (protection.editorOwned(frame)) return true;
+    // A measured frame can own clipping ancestors and independent fixed action
+    // bars. Any of those entering an editor invalidates the whole repair group;
+    // restore with the same author-override checks used for pause/removal.
+    for (const element of state?.elements.keys() ?? []) if (protection.editorOwned(element)) return true;
+    return false;
+  };
   const applyFrameRequirement = (frame, requirement) => {
-    if (!isActive() || requirement === null) {
-      observer.disconnect();
+    if (!isLayoutRepairActive() || requirement === null || frameTouchesEditor(frame)) {
+      disconnectObserver();
       try { restoreFrame(frame); } finally { if (!refreshing) observeRoots(); }
       return;
     }
@@ -150,16 +220,19 @@
     }
     let state = resizedFrames.get(frame);
     if (!state && Math.abs(box.height - viewportHeight) > 4) return;
-    observer.disconnect();
+    disconnectObserver();
     try {
       if (!state) {
-        state = { hadStyle: frame.hasAttribute("style"), properties: new Map(), elements: new Map() };
+        state = { hadStyle: getStylePresence(frame), properties: new Map(), elements: new Map() };
         resizedFrames.set(frame, state);
       }
       const shortAncestors = [];
       for (let parent = frame.parentElement; parent && parent !== document.body && shortAncestors.length < 4; parent = parent.parentElement) {
         const style = getComputedStyle(parent), before = parent.getBoundingClientRect();
-        if (before.height > 160 || before.width + 2 < box.width) break;
+        // Our earlier request can grow an eligible wrapper past the native
+        // cutoff. Keep following that owned wrapper when later fonts or
+        // settings require more room; new ancestors still use the cutoff.
+        if ((before.height > 160 && !state.elements.has(parent)) || before.width + 2 < box.width) break;
         shortAncestors.push({ element: parent, box: before, clips: /hidden|clip/.test(style.overflowY) });
       }
       const oldBottom = shortAncestors.at(-1)?.box.bottom ?? box.bottom;
@@ -175,7 +248,7 @@
           original.priority = frame.style.getPropertyPriority(name);
         }
         original.applied = value;
-        if (frame.style.getPropertyValue(name) !== value || frame.style.getPropertyPriority(name) !== "important") frame.style.setProperty(name, value, "important");
+        if (frame.style.getPropertyValue(name) !== value || frame.style.getPropertyPriority(name) !== "important") mutateAttribute(frame, "style", () => frame.style.setProperty(name, value, "important"));
       }
       for (const parent of shortAncestors) {
         const frameBox = frame.getBoundingClientRect(), parentBox = parent.element.getBoundingClientRect();
@@ -201,6 +274,13 @@
     if (event.data?.type !== FRAME_MESSAGE || !event.source) return;
     const frame = [...document.querySelectorAll("iframe")].find((candidate) => candidate.contentWindow === event.source);
     if (frame) applyFrameRequirement(frame, event.data.requirement);
+  };
+  const isBackgroundSender = (sender) => {
+    if (sender?.id !== extension.runtime.id) return false;
+    try {
+      const senderUrl = new URL(sender.url), extensionUrl = new URL(extension.runtime.getURL(""));
+      return senderUrl.protocol === extensionUrl.protocol && senderUrl.host === extensionUrl.host;
+    } catch { return false; }
   };
   const receiveRuntimeFrameRequirement = (message, sender) => {
     if (sender?.id !== extension.runtime.id || !Number.isInteger(message.sourceFrameId) || message.sourceFrameId <= 0) return;
@@ -319,15 +399,11 @@
     }
     return effectiveCache.value;
   };
-  const isActive = () => getEffectiveSettings().active;
+  const isActive = () => settingsLoaded && getEffectiveSettings().active;
+  const isLayoutRepairActive = () => isActive() && getEffectiveSettings().layoutRepair === true;
   const composedParent = (element) => element.parentElement
     ?? (element.getRootNode() instanceof ShadowRoot ? element.getRootNode().host : null);
-  const hasProtectedAncestor = (element) => {
-    for (let current = element; current; current = composedParent(current)) {
-      if (current.matches(protectedSelector)) return true;
-    }
-    return false;
-  };
+  const hasProtectedAncestor = (element) => protection.protected(element);
   const isHeading = (element) => {
     for (let current = element; current; current = composedParent(current)) {
       if (/^H[1-6]$/.test(current.tagName) || current.getAttribute("role") === "heading") return true;
@@ -406,12 +482,14 @@
   const isTextControl = (element) => element.matches("textarea,select,option,button,input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color'])");
   const allElements = function* (root) {
     const scope = root === document.documentElement ? document.body : root;
-    if (!scope || (root instanceof ShadowRoot && hasProtectedAncestor(root.host))) return;
+    if (!scope || protection.editorOwned(scope instanceof ShadowRoot ? scope.host : scope)
+        || (root instanceof ShadowRoot && hasProtectedAncestor(root.host))) return;
     // Freeze the typography at each semantic boundary. Its descendants then
     // inherit the original font naturally; thousands of editor tokens need no
     // overrides, pseudo measurements, or clone-recovery attributes of their own.
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT, {
       acceptNode: (element) => !element.style || ownStyleIds.includes(element.id)
+        || element.matches(protection.editorSelector)
         || element.matches("script,style,template,noscript") || element.parentElement?.matches(protectedSelector)
         ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     });
@@ -426,7 +504,7 @@
   const manage = (element) => {
     let state = managedElements.get(element);
     if (!state) {
-      state = { attributes: new Map(), properties: new Map(), hadStyle: element.hasAttribute("style") };
+      state = { attributes: new Map(), properties: new Map(), hadStyle: getStylePresence(element) };
       managedElements.set(element, state);
     }
     return state;
@@ -434,17 +512,27 @@
   const setAttribute = (element, name, value) => {
     const state = manage(element);
     if (!state.attributes.has(name)) state.attributes.set(name, element.getAttribute(name));
+    const finish = beginAttributeMutation(element, name);
     element.setAttribute(name, value);
+    finish();
   };
   const setProperty = (element, name, value, priority = "") => {
     const state = manage(element);
     if (!state.properties.has(name)) state.properties.set(name, {
       value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name)
     });
+    const finish = beginAttributeMutation(element, "style");
     element.style.setProperty(name, value, priority);
+    const applied = finish();
     const property = state.properties.get(name);
-    property.appliedValue = element.style.getPropertyValue(name);
-    property.appliedPriority = element.style.getPropertyPriority(name);
+    if (applied === null) {
+      property.appliedValue = element.style.getPropertyValue(name);
+      property.appliedPriority = element.style.getPropertyPriority(name);
+    } else {
+      mutationStyle.cssText = applied.value ?? "";
+      property.appliedValue = mutationStyle.getPropertyValue(name);
+      property.appliedPriority = mutationStyle.getPropertyPriority(name);
+    }
   };
   // Compare author declarations, not the temporary typography overrides a
   // framework may remove when it reapplies its style prop. Restoring an
@@ -496,7 +584,7 @@
   };
   const retainOverwrittenTypography = (element) => {
     const state = managedElements.get(element);
-    if (!state || !element.isConnected || !isActive()) return;
+    if (!state || !element.isConnected || !isActive() || protection.editorOwned(element)) return;
     // The stylesheet handles repeated copies of the same author baseline.
     // A later, genuinely different declaration still gets immediate retention
     // while the scheduled pass measures its new typography.
@@ -522,8 +610,10 @@
       // typography before the browser paints the intervening native font.
       property.value = value;
       property.priority = priority;
-      if (property.appliedValue) element.style.setProperty(name, property.appliedValue, property.appliedPriority);
-      else element.style.removeProperty(name);
+      mutateAttribute(element, "style", () => {
+        if (property.appliedValue) element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+        else element.style.removeProperty(name);
+      });
       overwritten = true;
     });
     if (overwritten) {
@@ -554,13 +644,15 @@
       ...(root.matches?.("[data-lexend-original-typography]") ? [root] : []),
       ...root.querySelectorAll("[data-lexend-original-typography]")
     ].forEach((element) => {
-      if (managedElements.has(element)) return;
+      if (managedElements.has(element) || protection.editorOwned(element)) return;
       try {
         const original = JSON.parse(element.getAttribute("data-lexend-original-typography"));
         for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", "data-lexend-retained"]) element.removeAttribute(attribute);
         original.properties.filter(([name]) => name !== "transition-property").forEach(([name, value, priority]) => {
-          if (value) element.style.setProperty(name, value, priority);
-          else element.style.removeProperty(name);
+          mutateAttribute(element, "style", () => {
+            if (value) element.style.setProperty(name, value, priority);
+            else element.style.removeProperty(name);
+          });
         });
         clones.push({ element, original });
       } catch { /* Do not trust unrelated malformed page attributes. */ }
@@ -577,19 +669,23 @@
       try {
         const transition = original.properties.find(([name]) => name === "transition-property");
         if (transition) {
-          if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
-          else element.style.removeProperty(transition[0]);
+          mutateAttribute(element, "style", () => {
+            if (transition[1]) element.style.setProperty(transition[0], transition[1], transition[2]);
+            else element.style.removeProperty(transition[0]);
+          });
         }
         for (const attribute of [TEXT_ATTRIBUTE, PROTECTED_ATTRIBUTE, FONT_ATTRIBUTE, "data-lexend-before", "data-lexend-after", ...transitionAttributes, "data-lexend-original-typography"]) element.removeAttribute(attribute);
-        if (!original.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+        if (!original.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
       } catch { /* Do not trust unrelated malformed page attributes. */ }
     }
   };
-  const clearTypography = () => {
+  const clearTypography = (scope = null) => {
+    const ownsElement = (element) => scope === null || element.getRootNode() === scope;
     // Preserve font-transition guards while removing a contested element's
     // stylesheet fallback. Otherwise releasing that rule can animate toward
     // the native font and make the next capture measure an intermediate size.
     if (retainedStyleRules.size) for (const [element, state] of managedElements) {
+      if (!ownsElement(element)) continue;
       if (!state.retainedStyle) continue;
       for (const [name, property] of state.properties) {
         if (!name.startsWith("transition-")) continue;
@@ -598,18 +694,22 @@
           property.value = value;
           property.priority = priority;
         }
-        element.style.setProperty(name, property.appliedValue, property.appliedPriority);
+        mutateAttribute(element, "style", () => element.style.setProperty(name, property.appliedValue, property.appliedPriority));
       }
     }
     for (const [sheet, indices] of retainedStyleRules) {
+      if (scope !== null && sheet !== scope.querySelector(`#${STYLE_ID}`)?.sheet) continue;
       for (const index of indices.reverse()) sheet.deleteRule(index);
+      retainedStyleRules.delete(sheet);
     }
-    retainedStyleRules.clear();
     const restorations = [];
     managedElements.forEach((state, element) => {
+      if (!ownsElement(element)) return;
       const restoreAttribute = (value, name) => {
-        if (value === null) element.removeAttribute(name);
-        else element.setAttribute(name, value);
+        mutateAttribute(element, name, () => {
+          if (value === null) element.removeAttribute(name);
+          else element.setAttribute(name, value);
+        });
       };
       state.attributes.forEach((value, name) => {
         if (!transitionAttributes.includes(name)) restoreAttribute(value, name);
@@ -623,8 +723,10 @@
           property.priority = element.style.getPropertyPriority(name);
         }
         const { value, priority } = property;
-        if (value) element.style.setProperty(name, value, priority);
-        else element.style.removeProperty(name);
+        mutateAttribute(element, "style", () => {
+          if (value) element.style.setProperty(name, value, priority);
+          else element.style.removeProperty(name);
+        });
       };
       state.properties.forEach((property, name) => {
         if (name !== "transition-property") restoreProperty(property, name);
@@ -656,32 +758,14 @@
       for (const name of transitionAttributes) {
         if (state.attributes.has(name)) restoreAttribute(state.attributes.get(name), name);
       }
-      if (!state.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+      if (!state.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
     }
-    managedElements.clear();
-    authorFontFamilies.clear();
-    eligibleTextRoots.clear();
-    transitionRules.clear();
-  };
-  const withExtensionStylesDisabled = (callback) => {
-    const styles = [...styledRoots].map((root) => root.querySelector(`#${STYLE_ID}`)).filter(Boolean);
-    const states = styles.map((style) => style.sheet?.disabled ?? false);
-    styles.forEach((style) => { if (style.sheet) style.sheet.disabled = true; });
-    const inline = [];
-    managedElements.forEach((state, element) => state.properties.forEach((property, name) => {
-      if (name.startsWith("--")) return;
-      inline.push({ element, name, value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) });
-      if (property.value) element.style.setProperty(name, property.value, property.priority);
-      else element.style.removeProperty(name);
-    }));
-    try { return callback(); }
-    finally {
-      inline.forEach(({ element, name, value, priority }) => {
-        if (value) element.style.setProperty(name, value, priority);
-        else element.style.removeProperty(name);
-      });
-      styles.forEach((style, index) => { if (style.sheet) style.sheet.disabled = states[index]; });
-    }
+    for (const { element } of restorations) managedElements.delete(element);
+    if (scope === null) {
+      authorFontFamilies.clear();
+      eligibleTextRoots.clear();
+      transitionRules.clear();
+    } else eligibleTextRoots.delete(scope);
   };
   const typographyTransitionProperties = new Set([
     "font", "font-family", "font-size", "line-height", "letter-spacing", "font-stretch", "font-variation-settings"
@@ -724,13 +808,25 @@
   const measureTypography = (roots, newOnly = false) => {
     const effective = getEffectiveSettings();
     const measurements = [];
+    // Do not convert inherited typography above an editor either. A boundary
+    // style would serialize into editor HTML; preserving its ancestors avoids
+    // that write and leaves mixed ancestor-owned prose in the authored font.
+    const editorAncestors = new WeakSet();
+    for (const root of roots) {
+      const editors = [...root.querySelectorAll(protection.editorSelector)];
+      if (root.matches?.(protection.editorSelector)) editors.push(root);
+      for (const editor of editors) {
+        knownEditorBoundaries.add(editor);
+        for (let parent = composedParent(editor); parent; parent = composedParent(parent)) editorAncestors.add(parent);
+      }
+    }
     const styles = new WeakMap();
     const styleFor = (element) => {
       if (!styles.has(element)) styles.set(element, getComputedStyle(element));
       return styles.get(element);
     };
     for (const root of roots) for (const element of allElements(root)) {
-      if (newOnly && managedElements.has(element)) continue;
+      if (editorAncestors.has(element) || newOnly && managedElements.has(element)) continue;
       const style = styleFor(element);
       const family = newOnly ? authorFontFamilies.get(style.fontFamily) ?? style.fontFamily : style.fontFamily;
       const semanticProtection = hasProtectedAncestor(element);
@@ -765,7 +861,7 @@
     }
     return measurements;
   };
-  const applyTypography = (measurements, fontOnly = false) => {
+  const applyTypography = (measurements, fontOnly = false, roots = styledRoots) => {
     measurements.forEach(({ typography, pseudos }) => {
       for (const values of [typography, ...pseudos.map(({ typography }) => typography)]) {
         if (values.transition !== null && !transitionRules.has(values.transition.property)) {
@@ -784,7 +880,7 @@
     `).join("\n");
     // These declarations stay enabled during baseline measurement so temporary
     // typography removal cannot restart the page's original font transitions.
-    styledRoots.forEach((root) => {
+    roots.forEach((root) => {
       let style = root.querySelector(`#${TRANSITION_STYLE_ID}`);
       if (!style) { style = document.createElement("style"); style.id = TRANSITION_STYLE_ID; root.append(style); }
       if (style.textContent !== transitionCss) style.textContent = transitionCss;
@@ -873,6 +969,7 @@
     });
   };
   const installFontStyle = (root) => {
+    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
     // Font declarations stay enabled while measuring author typography.
     // Disabling/re-enabling @font-face repeatedly emits loadingdone events
     // even with cached files, which would perpetually schedule new baselines.
@@ -885,6 +982,7 @@
     }
   };
   const applyToRoot = (root) => {
+    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
     installFontStyle(root);
     let style = root.querySelector(`#${STYLE_ID}`);
     if (!style) {
@@ -899,29 +997,50 @@
     if (style.textContent !== css) style.textContent = css;
     styledRoots.add(root);
   };
+  // Classification can move an element across a protection boundary; author
+  // typography and geometry may affect ancestors/siblings through selectors.
+  // All retain the conservative capture fallback, but only this finite state
+  // vocabulary is observed. Work is coalesced by first-old/final value below.
+  const observedAttributeKinds = Object.freeze({
+    role: "classification", "aria-multiline": "classification", contenteditable: "classification", "data-lexend-ignore": "classification", "data-icon": "classification",
+    class: "typography", style: "typography", "data-state": "typography",
+    hidden: "geometry", "aria-hidden": "geometry", open: "geometry", "aria-expanded": "geometry", "aria-selected": "geometry", "aria-pressed": "geometry"
+  });
+  const observedAttributes = Object.keys(observedAttributeKinds);
   const observeRoots = () => {
+    // Blink can keep CSSOM-only styles physically absent until serialization.
+    // Materialize each written attribute once before returning it to authors;
+    // otherwise their later removeAttribute can recreate style="" natively.
+    for (const element of pendingStyleWrites) element.getAttribute("style");
+    pendingStyleWrites.clear();
+    if (!isActive() || protection.editorDocument()) return;
     observer.observe(document, { childList: true, subtree: true, characterData: true, characterDataOldValue: true,
-      attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+      attributes: true, attributeOldValue: true, attributeFilter: observedAttributes });
     styledRoots.forEach((root) => {
       if (root instanceof ShadowRoot) observer.observe(root, { childList: true, subtree: true,
-        characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: ["class", "style", "hidden", "aria-hidden", "role", "contenteditable", "data-lexend-ignore", "data-icon"] });
+        characterData: true, characterDataOldValue: true, attributes: true, attributeOldValue: true, attributeFilter: observedAttributes });
     });
   };
   const visitShadowRoots = (root) => {
-    root.querySelectorAll?.("*").forEach((element) => {
-      if (element.shadowRoot) {
-        applyToRoot(element.shadowRoot);
-        visitShadowRoots(element.shadowRoot);
-      }
+    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (element) => element.matches(protection.editorSelector) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     });
+    let element;
+    while ((element = walker.nextNode())) if (element.shadowRoot) {
+      applyToRoot(element.shadowRoot);
+      visitShadowRoots(element.shadowRoot);
+    }
   };
   const applyIncomingFonts = (branches, fontOnly = true) => {
     if (!isActive() || !document.documentElement || !branches.size) return;
+    adoptStyleMutations(observer.takeRecords());
     observer.disconnect();
     try {
       applyToRoot(document.documentElement);
       const roots = new Set(branches);
       for (const branch of branches) {
+        if (protection.editorOwned(branch)) continue;
         if (branch.shadowRoot) { applyToRoot(branch.shadowRoot); roots.add(branch.shadowRoot); }
         const previousRoots = new Set(styledRoots);
         visitShadowRoots(branch);
@@ -949,9 +1068,37 @@
     pendingRepair = null;
     return pending;
   };
+  const createViewportStyleWitness = (guards) => {
+    const records = [], expected = new WeakSet();
+    const witness = new MutationObserver((batch) => records.push(...batch));
+    for (const element of guards.keys()) witness.observe(element, { attributes: true, attributeOldValue: true, attributeFilter: ["style"] });
+    const drain = () => records.push(...witness.takeRecords());
+    const flush = () => {
+      drain();
+      adoptStyleMutations(records.splice(0), expected);
+    };
+    return {
+      flush,
+      begin(element, name) {
+        if (name !== "style" || !guards.has(element)) return null;
+        flush();
+        const oldValue = element.getAttribute("style");
+        return () => {
+          drain();
+          const first = records[0];
+          if (first?.target === element && first.oldValue === oldValue) expected.add(first);
+          const next = records.slice(1).find((record) => record.target === element);
+          const applied = { value: next ? next.oldValue : element.getAttribute("style") };
+          flush();
+          return applied;
+        };
+      },
+      stop() { try { flush(); } finally { witness.disconnect(); } }
+    };
+  };
   const withViewportPreserved = (callback) => {
     refreshing = true;
-    observer.disconnect();
+    disconnectObserver();
     let focusedElement = document.activeElement;
     while (focusedElement?.shadowRoot?.activeElement) focusedElement = focusedElement.shadowRoot.activeElement;
     const ownedTableChild = (element) => element?.matches?.("[data-lexend-layout-repair~='scroll-table']")
@@ -959,29 +1106,46 @@
     const focusedTable = ownedTableChild(focusedElement);
     const scrollPosition = { x: scrollX, y: scrollY };
     const rootStyle = document.documentElement.style;
-    const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: document.documentElement.hasAttribute("style") };
+    const anchor = { value: rootStyle.getPropertyValue("overflow-anchor"), priority: rootStyle.getPropertyPriority("overflow-anchor"), hadStyle: getStylePresence(document.documentElement) };
     const body = document.body;
-    const primaryBodyScroller = body && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
+    const primaryBodyScroller = body && !protection.editorOwned(body) && /^(auto|scroll)$/.test(getComputedStyle(body).overflowY)
       && body.clientHeight >= innerHeight * 0.8 && body.clientHeight <= innerHeight + 64
       && body.scrollHeight > body.clientHeight + 2;
     const bodyScroll = primaryBodyScroller ? { x: body.scrollLeft, y: body.scrollTop,
       value: body.style.getPropertyValue("overflow-anchor"), priority: body.style.getPropertyPriority("overflow-anchor"),
-      hadStyle: body.hasAttribute("style") } : null;
+      hadStyle: getStylePresence(body) } : null;
     const nestedScrollers = new Map();
     for (const root of new Set([document.documentElement, ...styledRoots])) {
+      if (protection.editorDocument()) break;
       root.querySelectorAll("*").forEach((element) => {
-        if (!element.style || element === body || element === document.documentElement
-            || (!element.scrollLeft && !element.scrollTop)) return;
-        nestedScrollers.set(element, { x: element.scrollLeft, y: element.scrollTop,
+        if (!element.style || element === body || element === document.documentElement) return;
+        const x = element.scrollLeft, y = element.scrollTop;
+        if ((!x && !y) || protection.editorOwned(element)) return;
+        nestedScrollers.set(element, { x, y,
           value: element.style.getPropertyValue("overflow-anchor"), priority: element.style.getPropertyPriority("overflow-anchor"),
-          hadStyle: element.hasAttribute("style"), table: ownedTableChild(element) });
+          hadStyle: getStylePresence(element), table: ownedTableChild(element) });
       });
     }
     // Read every scroll offset before changing styles; interleaving these
     // writes with geometry reads forces layout repeatedly on dashboard pages.
-    rootStyle.setProperty("overflow-anchor", "none", "important");
-    if (bodyScroll) body.style.setProperty("overflow-anchor", "none", "important");
-    for (const element of nestedScrollers.keys()) element.style.setProperty("overflow-anchor", "none", "important");
+    if (!protection.editorOwned(document.documentElement)) viewportStyleGuards.set(document.documentElement, anchor);
+    if (bodyScroll) viewportStyleGuards.set(body, bodyScroll);
+    for (const [element, position] of nestedScrollers) viewportStyleGuards.set(element, position);
+    viewportStyleWitness = createViewportStyleWitness(viewportStyleGuards);
+    const restoreAnchor = (element, position) => {
+      viewportStyleWitness.flush();
+      if (element.style.getPropertyValue("overflow-anchor") === "none"
+          && element.style.getPropertyPriority("overflow-anchor") === "important") {
+        mutateAttribute(element, "style", () => {
+          if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
+          else element.style.removeProperty("overflow-anchor");
+        });
+      }
+      if (!position.hadStyle && !element.getAttribute("style")) mutateAttribute(element, "style", () => element.removeAttribute("style"));
+    };
+    if (!protection.editorOwned(document.documentElement)) mutateAttribute(document.documentElement, "style", () => rootStyle.setProperty("overflow-anchor", "none", "important"));
+    if (bodyScroll) mutateAttribute(body, "style", () => body.style.setProperty("overflow-anchor", "none", "important"));
+    for (const element of nestedScrollers.keys()) mutateAttribute(element, "style", () => element.style.setProperty("overflow-anchor", "none", "important"));
     let refreshError = null;
     try {
       callback();
@@ -994,7 +1158,7 @@
       try {
         document.documentElement.getBoundingClientRect();
         const focusTarget = focusedElement?.isConnected ? focusedElement : focusedTable?.parentElement;
-        if (focusTarget && focusTarget !== document.body && focusTarget !== document.documentElement
+        if (focusTarget && !protection.editorOwned(focusTarget) && focusTarget !== document.body && focusTarget !== document.documentElement
             && (!focusedTable || focusTarget.matches("[data-lexend-layout-repair~='scroll-table']"))) {
           focusTarget.focus({ preventScroll: true });
         }
@@ -1002,26 +1166,26 @@
           const element = originalElement.isConnected ? originalElement : position.table?.parentElement;
           if (!element?.isConnected || (position.table && !element.matches("[data-lexend-layout-repair~='scroll-table']"))) return;
           element.scrollTo({ left: position.x, top: position.y, behavior: "instant" });
-          if (position.value) element.style.setProperty("overflow-anchor", position.value, position.priority);
-          else element.style.removeProperty("overflow-anchor");
-          if (!position.hadStyle && !element.getAttribute("style")) element.removeAttribute("style");
+          // A replacement table wrapper never received the old guard write.
+          if (element === originalElement) restoreAnchor(element, position);
         });
         window.scrollTo({ left: scrollPosition.x, top: scrollPosition.y, behavior: "instant" });
         if (bodyScroll && body.isConnected) {
           body.scrollTo({ left: bodyScroll.x, top: bodyScroll.y, behavior: "instant" });
-          if (bodyScroll.value) body.style.setProperty("overflow-anchor", bodyScroll.value, bodyScroll.priority);
-          else body.style.removeProperty("overflow-anchor");
-          if (!bodyScroll.hadStyle && !body.getAttribute("style")) body.removeAttribute("style");
+          restoreAnchor(body, bodyScroll);
         }
-        if (anchor.value) rootStyle.setProperty("overflow-anchor", anchor.value, anchor.priority);
-        else rootStyle.removeProperty("overflow-anchor");
-        if (!anchor.hadStyle && !document.documentElement.getAttribute("style")) document.documentElement.removeAttribute("style");
+        if (!protection.editorOwned(document.documentElement)) {
+          restoreAnchor(document.documentElement, anchor);
+        }
         // An already focused action does not emit focusin again when its pane
         // grows. Recheck its repaired vertical viewport after restoring saved
         // offsets; ordinary page/table scrollers remain under native control.
-        if (!refreshError && isActive() && focusTarget?.isConnected) globalThis.LexendControls?.revealFocused?.(focusTarget);
+        if (!refreshError && isLayoutRepairActive() && focusTarget?.isConnected && !protection.editorOwned(focusTarget)) globalThis.LexendControls?.revealFocused?.(focusTarget);
       } catch (error) { refreshError ??= error; }
       finally {
+        try { viewportStyleWitness.stop(); }
+        catch (error) { refreshError ??= error; }
+        finally { viewportStyleWitness = null; viewportStyleGuards.clear(); }
         refreshing = false;
         try { observeRoots(); }
         catch (error) { refreshError ??= error; }
@@ -1029,13 +1193,163 @@
     }
     return refreshError;
   };
-  const budgetRefresh = (duration) => {
+  const budgetRefresh = (duration, regional = false) => {
     // Count synchronous work in both phases, excluding time spent waiting for
     // a rendering frame or coalescing author changes.
+    // A cheaper regional pass still consumes the same share of a busy stream.
     const finished = performance.now();
-    nextRefreshTime = finished + (duration > 50 ? duration * 4 : 0);
+    nextRefreshTime = finished + (regional || duration > 50 ? duration * 4 : 0);
   };
-  const completeRefresh = (refreshError, completedConversion = true, duration = 0) => {
+  const clearPendingRegions = () => {
+    pendingRegions = null;
+    queuedGlobalRefresh = false;
+  };
+  // CSS containment does not isolate selectors. Only a closed layout surface
+  // inside an open shadow tree can qualify, and any unobservable stylesheet
+  // change must first return the page to the normal full capture.
+  const snapshotAuthorStylesheets = () => {
+    try {
+      const records = [];
+      const staticPseudos = new Set(["root", "scope", "empty", "first-child", "last-child", "only-child",
+        "first-of-type", "last-of-type", "only-of-type", "nth-child", "nth-last-child", "nth-of-type", "nth-last-of-type",
+        "is", "where", "not", "has", "host", "host-context"]);
+      const staticElements = new Set(["before", "after", "slotted"]);
+      const staticSelector = (selector) => {
+        if (selector.includes("\\") || selector.includes("&")) return false;
+        let known = true;
+        const rest = selector.replace(/(::?)([-a-zA-Z_][-a-zA-Z_0-9]*)/g, (token, prefix, name) => {
+          const allowed = prefix === "::" ? staticElements : staticPseudos;
+          if (!allowed.has(name.toLowerCase())) known = false;
+          return "";
+        });
+        return known && !rest.includes(":");
+      };
+      const staticDeclarations = (cssText) => {
+        if (cssText.includes("\\")) return false;
+        for (const match of cssText.matchAll(/\bvar\s*\(\s*([^,\s)]+)/gi)) {
+          if (!/^--lexend-[a-zA-Z0-9_-]+$/.test(match[1])) return false;
+        }
+        return true;
+      };
+      const serializeRules = (rules) => [...rules].map((rule) => {
+        const layer = ["CSSLayerBlockRule", "CSSLayerStatementRule"].includes(rule.constructor.name);
+        if (![1, 4, 5, 12].includes(rule.type) && !layer) throw new Error("Unsupported stylesheet rules require a full capture.");
+        if (rule.type === 1 && !staticSelector(rule.selectorText)) throw new Error("Stateful selectors require a full capture.");
+        if (rule.style && !staticDeclarations(rule.style.cssText)) throw new Error("Author variables require a full capture.");
+        const media = rule.type === 4 ? String(matchMedia(rule.conditionText).matches) : "";
+        const supports = rule.type === 12 ? String(CSS.supports(rule.conditionText)) : "";
+        return [rule.cssText, media, supports, rule.cssRules ? serializeRules(rule.cssRules) : ""];
+      });
+      for (const root of new Set([document, ...[...styledRoots].filter((root) => root instanceof ShadowRoot)])) {
+        // Manual slot assignment can change another component's composed tree
+        // without a DOM mutation. Keep pages containing slots on full capture.
+        if (root instanceof ShadowRoot && root.querySelector("slot")) return null;
+        for (const element of root.querySelectorAll("[style]")) {
+          const cssText = element.getAttribute("style") ?? "";
+          // Most declarations and saved author values contain no dynamic
+          // variables. They need no canonical CSS parsing or JSON round trip.
+          // Inspect originals too: our applied pixels may mask an author var().
+          let staticInline = !/[\u0000-\u001f\u007f']/.test(cssText) && !cssText.includes("/*") && staticDeclarations(cssText);
+          if (staticInline) for (const property of managedElements.get(element)?.properties.values() ?? []) {
+            if (property.value && (/[\u0000-\u001f\u007f']/.test(property.value) || property.value.includes("/*") || !staticDeclarations(property.value))) { staticInline = false; break; }
+          }
+          if (staticInline) continue;
+          const declarations = JSON.parse(authorStyleSignature(element, cssText));
+          if (declarations.some(([, value]) => !staticDeclarations(value))) return null;
+        }
+        const sheets = root === document ? [...document.styleSheets]
+          : [...root.querySelectorAll("style,link[rel~='stylesheet']")].map((element) => element.sheet);
+        sheets.push(...(root.adoptedStyleSheets ?? []));
+        for (const sheet of sheets) {
+          // The page can mutate our sheets too; an element ID is not an
+          // ownership guarantee and must never exempt CSSOM from this check.
+          if (!sheet) return null;
+          const media = sheet.media?.mediaText ?? "";
+          records.push({ root, sheet, value: JSON.stringify([sheet.disabled, media,
+            media ? matchMedia(media).matches : true, serializeRules(sheet.cssRules)]) });
+        }
+      }
+      return records;
+    } catch { return null; }
+  };
+  const snapshotNativeState = () => {
+    try {
+      const focus = [];
+      for (let element = document.activeElement; element; element = element.shadowRoot?.activeElement) focus.push(element);
+      const controls = [], topLayer = [];
+      const validityFlags = ["badInput", "customError", "patternMismatch", "rangeOverflow", "rangeUnderflow", "stepMismatch",
+        "tooLong", "tooShort", "typeMismatch", "valid", "valueMissing"];
+      for (const root of new Set([document, ...[...styledRoots].filter((root) => root instanceof ShadowRoot)])) {
+        for (const element of root.querySelectorAll(":popover-open,:modal,:fullscreen")) topLayer.push(element);
+        for (const element of root.querySelectorAll("input,textarea,select,option,button,fieldset,output")) {
+          controls.push({ element, form: element.form, value: JSON.stringify([
+            element.value, element.defaultValue, element.checked, element.defaultChecked, element.indeterminate,
+            element.selected, element.defaultSelected, element.selectedIndex, element.disabled, element.readOnly,
+            element.required, element.multiple, element.type, element.willValidate, element.selectionStart,
+            element.selectionEnd, element.selectionDirection,
+            element.validity ? validityFlags.map((name) => element.validity[name]) : null
+          ]) });
+        }
+      }
+      if (!document.fonts?.[Symbol.iterator]) return null;
+      const fontDescriptors = ["family", "style", "weight", "stretch", "unicodeRange", "variant", "featureSettings",
+        "variationSettings", "display", "ascentOverride", "descentOverride", "lineGapOverride", "sizeAdjust", "status"];
+      const fonts = [...document.fonts].map((face) => ({ face, value: JSON.stringify(fontDescriptors.map((name) => face[name])) }));
+      return { url: location.href, focus, topLayer, controls, fonts, fontStatus: document.fonts.status };
+    } catch { return null; }
+  };
+  const nativeStateUnchanged = () => {
+    if (nativeStateSnapshot === null) return false;
+    const current = snapshotNativeState(), previous = nativeStateSnapshot;
+    return current !== null && current.url === previous.url && current.fontStatus === previous.fontStatus
+      && current.focus.length === previous.focus.length && current.focus.every((element, index) => element === previous.focus[index])
+      && current.topLayer.length === previous.topLayer.length && current.topLayer.every((element, index) => element === previous.topLayer[index])
+      && current.controls.length === previous.controls.length && current.controls.every((record, index) =>
+        record.element === previous.controls[index].element && record.form === previous.controls[index].form
+          && record.value === previous.controls[index].value)
+      && current.fonts.length === previous.fonts.length && current.fonts.every((record, index) =>
+        record.face === previous.fonts[index].face && record.value === previous.fonts[index].value);
+  };
+  const authorStylesheetsUnchanged = () => {
+    if (authorStylesheetSnapshot === null) return false;
+    const current = snapshotAuthorStylesheets();
+    return current !== null && current.length === authorStylesheetSnapshot.length
+      && current.every((record, index) => record.root === authorStylesheetSnapshot[index].root
+        && record.sheet === authorStylesheetSnapshot[index].sheet && record.value === authorStylesheetSnapshot[index].value);
+  };
+  const canRefreshRegion = (root) => {
+    if (!(root instanceof ShadowRoot) || root.host.shadowRoot !== root || !styledRoots.has(root)
+        || !root.host.isConnected || window !== window.top) return false;
+    const host = root.host;
+    if (host.childNodes.length || protection.editorOwned(host) || protection.protected(host)) return false;
+    const css = getComputedStyle(host), containment = new Set(css.contain.split(/\s+/));
+    if (!(containment.has("strict") || ["size", "layout", "style", "paint"].every((value) => containment.has(value)))
+        || !["block", "flow-root"].includes(css.display) || !["static", "relative"].includes(css.position)
+        || ![css.overflowX, css.overflowY].every((value) => ["auto", "scroll"].includes(value))
+        || css.display === "none" || css.visibility !== "visible" || Number(css.opacity) === 0
+        || !host.getClientRects().length || host.checkVisibility && !host.checkVisibility({ contentVisibilityAuto: true })) return false;
+    for (let current = host; current; current = composedParent(current)) {
+      if (managedElements.has(current) || current.matches("[dir='auto' i],bdi")) return false;
+    }
+    if (root.querySelector(`slot,iframe,frame,bdi,[dir='auto' i],${protection.editorSelector},${protection.semanticSelector}`)) return false;
+    for (const element of root.querySelectorAll("*")) if (element.shadowRoot) return false;
+    return layout?.canRefreshRegion?.(root) === true;
+  };
+  const regionalMutationRoots = (mutations) => {
+    if (!isLayoutRepairActive() || !mutations.length || initializing || refreshing || restoringChanges !== null || pendingRepair !== null
+        || repairFrame !== null || refreshRevision === 0 || lastRefreshError !== null || !settingsLoaded) return null;
+    const roots = new Set();
+    for (const mutation of mutations) {
+      if (mutation.type !== "characterData" || !mutation.oldValue?.trim() || !mutation.target.data.trim()
+          || !managedElements.has(mutation.target.parentElement)) return null;
+      const root = mutation.target.getRootNode();
+      if (!(root instanceof ShadowRoot) || !styledRoots.has(root)) return null;
+      roots.add(root);
+    }
+    return roots;
+  };
+  const completeRefresh = (refreshError, completedConversion = true, duration = 0, regional = false) => {
+    const completionStarted = performance.now();
     if (refreshError) {
       lastRefreshError = refreshError instanceof Error ? refreshError.message : String(refreshError);
       if (warnedRefreshError !== lastRefreshError) {
@@ -1050,27 +1364,37 @@
       // to a subtree that has since been skipped. Only painted subtrees have
       // a valid baseline from this refresh; returning to an omitted subtree
       // must trigger another capture even without an author mutation/resize.
-      revealedAutoContent = new WeakSet();
-      for (const [target, skipped] of knownAutoContent) {
-        if (!target.isConnected) { knownAutoContent.delete(target); continue; }
-        const child = target.firstElementChild;
-        const painted = child?.checkVisibility
-          ? child.checkVisibility({ contentVisibilityAuto: true }) : !skipped;
-        if (painted) revealedAutoContent.add(target);
+      if (!regional && isLayoutRepairActive()) {
+        authorStylesheetSnapshot = [...styledRoots].some((root) => root instanceof ShadowRoot && canRefreshRegion(root))
+          ? snapshotAuthorStylesheets() : null;
+        nativeStateSnapshot = authorStylesheetSnapshot === null ? null : snapshotNativeState();
+        revealedAutoContent = new WeakSet();
+        for (const [target, skipped] of knownAutoContent) {
+          if (!target.isConnected) { knownAutoContent.delete(target); continue; }
+          const child = target.firstElementChild;
+          const painted = child?.checkVisibility
+            ? child.checkVisibility({ contentVisibilityAuto: true }) : !skipped;
+          if (painted) revealedAutoContent.add(target);
+        }
       }
       notifyFrameRequirement();
     }
     // Large pages can spend hundreds of milliseconds in a full repair. Give
     // the site four times that duration to handle input and paint before the
     // next automatic pass. Incoming text receives its font independently.
-    budgetRefresh(duration);
+    budgetRefresh(duration + performance.now() - completionStarted, regional);
+    notifyState();
   };
-  const refresh = (preserveHidden = false) => {
+  const refresh = (preserveHidden = false, priorDuration = 0) => {
     refreshTimer = null;
     refreshUrgent = false;
     refreshRequired = false;
     pendingAriaChanges.clear();
     pendingStyleChanges.clear();
+    pendingStateChanges.clear();
+    clearPendingRegions();
+    authorStylesheetSnapshot = null;
+    nativeStateSnapshot = null;
     if (refreshing || !document.documentElement) return;
     const started = performance.now();
     cancelPendingRepair();
@@ -1081,7 +1405,10 @@
     retentionWrites = new WeakMap();
     let deferred = false;
     const error = withViewportPreserved(() => {
-      for (const frame of resizedFrames.keys()) {
+      for (const [frame, state] of resizedFrames) {
+        // Disposal precedes geometry reads: document editing and a protected
+        // member of this independent ownership group cannot retain old repairs.
+        if (!isLayoutRepairActive() || frameTouchesEditor(frame, state)) { restoreFrame(frame); continue; }
         let hidden = !frame.isConnected || !frame.getClientRects().length;
         for (let current = frame; !hidden && current; current = current.parentElement) {
           const css = getComputedStyle(current);
@@ -1092,28 +1419,45 @@
         // close-state mutations, even when typography remains enabled.
         if (hidden) restoreFrame(frame);
       }
-      layout?.restore({ preserveHidden });
-      if (!isActive()) for (const frame of resizedFrames.keys()) restoreFrame(frame);
+      layout?.restore({ preserveHidden: isLayoutRepairActive() && preserveHidden });
+      if (!isLayoutRepairActive()) layout?.dispose();
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
-      [...styledRoots].forEach((root) => { if (!root.isConnected) styledRoots.delete(root); });
+      knownEditorBoundaries = new WeakSet();
+      for (const root of styledRoots) {
+        if (root.isConnected && !protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) continue;
+        for (const id of ownStyleIds) root.querySelector(`#${id}`)?.remove();
+        styledRoots.delete(root);
+      }
+      if (!isActive() || protection.editorDocument()) {
+        layout?.dispose();
+        for (const root of styledRoots) for (const id of ownStyleIds) root.querySelector(`#${id}`)?.remove();
+        styledRoots.clear(); knownAutoContent.clear();
+        return;
+      }
       applyToRoot(document.documentElement);
       visitShadowRoots(document.documentElement);
       if (isActive()) {
         const roots = [...styledRoots];
-        let measurements;
-        withExtensionStylesDisabled(() => {
-          measurements = measureTypography(roots);
-          layout?.capture(roots, { preserveHidden });
-        });
+        // Layout and typography ownership have already been restored above.
+        // Keep the now-inert stylesheet active: toggling its cascade layer
+        // recreates author FontFaces in Chromium, whose loadingdone events
+        // would schedule another capture indefinitely.
+        const measurements = measureTypography(roots);
+        if (isLayoutRepairActive()) layout?.capture(roots, { preserveHidden });
         applyTypography(measurements);
-        // Focused repaired controls must retain their wrapper and scroll range
-        // within the same task. Hidden tabs cannot depend on animation frames.
-        if (repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
-        else deferred = true;
+        // Automatic recaptures must restore existing repairs before painting,
+        // so ordinary site animations cannot alternate between repaired and
+        // unrepaired layouts. Startup and explicit preference changes keep
+        // their early font paint. Hidden tabs cannot depend on frames either.
+        const keepLayoutStable = preserveHidden && refreshRevision > 0;
+        if (isLayoutRepairActive()) {
+          if (keepLayoutStable || repairSynchronously || focused || document.visibilityState === "hidden" || window !== window.top) layout?.repair(settings);
+          else deferred = true;
+        }
       }
     });
-    const duration = performance.now() - started;
+    const duration = priorDuration + performance.now() - started;
     repairSynchronously = false;
     if (error || !deferred) { completeRefresh(error, true, duration); return; }
     refreshRevision++;
@@ -1122,7 +1466,7 @@
       pendingRepair = null;
       repairFrame = null;
       const started = performance.now();
-      const error = withViewportPreserved(() => layout?.repair(settings));
+      const error = withViewportPreserved(() => { if (isLayoutRepairActive()) layout?.repair(settings); });
       completeRefresh(error, false, duration + performance.now() - started);
     };
     // Let converted text paint before the expensive geometry repair. A second
@@ -1133,6 +1477,255 @@
       repairFrame = requestAnimationFrame(() => pendingRepair?.());
     });
   };
+  const createRegionalMutationWitness = (roots) => {
+    const records = [], expected = new WeakSet(), changes = new Map();
+    const outsideAttributes = new Map(), outsideText = new Map();
+    const scopes = new Set(roots);
+    let processed = 0, unexpectedInternal = false, outsideStructure = false;
+    const append = (batch) => { for (const record of batch) records.push(record); };
+    const witness = new MutationObserver(append);
+    const options = { subtree: true, childList: true, characterData: true,
+      characterDataOldValue: true, attributes: true, attributeOldValue: true };
+    witness.observe(document, options);
+    for (const root of styledRoots) if (root instanceof ShadowRoot) witness.observe(root, options);
+    const drain = () => append(witness.takeRecords());
+    const attributeValue = (record) => record.attributeNamespace === null
+      ? record.target.getAttribute(record.attributeName)
+      : record.target.getAttributeNS(record.attributeNamespace, record.attributeName);
+    const attributeKey = (record) => `${record.attributeNamespace ?? ""}\u0000${record.attributeName}`;
+    const changeFor = (element) => {
+      if (!changes.has(element)) changes.set(element, { properties: new Map(), attributes: new Map(), stylePresent: undefined });
+      return changes.get(element);
+    };
+    const beforeStyle = document.createElement("span").style;
+    const afterStyle = document.createElement("span").style;
+    const process = () => {
+      drain();
+      const batch = records.slice(processed), after = new Map(), tails = new Map();
+      for (let index = batch.length - 1; index >= 0; index--) {
+        const record = batch[index];
+        if (record.type !== "attributes" && record.type !== "characterData") continue;
+        let values = tails.get(record.target);
+        if (!values) tails.set(record.target, values = new Map());
+        const key = record.type === "attributes" ? attributeKey(record) : "text";
+        after.set(record, values.has(key) ? values.get(key)
+          : record.type === "attributes" ? attributeValue(record) : record.target.data);
+        values.set(key, record.oldValue);
+      }
+      for (const record of batch) {
+        if (expected.has(record)) continue;
+        const internal = scopes.has(record.target.getRootNode());
+        if (internal) unexpectedInternal = true;
+        else if (record.type === "childList") outsideStructure = true;
+        if (record.type === "attributes") {
+          const value = after.get(record);
+          if (!internal) {
+            let attributes = outsideAttributes.get(record.target);
+            if (!attributes) outsideAttributes.set(record.target, attributes = new Map());
+            const key = attributeKey(record);
+            if (!attributes.has(key)) attributes.set(key, { record, before: record.oldValue, after: value });
+            else attributes.get(key).after = value;
+          }
+          if (record.attributeNamespace !== null) continue;
+          const change = changeFor(record.target);
+          if (record.attributeName !== "style") change.attributes.set(record.attributeName, value);
+          else {
+            beforeStyle.cssText = record.oldValue ?? "";
+            afterStyle.cssText = value ?? "";
+            for (const name of new Set([...beforeStyle, ...afterStyle])) {
+              const next = { value: afterStyle.getPropertyValue(name), priority: afterStyle.getPropertyPriority(name) };
+              if (beforeStyle.getPropertyValue(name) !== next.value || beforeStyle.getPropertyPriority(name) !== next.priority) {
+                change.properties.set(name, next);
+              }
+            }
+            change.stylePresent = value !== null;
+          }
+        } else if (record.type === "characterData" && !internal) {
+          if (!outsideText.has(record.target)) outsideText.set(record.target, { before: record.oldValue, after: after.get(record) });
+          else outsideText.get(record.target).after = after.get(record);
+        }
+      }
+      processed = records.length;
+    };
+    const inspect = () => {
+      process();
+      const changedAttributes = [...outsideAttributes.values()].some((attributes) => [...attributes.values()].some(({ before, after }) =>
+        before !== after));
+      return { changes, unexpected: unexpectedInternal || outsideStructure || changedAttributes
+        || [...outsideText.values()].some(({ before, after }) => before !== after) };
+    };
+    return {
+      begin(element, name) {
+        drain();
+        const index = records.length, oldValue = element.getAttribute(name);
+        return () => {
+          drain();
+          const first = records[index];
+          if (first?.type === "attributes" && first.target === element && first.attributeNamespace === null
+              && first.attributeName === name && first.oldValue === oldValue) expected.add(first);
+          const next = records.slice(index + 1).find((record) => record.type === "attributes" && record.target === element
+            && record.attributeNamespace === null && record.attributeName === name);
+          return { value: next ? next.oldValue : element.getAttribute(name) };
+        };
+      },
+      inspect,
+      stop() { try { drain(); } finally { witness.disconnect(); } }
+    };
+  };
+  const adoptAuthoredChanges = (changes, typographyProperties = true) => {
+    for (const [element, change] of changes) {
+      const state = managedElements.get(element);
+      if (!state) continue;
+      if (change.stylePresent !== undefined) state.hadStyle = change.stylePresent;
+      for (const [name, value] of change.properties) {
+        const property = state.properties.get(name);
+        if (property && (typographyProperties || value.value === property.appliedValue
+            && value.priority === property.appliedPriority)) {
+          property.value = value.value; property.priority = value.priority;
+        }
+      }
+      for (const [name, value] of change.attributes) if (state.attributes.has(name)) state.attributes.set(name, value);
+    }
+    layout.adoptAuthorChanges(changes);
+  };
+  // Read every transition's actual after-value, including synchronous custom
+  // element reactions that run before a CSSOM operation returns. Only the
+  // mutation produced by our own operation is excluded by the guard witness.
+  const adoptStyleMutations = (records, expected = null, typographyProperties = true) => {
+    const styles = records.filter((record) => record.type === "attributes" && record.attributeName === "style"
+      && record.attributeNamespace === null);
+    if (!styles.length) return;
+    const after = new Map(), tails = new Map(), changes = new Map();
+    for (let index = styles.length - 1; index >= 0; index--) {
+      const record = styles[index], element = record.target;
+      after.set(record, tails.has(element) ? tails.get(element) : element.getAttribute("style"));
+      tails.set(element, record.oldValue);
+    }
+    let beforeStyle, afterStyle;
+    for (const record of styles) {
+      if (expected?.has(record)) continue;
+      const element = record.target, value = after.get(record);
+      let change = changes.get(element);
+      if (!change) changes.set(element, change = { properties: new Map(), attributes: new Map() });
+      change.stylePresent = value !== null;
+      beforeStyle ??= document.createElement("span").style;
+      afterStyle ??= document.createElement("span").style;
+      beforeStyle.cssText = record.oldValue ?? "";
+      afterStyle.cssText = value ?? "";
+      for (const name of new Set([...beforeStyle, ...afterStyle])) {
+        const next = { value: afterStyle.getPropertyValue(name), priority: afterStyle.getPropertyPriority(name) };
+        if (beforeStyle.getPropertyValue(name) !== next.value || beforeStyle.getPropertyPriority(name) !== next.priority) change.properties.set(name, next);
+      }
+    }
+    if (!changes.size) return;
+    adoptAuthoredChanges(changes, typographyProperties);
+    for (const [element, change] of changes) {
+      const guard = viewportStyleGuards.get(element);
+      if (guard) {
+        guard.hadStyle = change.stylePresent;
+        const anchor = change.properties.get("overflow-anchor");
+        if (anchor) { guard.value = anchor.value; guard.priority = anchor.priority; }
+      }
+      for (const [frame, state] of resizedFrames) {
+        const properties = frame === element ? state.properties : state.elements.get(element)?.values;
+        const owner = frame === element ? state : state.elements.get(element);
+        if (!owner) continue;
+        owner.hadStyle = change.stylePresent;
+        for (const [name, value] of change.properties) {
+          const property = properties.get(name);
+          if (property) { property.value = value.value; property.priority = value.priority; }
+        }
+      }
+    }
+  };
+  const preserveWitnessAuthorChanges = (witness) => {
+    let { changes } = witness.inspect();
+    adoptAuthoredChanges(changes);
+    // Replay declaration deltas rather than whole historical cssText, retaining
+    // unrelated current declarations and any newer callback writes. New keys
+    // produced by replay callbacks already exist in the live DOM; ownership is
+    // updated again below before the full restore can remove those values.
+    const targets = [...changes].map(([element, change]) => ({ element,
+      properties: [...change.properties.keys()], attributes: [...change.attributes.keys()] }));
+    try {
+      for (const { element, properties, attributes } of targets) {
+        for (const name of properties) {
+          ({ changes } = witness.inspect());
+          const value = changes.get(element).properties.get(name);
+          if (element.style.getPropertyValue(name) === value.value && element.style.getPropertyPriority(name) === value.priority) continue;
+          mutateAttribute(element, "style", () => {
+            if (value.value) element.style.setProperty(name, value.value, value.priority);
+            else element.style.removeProperty(name);
+          });
+        }
+        for (const name of attributes) {
+          ({ changes } = witness.inspect());
+          const value = changes.get(element).attributes.get(name);
+          if (element.getAttribute(name) === value) continue;
+          mutateAttribute(element, name, () => {
+            if (value === null) element.removeAttribute(name);
+            else element.setAttribute(name, value);
+          });
+        }
+        ({ changes } = witness.inspect());
+        const present = changes.get(element).stylePresent;
+        if (present === true && !element.hasAttribute("style")) mutateAttribute(element, "style", () => element.setAttribute("style", ""));
+        else if (present === false && !element.getAttribute("style") && element.hasAttribute("style")) {
+          mutateAttribute(element, "style", () => element.removeAttribute("style"));
+        }
+      }
+    } finally { adoptAuthoredChanges(witness.inspect().changes); }
+  };
+  const refreshChangedRegions = (roots) => {
+    const started = performance.now();
+    const eligible = () => isLayoutRepairActive() && document.getAnimations && document.getAnimations().length === 0
+      && authorStylesheetsUnchanged() && nativeStateUnchanged() && roots.every(canRefreshRegion);
+    if (!eligible()) { refresh(true, performance.now() - started); return; }
+    refreshTimer = null;
+    refreshUrgent = false;
+    refreshRequired = false;
+    pendingAriaChanges.clear();
+    pendingStyleChanges.clear();
+    pendingStateChanges.clear();
+    clearPendingRegions();
+    const witness = createRegionalMutationWitness(roots);
+    regionalMutationWitness = witness;
+    let error;
+    try {
+      error = withViewportPreserved(() => {
+        // A queued deadline may follow another page task. Recheck every boundary
+        // immediately before restoring any ownership, not merely at delivery.
+        if (!eligible()) throw new Error("The changed region no longer has an isolated layout boundary.");
+        for (const root of roots) {
+          const host = root.host, before = host.getBoundingClientRect();
+          layout.withRegion(root, () => {
+            layout.restore({ preserveHidden: true });
+            clearTypography(root);
+            const measurements = measureTypography([root]);
+            layout.capture([root], { preserveHidden: true });
+            applyTypography(measurements, false, [root]);
+            layout.repair(settings);
+          });
+          const after = host.getBoundingClientRect();
+          if (["left", "top", "width", "height"].some((name) => Math.abs(after[name] - before[name]) > 0.01)) {
+            throw new Error("A changed region altered its outer layout boundary.");
+          }
+        }
+      });
+      if (!error && (witness.inspect().unexpected || !eligible())) {
+        error = new Error("Author callbacks changed the regional transaction.");
+      }
+      if (error) preserveWitnessAuthorChanges(witness);
+    } catch (failure) { error = failure; }
+    finally {
+      try { witness.stop(); } catch (failure) { error ??= failure; }
+      finally { regionalMutationWitness = null; }
+    }
+    // Scoped state is kept in the shared layout owner even when repair throws,
+    // so the ordinary transaction can restore it and recapture the full page.
+    if (error) { refresh(true, performance.now() - started); return; }
+    completeRefresh(null, true, performance.now() - started, true);
+  };
   const runQueuedRefresh = () => {
     // Responsive navigation can temporarily hide and reveal the same links
     // across separate observer deliveries while measuring them. Restoring
@@ -1142,18 +1735,26 @@
     const changed = !refreshRequired && ([...pendingAriaChanges].some(([element, value]) =>
       element.isConnected && element.getAttribute("aria-hidden") !== value)
       || [...pendingStyleChanges].some(([element, value]) => element.isConnected
-        && authorStyleSignature(element, element.getAttribute("style")) !== value));
-    if (refreshRequired || changed) { refresh(true); return; }
+        && authorStyleSignature(element, element.getAttribute("style")) !== value)
+      || [...pendingStateChanges].some(([element, names]) => element.isConnected
+        && [...names].some(([name, value]) => element.getAttribute(name) !== value)));
+    if (refreshRequired || changed) {
+      if (!changed && !queuedGlobalRefresh && pendingRegions?.size) refreshChangedRegions([...pendingRegions]);
+      else refresh(true);
+      return;
+    }
     refreshTimer = null;
     refreshUrgent = false;
     pendingAriaChanges.clear();
     pendingStyleChanges.clear();
+    pendingStateChanges.clear();
+    clearPendingRegions();
     // A reverted temporary style/accessibility change leaves the saved native
     // baseline valid. Finish its suspended repair without another conversion.
     repairSynchronously = false;
     pendingRepair?.();
   };
-  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null) => {
+  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null, regions = null) => {
     urgent = urgent === true;
     if (refreshing || !settingsLoaded || !isActive()) return;
     if (pendingRepair !== null) {
@@ -1162,7 +1763,14 @@
       repairSynchronously = true;
       // Content/geometry changes invalidate the baseline outright. Temporary
       // author styles can settle back before the queued deadline instead.
-      if (!ariaChanges && !styleChanges) pendingRepair = null;
+      if (!ariaChanges && !styleChanges && !stateChanges) pendingRepair = null;
+    }
+    if (regions && !queuedGlobalRefresh && !ariaChanges && !styleChanges && !stateChanges) {
+      pendingRegions ??= new Set();
+      for (const root of regions) pendingRegions.add(root);
+    } else {
+      queuedGlobalRefresh = true;
+      pendingRegions = null;
     }
     if (ariaChanges) {
       for (const mutation of ariaChanges) {
@@ -1174,7 +1782,12 @@
         if (!pendingStyleChanges.has(element)) pendingStyleChanges.set(element, value);
       }
     }
-    if (!ariaChanges && !styleChanges) refreshRequired = true;
+    if (stateChanges) for (const mutation of stateChanges) {
+      let names = pendingStateChanges.get(mutation.target);
+      if (!names) pendingStateChanges.set(mutation.target, names = new Map());
+      if (!names.has(mutation.attributeName)) names.set(mutation.attributeName, mutation.oldValue);
+    }
+    if (!ariaChanges && !styleChanges && !stateChanges) refreshRequired = true;
     // Parser mutations still receive their fonts immediately, but cannot
     // start native capture before the startup preload has settled or timed out.
     if (initializing) return;
@@ -1187,18 +1800,30 @@
     refreshUrgent = urgent;
     refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
   };
-  const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null) => {
+  const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null) => {
     revealedAutoContent = new WeakSet();
-    queueRefresh(urgent === true, ariaChanges, styleChanges);
+    queueRefresh(urgent === true, ariaChanges, styleChanges, stateChanges);
   };
 
+  const pageState = () => ({
+    ready: settingsLoaded && settingsLoadError === null,
+    pending: initializing || restoringChanges !== null || refreshing || refreshTimer !== null || pendingRepair !== null,
+    refreshRevision,
+    healthy: settingsLoaded && settingsLoadError === null && lastRefreshError === null,
+    error: settingsLoadError ?? lastRefreshError,
+    active: isActive(),
+    layoutRepair: isLayoutRepairActive(),
+    hostname: getEffectiveHostname(),
+    scope: getEffectiveSettings().scope
+  });
+  let lastNotifiedState;
   const notifyState = () => {
     if (window.top !== window) return;
-
-    extension.runtime.sendMessage({
-      type: "LEXEND_STATE",
-      active: isActive()
-    }).catch(() => {});
+    const state = pageState();
+    const key = [state.ready, state.pending, state.healthy, state.error, state.active, state.layoutRepair].join(";");
+    if (key === lastNotifiedState) return;
+    lastNotifiedState = key;
+    extension.runtime.sendMessage({ type: "LEXEND_STATE", ...state }).catch(() => {});
   };
 
   const applySettings = (nextSettings, deferLayout = false) => {
@@ -1208,8 +1833,12 @@
     settings = settingsApi.normalizeSettings(nextSettings);
     const effective = getEffectiveSettings();
     if (refreshRevision > 0 && lastRefreshError === null && previous.active === effective.active
+        && previous.layoutRepair === effective.layoutRepair
         && (!effective.active || previous.scope === effective.scope
-          && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) return;
+          && ["textScale", "lineHeight", "letterSpacing"].every((key) => previousTypography[key] === settings[key]))) {
+      notifyState();
+      return;
+    }
     revealedAutoContent = new WeakSet();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -1218,6 +1847,12 @@
       observeRoots();
       queueRefresh();
     } else refresh();
+    if (isLayoutRepairActive() && (!previous.active || !previous.layoutRepair)) {
+      // A child may have remained opted in while this parent was off. Its
+      // earlier requirement was ignored, and no child preference or viewport
+      // change is guaranteed when the parent turns back on.
+      extension.runtime.sendMessage({ type: FRAME_RUNTIME_RECHECK }).catch(() => {});
+    }
     notifyState();
   };
   const fittingCounterMutation = (mutation) => {
@@ -1271,6 +1906,10 @@
     // Frameworks frequently assign the same class/style again or change it
     // and restore it within one task. Compare the first old value with the
     // final value, rather than rebuilding the page for each notification.
+    // Retention needs previous author values for declarations that differ from
+    // our applied typography. Observable edits ending at the applied value can
+    // already adopt that author baseline without reapplying any typography.
+    adoptStyleMutations(mutations, null, false);
     const attributes = new Map();
     const authored = mutations.filter((mutation) => {
       if (!mutation.target.isConnected || ownStyleIds.includes(mutation.target.id)
@@ -1304,7 +1943,7 @@
     // Classify each new element once, before the next paint, without waiting
     // for the full-page repair cooldown.
     for (const element of incoming) {
-      if (!element?.isConnected || ownStyleIds.includes(element.id)
+      if (!element?.isConnected || ownStyleIds.includes(element.id) || protection.editorOwned(element)
           || element.matches("script,style,template,noscript")) { incoming.delete(element); continue; }
       for (let parent = composedParent(element); parent; parent = composedParent(parent)) {
         if (incoming.has(parent)) { incoming.delete(element); break; }
@@ -1318,51 +1957,116 @@
       styleChanges.set(mutation.target, before);
       return true;
     });
+    const enteringEditor = needsRefresh.some((mutation) => {
+      if (mutation.type !== "attributes"
+          || !(observedAttributeKinds[mutation.attributeName] === "classification" || mutation.attributeName === "class")
+          || !protection.editorOwned(mutation.target)) return false;
+      // Syntax highlighting and selection classes inside an already known
+      // editor must retain the bounded scheduler; no content there needs to
+      // release previous typography ownership. A WeakSet keeps this check
+      // local to the target's ancestry rather than scanning editor tokens.
+      for (let current = mutation.target; current; current = composedParent(current)) {
+        if (knownEditorBoundaries.has(current) && current.matches(protection.editorSelector)) return false;
+      }
+      return true;
+    });
     const changedStyles = new Set(authored.filter((mutation) => mutation.type === "attributes"
       && mutation.attributeName === "style").map((mutation) => mutation.target));
     if (changedStyles.size) {
-      observer.disconnect();
+      disconnectObserver();
       try { changedStyles.forEach(retainOverwrittenTypography); }
       finally { observeRoots(); }
     }
     applyIncomingFonts(incoming);
     if (!needsRefresh.length) return;
-    const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes"
-      && ["aria-hidden", "style"].includes(mutation.attributeName));
+    // Entering an editor boundary must release previous ownership at observer
+    // delivery, before the ordinary repair cooldown can leave serialized font
+    // markers in the newly editable subtree. This also removes owned shadow
+    // styles. Other classification/state changes retain the coalesced path.
+    if (enteringEditor) {
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      refresh();
+      return;
+    }
+    const regionalRoots = regionalMutationRoots(needsRefresh);
+    // Coalesce tokens on a fixed deadline even when each local repair is cheap.
+    if (regionalRoots) { queueRefresh(false, null, null, null, regionalRoots); return; }
+    const coalescible = needsRefresh.every((mutation) => mutation.type === "attributes");
     invalidateAutoContent(needsRefresh.some((mutation) => mutation.type === "childList" || mutation.type === "characterData"),
       coalescible ? needsRefresh.filter(mutation => mutation.attributeName === "aria-hidden") : null,
-      coalescible ? styleChanges : null);
+      coalescible ? styleChanges : null,
+      coalescible ? needsRefresh.filter(mutation => !["style", "aria-hidden"].includes(mutation.attributeName)) : null);
   });
   const start = async () => {
-    layout = globalThis.LexendLayout?.create({ withStylesDisabled: withExtensionStylesDisabled, getTextElements: collectTextElements }) ?? null;
+    layout = globalThis.LexendLayout?.create({ getTextElements: collectTextElements, beginAttributeMutation, getStylePresence }) ?? null;
     window.addEventListener("pageshow", async (event) => {
-      if (!event.persisted) return;
+      if (!event.persisted || initializing) return;
       // Cached documents may miss storage events while frozen. Read current
       // preferences before reusing their typography, without letting a stale
       // read replace a newer storage event or overlapping restoration.
-      const revision = ++settingsRevision;
+      const generation = ++settingsReadGeneration;
+      restoringChanges = {};
+      notifyState();
       try {
         const saved = await extension.storage.sync.get(null);
-        if (revision === settingsRevision) applySettings(saved);
+        if (generation === settingsReadGeneration) {
+          const reconciled = mergeStorageChanges(saved, restoringChanges);
+          const confirmed = settingsApi.decodeSettings(reconciled);
+          rawSettings = reconciled;
+          startupChanges = {};
+          settingsLoadError = null;
+          applySettings(confirmed);
+        }
       } catch (error) {
         console.warn("Lexend for the Web could not reload settings after navigation.", error);
+      } finally {
+        if (generation === settingsReadGeneration) restoringChanges = null;
       }
       notifyState();
     });
+    document.addEventListener("lexend-design-mode", () => {
+      const editing = protection.editorDocument();
+      if (editing === editingDocument) return;
+      editingDocument = editing;
+      if (!settingsLoaded || !isActive()) return;
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      // The native setter bridge dispatches synchronously, so existing owned
+      // typography is restored before the page serializes its new editor.
+      refresh();
+    }, true);
+    // The page-world bridge is only a discovery hint, never authority. Ignore
+    // payloads and validate the actual open root; spoofed known/no-root hints
+    // do not trigger traversal, typography reads, or a repair.
+    document.addEventListener("lexend-open-shadow-root", (event) => {
+      if (!isActive()) return;
+      const host = event.composedPath()[0];
+      if (!(host instanceof Element) || host.ownerDocument !== document || !host.isConnected
+          || !host.shadowRoot || styledRoots.has(host.shadowRoot) || protection.editorOwned(host)) return;
+      applyIncomingFonts(new Set([host]));
+      queueRefresh();
+    }, true);
     window.addEventListener("resize", invalidateAutoContent, { passive: true });
     window.addEventListener("message", receiveFrameRequirement);
     document.addEventListener("focusin", (event) => {
+      if (!isActive() || protection.editorOwned(event.target)) return;
       queueRefresh();
       requestAnimationFrame(() => {
-        if (isActive()) globalThis.LexendControls?.revealFocused?.(event.target);
+        if (isLayoutRepairActive()) globalThis.LexendControls?.revealFocused?.(event.target);
       });
     }, true);
-    document.addEventListener("focusout", queueRefresh, true);
+    document.addEventListener("focusout", (event) => {
+      if (isActive() && !protection.editorOwned(event.target)) queueRefresh();
+    }, true);
+    document.addEventListener("toggle", (event) => {
+      if (!isActive() || !(event.target instanceof Element) || protection.editorOwned(event.target)) return;
+      // details.open is observed and coalesced; popovers have no open attribute.
+      if (event.target.matches("[popover]") && event.oldState !== event.newState) invalidateAutoContent();
+    }, true);
     const remeasureRevealedLabels = (event) => {
       if (event.type === "transitionend"
           && !/^(transform|translate|left|right|top|bottom|inset.*|width|height)$/.test(event.propertyName)) return;
       const target = event.target;
-      if (!(target instanceof Element)) return;
+      if (!isActive() || !(target instanceof Element) || protection.editorOwned(target)) return;
       // The mutation that starts a drawer/rail animation can be measured while
       // its labels are still outside the viewport. Reclassify once movement
       // finishes; ordinary font/color transitions do not schedule this work.
@@ -1375,8 +2079,9 @@
     document.addEventListener("animationend", remeasureRevealedLabels, true);
     document.addEventListener("contentvisibilityautostatechange", (event) => {
       if (!(event.target instanceof Element)) return;
+      if (!isActive()) return;
       knownAutoContent.set(event.target, event.skipped);
-      if (!isActive() || event.skipped !== false || revealedAutoContent.has(event.target)) return;
+      if (event.skipped !== false || revealedAutoContent.has(event.target)) return;
       // Offscreen automatic-containment subtrees have no usable geometry.
       // Capture their native layout once the browser paints them. Remember
       // the target until author content, settings or the viewport changes so
@@ -1414,15 +2119,22 @@
       // fonts change that baseline too and require a fresh capture.
       if (newMetrics && (authorMetrics || !initializing && pendingRepair === null)) invalidateAutoContent(true);
     });
-    let initialSettings;
-    const revision = settingsRevision;
-    try { initialSettings = await extension.storage.sync.get(null); }
-    catch (error) {
-      console.warn("Lexend for the Web could not load settings; using defaults.", error);
-      initialSettings = settingsApi.defaults;
+    let confirmed;
+    try {
+      const snapshot = await extension.storage.sync.get(null);
+      const reconciled = mergeStorageChanges(snapshot, startupChanges);
+      confirmed = settingsApi.decodeSettings(reconciled);
+      rawSettings = reconciled;
+      startupChanges = {};
+      settingsLoadError = null;
+    } catch (error) {
+      // An incomplete event stream cannot stand in for a saved snapshot. Stay
+      // passive until a successful reload establishes the user's preferences.
+      settingsLoadError = "SETTINGS_LOAD_FAILED";
+      console.warn("Lexend for the Web could not load settings; reload the page to retry.", error);
+      notifyState();
+      return;
     }
-    if (revision !== settingsRevision) return;
-    const confirmed = settingsApi.normalizeSettings(initialSettings);
     // Apply fonts and startup sizing before any full-page layout work. The
     // first capture waits for the bounded preload and a scheduled task.
     applySettings(confirmed, true);
@@ -1446,38 +2158,46 @@
 
   extension.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") return;
-    settingsRevision++;
+    if (restoringChanges) Object.assign(restoringChanges, changes);
 
-    const nextSettings = { ...settings };
-    Object.entries(changes).forEach(([key, change]) => {
-      if (change.newValue === undefined) delete nextSettings[key];
-      else nextSettings[key] = change.newValue;
-    });
-    applySettings(nextSettings);
+    if (!settingsLoaded) {
+      Object.assign(startupChanges, changes);
+      return;
+    }
+    rawSettings = mergeStorageChanges(rawSettings, changes);
+    try {
+      const confirmed = settingsApi.decodeSettings(rawSettings);
+      settingsLoadError = null;
+      applySettings(confirmed);
+    } catch (error) {
+      // Preserve confirmed preferences if a sync event is malformed/incomplete.
+      settingsLoadError = "SETTINGS_LOAD_FAILED";
+      console.warn("Lexend for the Web could not read updated settings.", error);
+      notifyState();
+    }
   });
 
   extension.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === FRAME_RECHECK) {
+      if (window !== window.top && isLayoutRepairActive() && isBackgroundSender(_sender)) {
+        lastFrameRequest = null;
+        notifyFrameRequirement();
+      }
+      return undefined;
+    }
     if (message?.type === FRAME_RUNTIME_APPLY) {
       receiveRuntimeFrameRequirement(message, _sender);
       sendResponse({ received: true });
       return undefined;
     }
     if (message?.type !== "LEXEND_GET_STATE") return undefined;
-    sendResponse({
-      ready: true,
-      pending: initializing || refreshing || refreshTimer !== null || pendingRepair !== null,
-      refreshRevision,
-      healthy: lastRefreshError === null,
-      error: lastRefreshError,
-      active: isActive(),
-      hostname: getEffectiveHostname(),
-      scope: getEffectiveSettings().scope
-    });
+    sendResponse(pageState());
     return undefined;
   });
 
   start().finally(() => {
     initializing = false;
-    if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size) queueRefresh(true);
+    if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size || pendingStateChanges.size) queueRefresh(true);
+    notifyState();
   });
 })();

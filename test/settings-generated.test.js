@@ -31,6 +31,7 @@ test("generated settings normalize idempotently and valid backups round-trip", (
       ]
     });
     assert.deepEqual(api.normalizeSettings(settings), settings, `normalization case ${iteration}`);
+    assert.deepEqual(api.decodeSettings(api.encodeSettings(settings)), settings, `persisted case ${iteration}`);
     assert.deepEqual(api.validateImport(JSON.parse(JSON.stringify({ schemaVersion: 2, settings }))), settings,
       `backup case ${iteration}`);
   }
@@ -99,7 +100,7 @@ test("generated writer operations preserve unrelated preferences and both rule v
       await store.mutate({ type: "removeRule", hostname, includeSubdomains });
       rules.delete(key);
     }
-    assert.deepEqual(new Map(saved.siteRules.map((rule) => [`${rule.hostname}:${rule.includeSubdomains}`, rule])), rules);
+    assert.deepEqual(new Map(api.decodeSettings(saved).siteRules.map((rule) => [`${rule.hostname}:${rule.includeSubdomains}`, rule])), rules);
     for (const [key, value] of Object.entries({ theme: "dark", textScale: 123, lineHeight: 1.73, letterSpacing: .057 })) {
       assert.equal(saved[key], value, `operation ${iteration} preserves ${key}`);
     }

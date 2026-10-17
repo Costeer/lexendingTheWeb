@@ -44,6 +44,28 @@
   margin: 0;
 }
 
+.about-diagnostics {
+  margin-top: 32px;
+}
+
+.about-fingerprint span,
+.about-fingerprint code {
+  display: block;
+}
+
+.about-fingerprint code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.about-diagnostics .helper {
+  margin-top: 16px;
+}
+
+.about-diagnostics button {
+  margin-top: 16px;
+}
+
 .about-links {
   display: flex;
   flex-wrap: wrap;

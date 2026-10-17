@@ -3,14 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { chromium } from "playwright";
 
-const source = await readFile(new URL("../src/adaptive-layout.js", import.meta.url), "utf8");
+const source = (await Promise.all(["adaptive-controls", "adaptive-layout"].map((name) => readFile(new URL(`../src/${name}.js`, import.meta.url), "utf8")))).join("\n");
 let browser;
 test.before(async () => { browser = await chromium.launch({ headless: true }); });
 test.after(async () => { await browser?.close(); });
 
-const prepare = async (html, viewport = { width: 390, height: 600 }, typographyCss = "body :is(p,h1,h2,h3,span,a,button) {font-size: 24px!important;line-height:1.6!important;letter-spacing:.02em!important}") => {
+const prepare = async (html, viewport = { width: 390, height: 600 }, typographyCss = "body :is(p,h1,h2,h3,span,a,button) {font-size: 24px!important;line-height:1.6!important;letter-spacing:.02em!important}", beforeCapture) => {
   const page = await browser.newPage({ viewport });
   await page.setContent(html);
+  await beforeCapture?.(page, typographyCss);
   await page.addScriptTag({ content: source });
   await page.evaluate((typographyCss) => {
     const typography = document.createElement("style");
@@ -123,12 +124,43 @@ test("new intrinsic inline-block prose stays within its viewport including autho
 });
 
 test("a newly cropped one-line label fits above its original size and restores", async () => {
+  let originalLabelStyle;
   const page = await prepare(`<style>
     body{margin:0;font:14px/24px Arial}.row{width:179px;display:flex;direction:rtl;padding:24px;gap:16px}
     .avatar{flex:none;width:48px;height:48px}.label{width:65px;flex:none;overflow:hidden;white-space:nowrap;direction:rtl}
     span{display:block;font:14px/24px Arial}
   </style><div class="row"><div class="avatar"></div><div class="label"><span>سارة أحمد</span></div></div>`,
-  {width:390,height:600}, "span{font-size:15.4px!important;line-height:1.6!important;letter-spacing:0!important}");
+  {width:390,height:600}, "span{font-size:15.4px!important;line-height:1.6!important;letter-spacing:0!important}", async (page, typographyCss) => {
+    const setup = await page.evaluate(async (typographyCss) => {
+      await document.fonts.ready;
+      const span = document.querySelector("span"), label = span.parentElement;
+      const range = document.createRange(); range.selectNodeContents(span);
+      const nativeWidth = range.getBoundingClientRect().width;
+      const probe = document.createElement("style"); probe.textContent = typographyCss;
+      document.head.append(probe);
+      const enlargedWidth = range.getBoundingClientRect().width;
+      probe.remove();
+      // System Arabic fallback fonts differ. Put the authored clip between the
+      // measured native and enlarged text widths rather than assuming 65px crops.
+      label.style.width = `${(nativeWidth + enlargedWidth) / 2}px`;
+      const measure = () => ({
+        text: range.getBoundingClientRect().toJSON(), clip: label.getBoundingClientRect().toJSON(),
+        size: parseFloat(getComputedStyle(span).fontSize)
+      });
+      const native = measure();
+      document.head.append(probe);
+      const enlarged = measure();
+      probe.remove();
+      return { native, enlarged, restored: measure(), labelStyle: label.getAttribute("style"), spanStyle: span.getAttribute("style") };
+    }, typographyCss);
+    assert.equal(setup.native.size, 14);
+    assert.ok(setup.native.text.left >= setup.native.clip.left - 1 && setup.native.text.right <= setup.native.clip.right + 1, JSON.stringify(setup));
+    assert.equal(setup.enlarged.size, 15.4);
+    assert.ok(setup.enlarged.text.left < setup.enlarged.clip.left - 1 || setup.enlarged.text.right > setup.enlarged.clip.right + 1, "Enlarged text must actually crop before repair: " + JSON.stringify(setup));
+    assert.deepEqual(setup.restored, setup.native, "The probe must restore native typography before layout capture");
+    assert.equal(setup.spanStyle, null);
+    originalLabelStyle = setup.labelStyle;
+  });
   const result = await page.evaluate(() => {
     const span=document.querySelector("span"), clip=span.parentElement.getBoundingClientRect();
     const range=document.createRange();range.selectNodeContents(span);
@@ -138,6 +170,7 @@ test("a newly cropped one-line label fits above its original size and restores",
   assert.ok(result.size>=14 && result.size<=15.4);
   assert.match(result.repair,/fit-tight-label/,JSON.stringify(result));
   assert.equal(await page.evaluate(()=>{layout.restore();return document.querySelector("span").getAttribute("style")}),null);
+  assert.equal(await page.locator(".label").getAttribute("style"), originalLabelStyle);
   await page.close();
 });
 
@@ -726,4 +759,85 @@ test("an originally whole Hangul token keeps its boundary only when every token 
  assert.equal(state.word,'keep-all');assert.equal(state.font,'18.7px');assert.equal(state.lines,1);assert.ok(state.overflow<=1);assert.equal(state.longWord,'normal');
  for(let i=0;i<4;i++){await page.evaluate(()=>{layout.capture();layout.repair()});assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.copy p')).wordBreak),'keep-all')}
  await page.evaluate(()=>layout.restore());assert.equal(await page.evaluate(()=>document.querySelector('.copy p').getAttribute('style')),null);await page.close();
+});
+
+test("late action fitting preserves whole reachable words without remeasuring unrelated prose", async () => {
+  const page = await browser.newPage({ viewport: { width: 600, height: 800 } });
+  try {
+    await page.setContent(`<style>
+      body{margin:16px;font:16px/20px Arial;background:white;color:black}
+      .row{width:360px}button{font:inherit;width:240px;padding:0;border:0;overflow:hidden;overflow-wrap:anywhere;background:white;color:black}
+      .prose{width:480px;margin:4px 0}
+    </style><div class="row"><button style="color: rgb(13, 21, 34);">Continue</button></div>
+      ${Array.from({ length: 12 }, (_, i) => `<p class="prose">Unrelated paragraph ${i} remains ordinary readable prose throughout the action repair.</p>`).join("")}`);
+    await page.addScriptTag({ content: source });
+    const result = await page.evaluate(() => {
+      const authorMarkup = document.body.innerHTML;
+      const typography = document.createElement("style");
+      typography.media = "not all";
+      typography.textContent = "p,button{font-size:24px!important;line-height:1.6!important}";
+      document.head.append(typography);
+      const layout = LexendLayout.create({ withStylesDisabled(callback) {
+        const media = typography.media;
+        typography.media = "not all";
+        try { return callback(); } finally { typography.media = media; }
+      } });
+      layout.capture();
+      typography.media = "all";
+      const controls = LexendControls;
+      const nativeRects = Range.prototype.getClientRects;
+      const nativeStyle = window.getComputedStyle;
+      const reads = { proseRanges: 0, proseStyles: 0 };
+      let afterLateWrite = false, lateWrites = 0, narrowedFragments = 0, narrowedWidth = 0;
+      Range.prototype.getClientRects = function (...args) {
+        const element = this.startContainer.nodeType === Node.TEXT_NODE ? this.startContainer.parentElement : this.startContainer;
+        if (afterLateWrite && element.closest?.("p.prose")) reads.proseRanges++;
+        return Reflect.apply(nativeRects, this, args);
+      };
+      window.getComputedStyle = function (element, ...args) {
+        if (afterLateWrite && element.matches?.("p.prose")) reads.proseStyles++;
+        return Reflect.apply(nativeStyle, window, [element, ...args]);
+      };
+      // A genuine final control repair changes geometry after the first text
+      // pass. The following action-word pass must still fit that narrowed word.
+      window.LexendControls = { ...controls, finalizeIconLabels(args) {
+        controls.finalizeIconLabels(args);
+        const action = document.querySelector("button"), word = document.createRange();
+        word.selectNodeContents(action);
+        narrowedWidth = Math.floor(word.getBoundingClientRect().width * 0.6);
+        args.write(action, "width", `${narrowedWidth}px`, "test-late-action");
+        lateWrites++;
+        narrowedFragments = word.getClientRects().length;
+        afterLateWrite = true;
+      } };
+      try { layout.repair(); }
+      finally {
+        afterLateWrite = false;
+        Range.prototype.getClientRects = nativeRects;
+        window.getComputedStyle = nativeStyle;
+        window.LexendControls = controls;
+      }
+      const action = document.querySelector("button"), box = action.getBoundingClientRect();
+      const word = document.createRange(); word.selectNodeContents(action);
+      const fragments = [...word.getClientRects()].map(rect => rect.toJSON());
+      const state = { ...reads, lateWrites, narrowedFragments, narrowedWidth, fragments, box: box.toJSON(),
+        repair: action.getAttribute("data-lexend-layout-repair"),
+        hit: document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) === action };
+      layout.restore();
+      state.restoredMarkup = document.body.innerHTML;
+      state.authorMarkup = authorMarkup;
+      return state;
+    });
+    assert.equal(result.lateWrites, 1, JSON.stringify(result));
+    assert.ok(result.narrowedFragments > 1, "the real late width write must split the action word before its final repair");
+    assert.equal(result.fragments.length, 1, JSON.stringify(result));
+    assert.ok(result.box.width > result.narrowedWidth, JSON.stringify(result));
+    assert.ok(result.fragments.every(rect => rect.left >= result.box.left - 1 && rect.right <= result.box.right + 1
+      && rect.top >= result.box.top - 1 && rect.bottom <= result.box.bottom + 1), JSON.stringify(result));
+    assert.match(result.repair, /whole-action-word/);
+    assert.equal(result.hit, true, JSON.stringify(result));
+    assert.equal(result.restoredMarkup, result.authorMarkup);
+    assert.equal(result.proseRanges, 0, "the final action-only pass must not measure unrelated prose ranges after the late write");
+    assert.equal(result.proseStyles, 0, "the final action-only pass must not read unrelated prose styles after the late write");
+  } finally { await page.close(); }
 });

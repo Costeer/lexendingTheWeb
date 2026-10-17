@@ -1,8 +1,25 @@
 (() => {
   "use strict";
+  // An editing surface owns its serialization, including read-only islands.
+  // Native contenteditable inheritance stops at false; our ownership boundary
+  // deliberately does not, because those islands are still saved by the editor.
+  const editorSelector = "[contenteditable='true' i],[contenteditable=''],[contenteditable='plaintext-only' i],[role='textbox'][aria-multiline='true'],.CodeMirror,.cm-editor,.monaco-editor,.ace_editor,.code-editor";
+  const semanticSelector = "pre,code,kbd,samp,math,svg,[data-lexend-ignore],[role='img']";
+  const parent = (element) => element.parentElement ?? element.getRootNode()?.host ?? null;
+  const editorDocument = () => document.designMode?.toLowerCase() === "on";
+  const within = (element, selector) => {
+    if (editorDocument()) return true;
+    for (let current = element; current; current = current.getRootNode()?.host ?? null) {
+      if (current.closest?.(selector)) return true;
+    }
+    return false;
+  };
+  const editorOwned = (element) => within(element, editorSelector);
+  globalThis.LexendProtection = Object.freeze({ editorSelector, semanticSelector, parent, editorDocument, editorOwned,
+    protected: (element) => within(element, `${semanticSelector},${editorSelector}`) });
   const EPSILON = 2;
   const interactive = (element) => element.matches("button,a[href],[role='button']");
-  const excluded = (element) => element.closest("pre,code,kbd,samp,math,svg,[data-lexend-ignore],[contenteditable='true']");
+  const excluded = (element) => globalThis.LexendProtection.protected(element);
   const grew = (before, now) => now.fontSize > before.fontSize * 1.04 || now.text && before.text && now.text.bottom - now.text.top > before.text.bottom - before.text.top + EPSILON;
   const sameRow = (left, right) => Math.abs(left.top - right.top) <= EPSILON;
   const footerPadding = new WeakMap();
@@ -129,6 +146,7 @@
   // Some authored tab handlers prevent arrow-key scrolling. Keep the focused
   // action visible without replacing their selection logic or rebuilding DOM.
   const revealFocused = (target) => {
+    if (globalThis.LexendProtection.editorOwned(target)) return;
     const action = target?.closest?.("button,a[href],input,select,textarea,[role='button'],[role='tab']");
     const navigation = action?.closest("nav,[role='navigation'],[role='tablist'],[role='menubar']");
     if (!action?.isConnected || excluded(action)) return;

@@ -1,6 +1,6 @@
 # Privacy Policy for Lexend for the Web
 
-Last updated: October 7, 2026
+Last updated: October 13, 2026
 
 Lexend for the Web doesn't track you. It doesn't collect your personal data or
 record what you read. The developer doesn't receive, sell, or share your data.
@@ -27,9 +27,12 @@ These use your browser's synchronized extension storage. If browser sync is on,
 your browser provider may sync them between signed-in profiles. The developer
 has no server and no access to your sync account.
 
-The popup and settings pages also keep a local copy of the interface theme so
-it can be applied before pages are painted. This cache stays in the browser and
-is not sent to the developer.
+The extension pages also keep a local copy of the interface theme so it can be
+applied before pages are painted. They remember the index of the last displayed
+quotation to avoid showing the same quotation twice in a row. This index refers
+only to the quotations included with the extension, not to pages you visit.
+The theme cache and quotation index stay in the browser's local storage; they
+are not synced or sent to the developer.
 
 ## You control your settings
 

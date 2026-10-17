@@ -1,0 +1,181 @@
+name: Installed browser contract
+
+on:
+  workflow_call:
+    inputs:
+      artifact-prefix:
+        type: string
+        default: browser-tests
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      browsers: ${{ steps.matrix.outputs.browsers }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: matrix
+        name: Read supported desktop minimums from the manifests
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const read = target => JSON.parse(readFileSync(`manifests/manifest.${target}.json`, 'utf8'));
+          const minimums = {
+            chrome: read('chrome').minimum_chrome_version,
+            firefox: read('firefox').browser_specific_settings.gecko.strict_min_version,
+          };
+          const include = [];
+          for (const browser of ['chrome', 'firefox']) {
+            include.push({ browser, channel: 'stable', version: 'stable' });
+            const minimum = minimums[browser];
+            if (minimum !== undefined) {
+              if (!/^\d+(?:\.\d+)*$/.test(minimum)) throw new Error(`Invalid ${browser} minimum: ${minimum}`);
+              include.push({ browser, channel: 'minimum', version: minimum });
+            } else if (browser === 'firefox') {
+              throw new Error('The Firefox desktop minimum must be declared.');
+            } else {
+              appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Chrome has no manifest-declared minimum; only stable Chrome is covered.\n');
+            }
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `browsers=${JSON.stringify({ include })}\n`);
+          NODE
+
+  browsers:
+    needs: matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.browsers) }}
+    env:
+      SE_AVOID_STATS: "true"
+      SE_FORCE_BROWSER_DOWNLOAD: "true"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run package
+      - name: Retain and verify the release packages
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/lexend-browser-tests"
+          cp dist/releases/*.zip "$RUNNER_TEMP/lexend-browser-tests/"
+          npm run test:packages 2>&1 | tee "$RUNNER_TEMP/lexend-browser-tests/package-verification.log"
+      - name: Provision the requested browser and driver
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
+          TEST_BROWSER_VERSION: ${{ matrix.version }}
+        shell: bash
+        run: |
+          # Retry downloads before testing; never retry a failed browser assertion.
+          for attempt in 1 2 3; do
+            if node_modules/selenium-webdriver/bin/linux-x86_64/selenium-manager \
+              --browser "$TEST_BROWSER" --browser-version "$TEST_BROWSER_VERSION" \
+              --force-browser-download --avoid-stats \
+              2>&1 | tee -a "$RUNNER_TEMP/lexend-browser-tests/provisioning.log"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
+      - name: Verify the installed release artifact
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
+          TEST_BROWSER_VERSION: ${{ matrix.version }}
+        shell: bash
+        run: |
+          xvfb-run -a npm run test:browser -- "$TEST_BROWSER" \
+            --browser-version "$TEST_BROWSER_VERSION" \
+            --output "$RUNNER_TEMP/lexend-browser-tests" \
+            2>&1 | tee "$RUNNER_TEMP/lexend-browser-tests/command.log"
+      - name: Verify installed shadow discovery and runtime lifecycle
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
+          TEST_BROWSER_VERSION: ${{ matrix.version }}
+        shell: bash
+        run: |
+          xvfb-run -a node scripts/shadow-browser-tests.mjs "$TEST_BROWSER" \
+            --browser-version "$TEST_BROWSER_VERSION" \
+            --checks scripts/runtime-lifecycle-checks.mjs \
+            --output "$RUNNER_TEMP/lexend-browser-tests/shadow" \
+            2>&1 | tee "$RUNNER_TEMP/lexend-browser-tests/shadow-command.log"
+      - name: Expose the actual engine and incomplete coverage
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+          const path = `${process.env.RUNNER_TEMP}/lexend-browser-tests/results.json`;
+          const lines = ['### Installed browser evidence'];
+          if (!existsSync(path)) {
+            lines.push('No browser report was produced; this run does not establish coverage.');
+          } else {
+            const report = JSON.parse(readFileSync(path, 'utf8'));
+            lines.push(`- Result: ${report.status}`);
+            lines.push(`- Browser: ${report.browser?.name ?? report.browserName} ${report.browser?.version ?? 'not started'}`);
+            lines.push(`- Driver: ${report.browser?.driverVersion ?? 'unavailable'}`);
+            lines.push(`- Requested version: ${report.requestedBrowserVersion}`);
+            lines.push(`- ZIP SHA-256: ${report.artifact?.sha256 ?? 'unavailable'}`);
+            lines.push(`- Build source hash: ${report.artifact?.buildIdentity?.sourceHash ?? 'unavailable'}`);
+            for (const check of report.checks ?? []) {
+              if (check.status !== 'passed') lines.push(`- **${check.status}**: ${check.name}: ${check.reason ?? check.error ?? 'See report'}`);
+            }
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ${{ inputs.artifact-prefix }}-${{ matrix.browser }}-${{ matrix.channel }}-${{ matrix.version }}
+          path: ${{ runner.temp }}/lexend-browser-tests/
+          if-no-files-found: error
+
+  node-floor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify the supported Node 22 floor
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/lexend-node-floor"
+          {
+            node --version
+            npm --version
+            npm test
+            npm run check
+            npm run package
+            npm run test:packages
+            npm run lint:firefox
+          } 2>&1 | tee "$RUNNER_TEMP/lexend-node-floor/command.log"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ${{ inputs.artifact-prefix }}-node-22.13.0
+          path: ${{ runner.temp }}/lexend-node-floor/
+          if-no-files-found: error

@@ -4,7 +4,8 @@
   // Adapt only constraints that become unsafe after typography changes. No site
   // identities or author class names are involved. Every write is reversible.
   const EPSILON = 2;
-  const PROTECTED = "pre,code,kbd,samp,math,svg,[data-lexend-ignore],[role='textbox'][aria-multiline='true'],[contenteditable='true']";
+  const NO_ATTRIBUTE_MUTATION = () => null;
+  const protection = globalThis.LexendProtection;
   const heading = (element) => /^H[1-6]$/.test(element.tagName) || element.getAttribute("role") === "heading";
   const control = (element) => element.matches("button,input,select,textarea,a[href],[role='button']");
   const rect = (value) => ({ left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width, height: value.height });
@@ -47,10 +48,17 @@
   };
   const ancestor = (element) => element.parentElement ?? element.getRootNode()?.host ?? null;
   const intersection = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-  const bounds = (rects) => rects.length ? {
-    left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)),
-    top: Math.min(...rects.map((r) => r.top)), bottom: Math.max(...rects.map((r) => r.bottom))
-  } : null;
+  const bounds = (rects) => {
+    if (!rects.length) return null;
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (const box of rects) {
+      left = Math.min(left, box.left);
+      right = Math.max(right, box.right);
+      top = Math.min(top, box.top);
+      bottom = Math.max(bottom, box.bottom);
+    }
+    return { left, right, top, bottom };
+  };
   const measureTextRects = (element) => {
     const result = [];
     for (const node of element.childNodes) {
@@ -87,14 +95,13 @@
       fontSize: parseFloat(style.fontSize) || 16, font: style.font, letterSpacing: parseFloat(style.letterSpacing) || 0,
       display: style.display, position: style.position, whiteSpace: style.whiteSpace,
       overflowX: style.overflowX, overflowY: style.overflowY, lineClamp: style.webkitLineClamp,
-      color: style.color, backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage,
+      color: style.color,
       paddingTop: parseFloat(style.paddingTop) || 0, paddingBottom: parseFloat(style.paddingBottom) || 0,
       paddingLeft: parseFloat(style.paddingLeft) || 0, paddingRight: parseFloat(style.paddingRight) || 0,
       borderTop: parseFloat(style.borderTopWidth) || 0, borderBottom: parseFloat(style.borderBottomWidth) || 0,
       borderLeft: parseFloat(style.borderLeftWidth) || 0, borderRight: parseFloat(style.borderRightWidth) || 0,
-      flexDirection: style.flexDirection, flexWrap: style.flexWrap, gridTemplateColumns: style.gridTemplateColumns,
-      textOverflow: style.textOverflow, transform: style.transform,
-      authoredTop: parseFloat(style.top), authoredHeight: parseFloat(style.height), hangulTokens: hangulTokens(element)
+      flexDirection: style.flexDirection,
+      textOverflow: style.textOverflow, transform: style.transform, hangulTokens: hangulTokens(element)
     };
   };
   const defaultTextElements = (root) => {
@@ -102,10 +109,10 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
-      if (node.textContent.trim() && node.parentElement && !node.parentElement.closest(PROTECTED)) elements.add(node.parentElement);
+      if (node.textContent.trim() && node.parentElement && !protection.protected(node.parentElement)) elements.add(node.parentElement);
     }
     root.querySelectorAll?.("input,select,textarea,button,[role='button']").forEach((element) => {
-      if (!element.closest(PROTECTED)) elements.add(element);
+      if (!protection.protected(element)) elements.add(element);
     });
     return elements;
   };
@@ -114,7 +121,9 @@
     return values?.length >= 3 && (values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722) > 180;
   };
 
-  const create = ({ withStylesDisabled = (callback) => callback(), getTextElements = defaultTextElements } = {}) => {
+  const create = ({ withStylesDisabled = (callback) => callback(), getTextElements = defaultTextElements,
+    beginAttributeMutation = () => NO_ATTRIBUTE_MUTATION,
+    getStylePresence = (element) => element.hasAttribute("style") } = {}) => {
     let baseline = new Map();
     let textElements = new Set();
     let descendants = new Map();
@@ -130,10 +139,51 @@
     const maskedScrollOffsets = new Map();
     const originalStylePresence = new Map();
     let canvas;
+    let appliedStyle;
+    const appliedProperty = (element, property, mutation) => {
+      if (mutation === null) return element.style.getPropertyValue(property);
+      appliedStyle ??= document.createElement("span").style;
+      appliedStyle.cssText = mutation.value ?? "";
+      return appliedStyle.getPropertyValue(property);
+    };
+    let region = null;
+    const regionOwns = (element) => region === null || element?.getRootNode() === region.root;
+    const requireRegionOwnership = (element) => {
+      if (!regionOwns(element)) throw new Error("Regional layout repair escaped its shadow root");
+    };
+    // Iteration stays local while geometry helpers retain their existing
+    // read-only ancestor context. In particular, a missing host baseline must
+    // not silently turn an otherwise necessary outer repair into a no-op.
+    const regionalBaseline = (entries = []) => {
+      const scope = region;
+      return new class extends Map {
+        constructor() { super(entries); }
+        get(element) {
+          if (super.has(element)) return super.get(element);
+          if (element === scope.root.host) return scope.hostBaseline;
+          if (element?.getRootNode() === scope.root) return undefined;
+          return scope.previous.baseline.get(element);
+        }
+        has(element) {
+          return super.has(element) || (element === scope.root.host && scope.hostBaseline !== null)
+            || element?.getRootNode() !== scope.root && scope.previous.baseline.has(element);
+        }
+        set(element, state) {
+          if (element === scope.root.host) { scope.hostBaseline = state; return this; }
+          requireRegionOwnership(element);
+          return super.set(element, state);
+        }
+      }();
+    };
     // Repeated repair stages read the same boxes and ancestor styles. Reuse
     // them only within this synchronous pass, and discard every measurement
     // after any write: a child can change its siblings or a :has() ancestor.
     let measurements = null;
+    let editorOwnership = new WeakMap();
+    const editorOwned = (element) => {
+      if (!editorOwnership.has(element)) editorOwnership.set(element, protection.editorOwned(element));
+      return editorOwnership.get(element);
+    };
     const freshMeasurements = () => ({
       styles: new WeakMap(), pseudoStyles: new WeakMap(), paintStyles: new WeakMap(),
       snapshots: [new WeakMap(), new WeakMap()],
@@ -144,6 +194,7 @@
     const withMeasurements = (callback) => {
       const previous = measurements;
       measurements = freshMeasurements();
+      editorOwnership = new WeakMap();
       try { return callback(); }
       finally { measurements = previous; }
     };
@@ -188,26 +239,45 @@
       return measurements.paintStyles.get(element);
     };
     const snapshot = (element, allowViewportEscape = false) => {
+      if (editorOwned(element)) return null;
       if (!measurements) return measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox);
       const cache = measurements.snapshots[Number(allowViewportEscape)];
       if (!cache.has(element)) cache.set(element, measureSnapshot(element, allowViewportEscape, styleFor, directTextRects, paintStyleFor, boxFor, hasBox));
       return cache.get(element);
     };
+    // Authored constraints are only consumed from the retained baseline. Capture
+    // them eagerly here: computed styles stay live across later repair writes.
+    // Capture and repair have separate measurement scopes, so current snapshots
+    // need neither these reads nor a deferred getter with a longer lifetime.
+    const captureSnapshot = (element) => {
+      const state = snapshot(element);
+      if (state) {
+        const style = styleFor(element);
+        state.authoredTop = parseFloat(style.top);
+        state.authoredHeight = parseFloat(style.height);
+      }
+      return state;
+    };
     const write = (element, property, value, category) => {
+      requireRegionOwnership(element);
+      if (editorOwned(element)) return;
       let properties = edits.get(element);
       if (!properties) {
         edits.set(element, properties = new Map());
-        originalStylePresence.set(element, element.hasAttribute("style"));
+        originalStylePresence.set(element, getStylePresence(element));
       }
       if (!properties.has(property)) properties.set(property, {
         value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property)
       });
       const original = properties.get(property);
+      let mutation = null;
       if (element.style.getPropertyValue(property) !== value || element.style.getPropertyPriority(property) !== "important") {
+        const finishMutation = beginAttributeMutation(element, "style");
         element.style.setProperty(property, value, "important");
         invalidateMeasurements();
+        mutation = finishMutation();
       }
-      original.applied = element.style.getPropertyValue(property);
+      original.applied = appliedProperty(element, property, mutation);
       original.appliedPriority = "important";
       mark(element, "data-lexend-layout-repair", category);
       // Shadow ::slotted typography rules read these variables. A measured
@@ -236,14 +306,18 @@
       write(element, property, value, "bounded-panel");
     };
     const mark = (element, name, value) => {
+      requireRegionOwnership(element);
+      if (editorOwned(element)) return;
       let values = attributes.get(element);
       if (!values) attributes.set(element, values = new Map());
       if (!values.has(name)) values.set(name, { value: element.getAttribute(name) });
       const previous = element.getAttribute(name);
       const next = name === "data-lexend-layout-repair" ? [...new Set([...(previous?.split(" ") ?? []), value])].join(" ") : value;
       if (previous !== next) {
+        const finishMutation = beginAttributeMutation(element, name);
         element.setAttribute(name, next);
         invalidateMeasurements();
+        finishMutation();
       }
       values.get(name).applied = next;
     };
@@ -255,21 +329,25 @@
       // measurement and makes the site alternate between two layouts forever.
       const retained = new Set();
       if (preserveHidden) for (const element of edits.keys()) {
+        if (!regionOwns(element)) continue;
         if (element.isConnected && getComputedStyle(element).visibility === "hidden"
             && element.getClientRects().length) retained.add(element);
       }
       for (const [element, offset] of maskedScrollOffsets) {
+        if (!regionOwns(element)) continue;
         const owned = edits.get(element)?.get("overflow-x");
         if (owned && element.style.getPropertyValue("overflow-x") === owned.applied) element.scrollLeft = offset;
+        maskedScrollOffsets.delete(element);
       }
-      maskedScrollOffsets.clear();
       for (const [element, properties] of edits) {
-        if (retained.has(element)) continue;
+        if (!regionOwns(element) || retained.has(element)) continue;
         const restoreProperty = (property, original) => {
           // The site may have changed its inline style since our last pass.
           if (element.style.getPropertyValue(property) !== original.applied || element.style.getPropertyPriority(property) !== original.appliedPriority) return;
+          const finishMutation = beginAttributeMutation(element, "style");
           if (original.value) element.style.setProperty(property, original.value, original.priority);
           else element.style.removeProperty(property);
+          finishMutation();
         };
         const transitions = [...properties].filter(([property]) => property.startsWith("transition-"));
         for (const [property, original] of properties) if (!property.startsWith("transition-")) restoreProperty(property, original);
@@ -278,33 +356,50 @@
         // repair back toward the author height and contaminate a recapture.
         if (transitions.length) void styleFor(element).height;
         for (const [property, original] of transitions) restoreProperty(property, original);
-        if (!element.getAttribute("style") && !originalStylePresence.get(element)) element.removeAttribute("style");
-      }
-      for (const [element, values] of attributes) {
-        if (retained.has(element)) continue;
-        for (const [name, original] of values) {
-          if (element.getAttribute(name) !== original.applied) continue;
-          if (original.value === null) element.removeAttribute(name);
-          else element.setAttribute(name, original.value);
+        if (!element.getAttribute("style") && !originalStylePresence.get(element)) {
+          const finishMutation = beginAttributeMutation(element, "style");
+          element.removeAttribute("style");
+          finishMutation();
         }
       }
-      for (const element of edits.keys()) if (!retained.has(element)) edits.delete(element);
-      for (const element of attributes.keys()) if (!retained.has(element)) attributes.delete(element);
-      for (const element of originalStylePresence.keys()) if (!retained.has(element)) originalStylePresence.delete(element);
+      for (const [element, values] of attributes) {
+        if (!regionOwns(element) || retained.has(element)) continue;
+        for (const [name, original] of values) {
+          if (element.getAttribute(name) !== original.applied) continue;
+          const finishMutation = beginAttributeMutation(element, name);
+          if (original.value === null) element.removeAttribute(name);
+          else element.setAttribute(name, original.value);
+          finishMutation();
+        }
+      }
+      for (const element of edits.keys()) if (regionOwns(element) && !retained.has(element)) edits.delete(element);
+      for (const element of attributes.keys()) if (regionOwns(element) && !retained.has(element)) attributes.delete(element);
+      for (const element of originalStylePresence.keys()) if (regionOwns(element) && !retained.has(element)) originalStylePresence.delete(element);
       for (const [table, wrapper] of tableWrappers) {
+        if (!regionOwns(table) || !regionOwns(wrapper)) continue;
         if (retained.has(wrapper)) continue;
         if (table.parentNode === wrapper && wrapper.parentNode) wrapper.parentNode.insertBefore(table, wrapper);
         if (!wrapper.childNodes.length) wrapper.remove();
         tableWrappers.delete(table);
       }
     };
+    const dispose = () => {
+      if (region) throw new Error("Cannot dispose layout during a regional repair");
+      restore();
+      baseline.clear(); textElements.clear(); descendants.clear();
+      visualContainers = new WeakMap(); pseudoBaseline.clear(); maskedTickers.clear();
+      panelReservations.clear(); viewportScrollOwners.clear(); frameQualification = null;
+      measurements = null; editorOwnership = new WeakMap(); canvas = null;
+    };
     const captureBaseline = (roots = [document.documentElement], options) => {
+      const sources = roots instanceof Set || Array.isArray(roots) ? roots : [roots];
+      if (region && (sources.length !== undefined ? sources.length !== 1 || sources[0] !== region.root
+        : sources.size !== 1 || !sources.has(region.root))) throw new Error("Regional capture requires its exact shadow root");
       restore(options);
-      baseline = new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
+      baseline = region ? regionalBaseline() : new Map(); textElements = new Set(); descendants = new Map(); visualContainers = new WeakMap(); pseudoBaseline = new Map(); maskedTickers = new Map();
       return withStylesDisabled(() => {
         panelReservations = new Map();
         viewportScrollOwners = new Set();
-        const sources = roots instanceof Set || Array.isArray(roots) ? roots : [roots];
         for (const root of sources) {
           if (!root) continue;
           const candidates = new Set(getTextElements(root));
@@ -312,13 +407,13 @@
           // label. They still reserve space even with no painted direct text.
           root.querySelectorAll?.("button,[role='button'],input,select,textarea,a[href]").forEach((element) => candidates.add(element));
           for (const element of candidates) {
-            if (!(element instanceof HTMLElement) || element.closest(PROTECTED)) continue;
-            const state = snapshot(element);
+            if (!(element instanceof HTMLElement) || protection.protected(element)) continue;
+            const state = captureSnapshot(element);
             if (!state) continue;
             textElements.add(element); baseline.set(element, state);
             if (element.matches("button,[role='button']") && element.children.length <= 4) {
               for (const child of element.children) {
-                const childState = snapshot(child);
+                const childState = captureSnapshot(child);
                 if (childState && !baseline.has(child)) baseline.set(child, childState);
               }
             }
@@ -327,15 +422,17 @@
             let parent = ancestor(element);
             // Include containing panels and siblings, even when they have no
             // direct text. Stop before document-wide reflow constraints.
-            for (let depth = 0; parent && depth < 8 && parent !== document.documentElement && parent !== document.body; depth++, parent = ancestor(parent)) {
+            for (let depth = 0; parent && depth < 8 && parent !== document.documentElement && parent !== document.body;
+              depth++, parent = region && parent === region.root.host ? null : ancestor(parent)) {
               if (!descendants.has(parent)) descendants.set(parent, []);
               descendants.get(parent).push(element);
-              if (!baseline.has(parent)) {
-                const parentState = snapshot(parent);
+              if (!baseline.has(parent) || region && parent === region.root.host) {
+                const parentState = captureSnapshot(parent);
                 if (parentState) baseline.set(parent, parentState);
+                if (region && parent === region.root.host) continue;
                 if (parent.children.length <= 16) for (const sibling of parent.children) {
                   if (!(sibling instanceof HTMLElement || sibling instanceof SVGElement) || baseline.has(sibling)) continue;
-                  const siblingState = snapshot(sibling);
+                  const siblingState = captureSnapshot(sibling);
                   if (siblingState) baseline.set(sibling, siblingState);
                 }
                 // A picture wrapper can have no box while its absolutely
@@ -343,7 +440,7 @@
                 // shallow image layers without scanning whole page subtrees.
                 if (parent.children.length <= 16) for (const visual of parent.querySelectorAll(":scope > picture > img")) {
                   if (!baseline.has(visual)) {
-                    const visualState = snapshot(visual);
+                    const visualState = captureSnapshot(visual);
                     if (visualState) baseline.set(visual, visualState);
                   }
                 }
@@ -353,13 +450,14 @@
           // Media-only branches may have no text ancestors near the flex
           // column that owns their width. Retain their measured geometry too.
           for (const media of root.querySelectorAll?.("img,video,canvas") ?? []) {
-            const state = snapshot(media);
+            const state = captureSnapshot(media);
             if (!state || state.box.width < 40 || state.box.height < 40) continue;
             if (!baseline.has(media)) baseline.set(media, state);
             let parent = ancestor(media);
-            for (let depth = 0; parent && depth < 10 && parent !== document.body && parent !== document.documentElement; depth++, parent = ancestor(parent)) {
-              if (baseline.has(parent)) continue;
-              const parentState = snapshot(parent);
+            for (let depth = 0; parent && depth < 10 && parent !== document.body && parent !== document.documentElement;
+              depth++, parent = region && parent === region.root.host ? null : ancestor(parent)) {
+              if (baseline.has(parent) && !(region && parent === region.root.host)) continue;
+              const parentState = captureSnapshot(parent);
               if (parentState) baseline.set(parent, parentState);
             }
           }
@@ -420,6 +518,7 @@
           }
           state.contentBounds = bounds(containedRects(element, true));
         }
+        if (region?.hostBaseline) region.hostBaseline.contentBounds = bounds(containedRects(region.root.host, true));
       });
     };
     const pseudoBox = (element, name) => {
@@ -902,7 +1001,7 @@
     };
     const repairContainers = () => {
       // Inner containers first. Their growth then informs outer constraints.
-      const containers = [...baseline.keys()].filter((element) => !element.closest(PROTECTED)).reverse();
+      const containers = [...baseline.keys()].filter((element) => !protection.protected(element)).reverse();
       for (const element of containers) {
         const before = baseline.get(element);
         const now = snapshot(element);
@@ -1124,9 +1223,14 @@
     };
     const repairPanels = () => {
       for (const [panel, before] of baseline) {
+        if (editorOwned(panel)) continue;
+        const modal = panel.matches("dialog,[role='dialog'],[aria-modal='true']");
+        // Most captured text belongs to ordinary flow, not a viewport panel.
+        // Earlier repairs can change position through author :has() rules.
+        const position = styleFor(panel).position;
+        if (!modal && position !== "fixed" && !(window !== window.top && position === "absolute")) continue;
         const now = snapshot(panel, true);
         if (!now) continue;
-        const modal = panel.matches("dialog,[role='dialog'],[aria-modal='true']");
         if (!modal && before.box.width >= innerWidth * 0.9 && before.box.height >= innerHeight * 0.9
             && !before.texts.length && panel.querySelector("dialog,[role='dialog'],[aria-modal='true']")) continue;
         // Embedded consent applications often mount an absolute panel without
@@ -1481,6 +1585,16 @@
     };
     const repairLayout = () => {
       if (!baseline.size) return;
+      // Reuse only a complete no-write scan within this synchronous repair.
+      // A write late in a scan can affect an earlier sibling or :has() ancestor,
+      // so finishing a write-producing scan does not establish convergence.
+      let settledContainerMeasurements = null;
+      const ensureContainers = () => {
+        if (measurements !== null && measurements === settledContainerMeasurements) return;
+        const before = measurements;
+        repairContainers();
+        settledContainerMeasurements = before !== null && before === measurements ? before : null;
+      };
       for (const [mask, { track, active, offset }] of maskedTickers) {
         if (!mask.isConnected || !active.isConnected) continue;
         const before = baseline.get(mask), box = boxFor(active);
@@ -1494,19 +1608,20 @@
         }
       }
       for (const element of textElements) if (element.isConnected) repairText(element, baseline.get(element));
-      repairContainers(); repairSiblings(); repairContainers();
-      repairMediaFootprints(); repairContainers();
+      ensureContainers(); repairSiblings(); ensureContainers();
+      repairMediaFootprints(); ensureContainers();
       globalThis.LexendControls?.repair({ baseline, textElements, descendants, snapshot, write, mark, ancestor, bounds, directTextRects, containedText, expandContainer });
       repairFloatingBounds();
-      repairExpandedFades(); repairContainers(); repairPseudoTooltips();
+      repairExpandedFades(); ensureContainers(); repairPseudoTooltips();
       repairPanels(); repairBackdropSpacing(); repairBorderBackdrops(); repairImageLayers(); repairOverlays(); repairTables(); repairMaskedContent();
       repairSolidContrast();
       globalThis.LexendControls?.finalizeIconLabels?.({ baseline, snapshot, write });
       // Controls and flex repairs can narrow an action after the first text
       // pass. Recheck only short action words against their settled geometry.
       for (const element of textElements) {
+        if (!element.closest("a[href],button,[role=button]")) continue;
         const before = baseline.get(element), now = snapshot(element);
-        if (before && now && element.closest("a[href],button,[role=button]")) fitHeading(element, before, now);
+        if (before && now) fitHeading(element, before, now);
       }
     };
     const getFrameRequirement = (originalViewportHeight = innerHeight) => {
@@ -1548,9 +1663,85 @@
       if (requiredHeight > limit) return null;
       return { baselineHeight: frameQualification.baselineHeight, requiredHeight, viewportHeight };
     };
+    const canRefreshRegion = (root) => {
+      if (region || measurements || !(root instanceof ShadowRoot) || !root.host.isConnected
+          || !baseline.has(root.host) || ![...textElements].some((element) => element.getRootNode() === root)) return false;
+      // A local pass cannot replace an outer ownership group. Its host and
+      // ancestors must retain their authored constraints and typography.
+      for (let element = root.host; element; element = ancestor(element)) {
+        if (edits.has(element) || attributes.has(element) || originalStylePresence.has(element)
+            || maskedScrollOffsets.has(element) || tableWrappers.has(element)
+            || [...tableWrappers.values()].includes(element)) return false;
+      }
+      return true;
+    };
+    const withRegion = (root, callback) => {
+      if (!canRefreshRegion(root)) throw new Error("Shadow root is not eligible for regional layout ownership");
+      const previous = { baseline, textElements, descendants, pseudoBaseline, maskedTickers,
+        panelReservations, viewportScrollOwners, frameQualification };
+      const owns = (element) => element?.getRootNode() === root;
+      const localMap = (map) => new Map([...map].filter(([element]) => owns(element)));
+      const localSet = (set) => new Set([...set].filter(owns));
+      const mergeMap = (target, updated) => {
+        for (const element of target.keys()) if (owns(element)) target.delete(element);
+        for (const [element, value] of updated) if (owns(element)) target.set(element, value);
+        return target;
+      };
+      const mergeSet = (target, updated) => {
+        for (const element of target) if (owns(element)) target.delete(element);
+        for (const element of updated) target.add(element);
+        return target;
+      };
+      region = { root, previous, hostBaseline: previous.baseline.get(root.host) };
+      baseline = regionalBaseline([...previous.baseline].filter(([element]) => owns(element)));
+      textElements = localSet(previous.textElements);
+      descendants = localMap(previous.descendants);
+      descendants.set(root.host, [...textElements]);
+      pseudoBaseline = localMap(previous.pseudoBaseline);
+      maskedTickers = localMap(previous.maskedTickers);
+      panelReservations = localMap(previous.panelReservations);
+      viewportScrollOwners = localSet(previous.viewportScrollOwners);
+      visualContainers = new WeakMap();
+      try { return callback(); }
+      finally {
+        // Central write ownership stays global throughout the transaction.
+        // Merge even an interrupted recapture so the immediate full fallback
+        // can restore every partial edit, without losing unrelated groups.
+        baseline = mergeMap(previous.baseline, baseline);
+        textElements = mergeSet(previous.textElements, textElements);
+        descendants = mergeMap(previous.descendants, descendants);
+        pseudoBaseline = mergeMap(previous.pseudoBaseline, pseudoBaseline);
+        maskedTickers = mergeMap(previous.maskedTickers, maskedTickers);
+        panelReservations = mergeMap(previous.panelReservations, panelReservations);
+        viewportScrollOwners = mergeSet(previous.viewportScrollOwners, viewportScrollOwners);
+        frameQualification = previous.frameQualification;
+        visualContainers = new WeakMap();
+        editorOwnership = new WeakMap();
+        region = null;
+      }
+    };
+    const adoptAuthorChanges = (changes) => {
+      // A page reaction can replace an owned declaration during a local pass.
+      // Preserve its actual authored value before full fallback restores edits.
+      for (const [element, change] of changes) {
+        for (const [property, value] of change.properties) {
+          const original = edits.get(element)?.get(property);
+          if (original) { original.value = value.value; original.priority = value.priority; }
+        }
+        for (const [name, value] of change.attributes) {
+          const original = attributes.get(element)?.get(name);
+          if (original) original.value = value;
+        }
+        if (change.stylePresent !== undefined && originalStylePresence.has(element)) {
+          originalStylePresence.set(element, change.stylePresent);
+        }
+      }
+    };
     const capture = (roots, options) => withMeasurements(() => captureBaseline(roots, options));
     const repair = () => withMeasurements(repairLayout);
-    return Object.freeze({ capture, repair, restore, getFrameRequirement, refresh: (roots) => { capture(roots); repair(); } });
+    return Object.freeze({ capture, repair, restore, dispose, getFrameRequirement, canRefreshRegion, withRegion, adoptAuthorChanges,
+      getStylePresence: (element) => originalStylePresence.get(element),
+      refresh: (roots) => { capture(roots); repair(); } });
   };
 
   globalThis.LexendLayout = Object.freeze({ create });

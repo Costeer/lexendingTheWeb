@@ -3,6 +3,7 @@
 
   const defaults = Object.freeze({
     enabled: true,
+    layoutRepair: false,
     scope: "body",
     siteRules: [],
     theme: "light",
@@ -10,7 +11,12 @@
     lineHeight: 0,
     letterSpacing: 0
   });
-  const MAX_SITE_RULE_BYTES = 7000;
+  const MAX_SITE_RULE_BYTES = 8192;
+  const ruleStoragePrefix = "@1\n";
+  const repairRuleStoragePrefix = "@2\n";
+  const preferenceKeys = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"];
+  const ruleKey = (rule) => `${rule.hostname}\n${rule.includeSubdomains}`;
+  const sameRule = (left, right) => left.enabled === right.enabled && left.scope === right.scope && left.layoutRepair === right.layoutRepair;
   const legacySpacingValues = Object.freeze({
     default: 0,
     wide: 0.04,
@@ -77,20 +83,63 @@
 
     const enabled = typeof rule?.enabled === "boolean" ? rule.enabled : null;
     const scope = ["body", "all"].includes(rule?.scope) ? rule.scope : null;
-    if (enabled === null && scope === null) return null;
+    const layoutRepair = typeof rule?.layoutRepair === "boolean" ? rule.layoutRepair : undefined;
+    if (enabled === null && scope === null && layoutRepair === undefined) return null;
 
     return {
       hostname,
       includeSubdomains: Boolean(rule.includeSubdomains),
       enabled,
-      scope
+      scope,
+      ...(layoutRepair === undefined ? {} : { layoutRepair })
     };
+  };
+
+  // One atomic storage item avoids exposing an incomplete set of rule shards.
+  // Exact pauses need only a hostname: their serialized bytes are smaller than
+  // the corresponding legacy disabledSites item, including the storage key.
+  const encodeRules = (rules) => {
+    const repair = rules.some((rule) => typeof rule.layoutRepair === "boolean");
+    return (repair ? repairRuleStoragePrefix : ruleStoragePrefix) + rules.map((rule) => {
+      const flags = Number(rule.includeSubdomains) * 9
+        + (rule.enabled === false ? 0 : rule.enabled === true ? 1 : 2) * 3
+        + (rule.scope === "body" ? 1 : rule.scope === "all" ? 2 : 0)
+        + (rule.layoutRepair === false ? 18 : rule.layoutRepair === true ? 36 : 0);
+      return rule.hostname + (flags ? `\t${flags}` : "");
+    }).join("\n");
+  };
+
+  const decodeRules = (value) => {
+    if (typeof value !== "string") return value;
+    const invalid = () => { throw settingsError("INVALID_STORAGE", "Saved site rules could not be read. No settings were changed. Reload the extension and try again, or use the extension version that saved these settings."); };
+    const repair = value.startsWith(repairRuleStoragePrefix);
+    if (!repair && !value.startsWith(ruleStoragePrefix)) return invalid();
+    const body = value.slice(ruleStoragePrefix.length);
+    if (!body) return [];
+    const keys = new Set();
+    return body.split("\n").map((line) => {
+      const fields = line.split("\t");
+      const [hostname, encodedFlags] = fields;
+      if (fields.length > 2 || (fields.length === 2 && !/^(?:0|[1-9][0-9]*)$/.test(encodedFlags))) return invalid();
+      const flags = encodedFlags === undefined ? 0 : Number(encodedFlags);
+      if (!Number.isInteger(flags) || flags > (repair ? 53 : 17)) return invalid();
+      const enabled = [false, true, null][Math.floor(flags % 9 / 3)];
+      const scope = [null, "body", "all"][flags % 3];
+      const includeSubdomains = flags % 18 >= 9;
+      const layoutRepair = [undefined, false, true][Math.floor(flags / 18)];
+      const key = `${hostname}\n${includeSubdomains}`;
+      if (!validHostname(hostname) || hostname !== normalizeHostname(hostname)
+          || (enabled === null && scope === null && layoutRepair === undefined) || keys.has(key)) return invalid();
+      keys.add(key);
+      return { hostname, includeSubdomains, enabled, scope,
+        ...(layoutRepair === undefined ? {} : { layoutRepair }) };
+    });
   };
 
   const normalizeSettings = (value = {}) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) value = {};
     const sourceRules = Object.prototype.hasOwnProperty.call(value, "siteRules")
-      ? value.siteRules
+      ? decodeRules(value.siteRules)
       : (Array.isArray(value.disabledSites)
         ? value.disabledSites.map((hostname) => ({ hostname, enabled: false }))
         : []);
@@ -110,6 +159,7 @@
 
     return {
       enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
+      layoutRepair: typeof value.layoutRepair === "boolean" ? value.layoutRepair : defaults.layoutRepair,
       scope: value.scope === "all" ? "all" : defaults.scope,
       siteRules,
       theme: value.theme === "dark" ? "dark" : defaults.theme,
@@ -122,10 +172,41 @@
   };
 
   const settingsError = (code, message) => Object.assign(new Error(message), { code });
+  const encodeSettings = (value) => {
+    const settings = normalizeSettings(value);
+    return { ...settings, siteRules: encodeRules(settings.siteRules) };
+  };
+  // Compact encoding is retained for profiles that already use it. Default
+  // writes remain readable by older versions, without expanding large legacy
+  // pause lists or switching the authoritative rule key during a scalar edit.
+  const encodeSettingsForStorage = (value, raw = {}) => {
+    const settings = normalizeSettings(value);
+    const previous = normalizeSettings(raw);
+    const { siteRules, ...preferences } = settings;
+    const hasRules = Object.hasOwn(raw, "siteRules");
+    const legacy = !hasRules && Array.isArray(raw.disabledSites);
+    if (settingsEqual({ siteRules: previous.siteRules }, { siteRules })) {
+      if (hasRules) return { ...preferences, siteRules: raw.siteRules };
+      if (legacy) return { ...preferences, disabledSites: raw.disabledSites };
+    }
+    if (hasRules && typeof raw.siteRules === "string") return encodeSettings(settings);
+    if (legacy && siteRules.every((rule) => !rule.includeSubdomains
+        && rule.enabled === false && rule.scope === null && rule.layoutRepair === undefined)) {
+      return { ...preferences, disabledSites: siteRules.map((rule) => rule.hostname) };
+    }
+    return settings;
+  };
+  const storedRuleBytes = (encoded) => {
+    const key = Object.hasOwn(encoded, "siteRules") ? "siteRules" : "disabledSites";
+    return new TextEncoder().encode(key + JSON.stringify(encoded[key])).length;
+  };
+  const ruleStorageBytes = (value) => new TextEncoder().encode(
+    "siteRules" + JSON.stringify(encodeRules(normalizeSettings(value).siteRules))
+  ).length;
   const validateCapacity = (value) => {
     const settings = normalizeSettings(value);
     if (settings.siteRules.length > 250
-        || new TextEncoder().encode(JSON.stringify(settings.siteRules)).length > MAX_SITE_RULE_BYTES) {
+        || ruleStorageBytes(settings) > MAX_SITE_RULE_BYTES) {
       throw settingsError("RULE_CAPACITY", "There isn't room for these site rules. Remove some rules before adding or importing more.");
     }
     return settings;
@@ -133,13 +214,27 @@
 
   const validateImport = (payload) => {
     const value = payload?.settings;
-    if (![1, 2].includes(payload?.schemaVersion) || !value || typeof value !== "object" || Array.isArray(value)) {
+    if (![1, 2, 3].includes(payload?.schemaVersion) || !value || typeof value !== "object" || Array.isArray(value)) {
       throw settingsError("INVALID_IMPORT", "Choose a valid Lexend settings file.");
+    }
+    if (payload.schemaVersion >= 2 && Object.keys(defaults).filter((key) => payload.schemaVersion === 3 || key !== "layoutRepair").some((key) => !Object.hasOwn(value, key))) {
+      throw settingsError("INVALID_IMPORT", "This settings backup is incomplete. Nothing was imported.");
+    }
+    if (payload.schemaVersion >= 2 && !Array.isArray(value.siteRules)) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains an invalid site rule list. Nothing was imported.");
+    }
+    if (payload.schemaVersion === 1 && ![...Object.keys(defaults), "disabledSites", "spacing"].some((key) => Object.hasOwn(value, key))) {
+      throw settingsError("INVALID_IMPORT", "This legacy settings backup is empty. Nothing was imported.");
+    }
+    if (value.spacing !== undefined && !Object.hasOwn(legacySpacingValues, value.spacing)) {
+      throw settingsError("INVALID_IMPORT", "The settings file contains an invalid spacing value. Nothing was imported.");
     }
     if (value.siteRules !== undefined && (!Array.isArray(value.siteRules)
         || value.siteRules.some((rule) => !normalizeRule(rule)
           || (rule.enabled !== undefined && rule.enabled !== null && typeof rule.enabled !== "boolean")
           || (rule.scope !== undefined && rule.scope !== null && !["body", "all"].includes(rule.scope))
+          || (Object.hasOwn(rule, "layoutRepair") && typeof rule.layoutRepair !== "boolean")
+          || (payload.schemaVersion === 3 && Object.keys(rule).some((key) => !["hostname", "includeSubdomains", "enabled", "scope", "layoutRepair"].includes(key)))
           || (rule.includeSubdomains !== undefined && typeof rule.includeSubdomains !== "boolean")))) {
       throw settingsError("INVALID_IMPORT", "The settings file contains an invalid site rule. Nothing was imported.");
     }
@@ -149,13 +244,14 @@
     }
     for (const [key, valid] of [
       ["enabled", (v) => typeof v === "boolean"],
+      ["layoutRepair", (v) => typeof v === "boolean"],
       ["scope", (v) => ["body", "all"].includes(v)],
       ["theme", (v) => ["light", "dark"].includes(v)],
       ["textScale", (v) => typeof v === "number" && v >= 80 && v <= 140],
       ["lineHeight", (v) => typeof v === "number" && (v === 0 || (v >= 1 && v <= 2.4))],
       ["letterSpacing", (v) => typeof v === "number" && v >= 0 && v <= 0.2]
     ]) {
-      if (value[key] !== undefined && !valid(value[key])) {
+      if (((payload.schemaVersion >= 2 && (key !== "layoutRepair" || payload.schemaVersion === 3)) || Object.hasOwn(value, key)) && !valid(value[key])) {
         throw settingsError("INVALID_IMPORT", `The settings file contains an invalid ${key} value. Nothing was imported.`);
       }
     }
@@ -165,6 +261,69 @@
       throw settingsError("INVALID_IMPORT", "The settings file contains duplicate site rules. Nothing was imported.");
     }
     return settings;
+  };
+
+  // Rule order does not affect resolution. Compare normalized values by rule
+  // identity so a harmless reordering cannot invalidate a replacement preview.
+  const settingsEqual = (left, right) => {
+    const before = normalizeSettings(left);
+    const after = normalizeSettings(right);
+    if (preferenceKeys.some((key) => before[key] !== after[key])
+        || before.siteRules.length !== after.siteRules.length) return false;
+    const rules = new Map(after.siteRules.map((rule) => [ruleKey(rule), rule]));
+    return before.siteRules.every((rule) => {
+      const other = rules.get(ruleKey(rule));
+      return other && sameRule(rule, other);
+    });
+  };
+
+  const previewImport = (current, imported) => {
+    const before = normalizeSettings(current);
+    const after = normalizeSettings(imported);
+    const beforeRules = new Map(before.siteRules.map((rule) => [ruleKey(rule), rule]));
+    const afterRules = new Map(after.siteRules.map((rule) => [ruleKey(rule), rule]));
+    return {
+      before,
+      after,
+      changes: preferenceKeys.filter((key) => before[key] !== after[key])
+        .map((key) => ({ key, before: before[key], after: after[key] })),
+      rules: {
+        added: after.siteRules.filter((rule) => !beforeRules.has(ruleKey(rule))),
+        removed: before.siteRules.filter((rule) => !afterRules.has(ruleKey(rule))),
+        changed: after.siteRules.filter((rule) => {
+          const previous = beforeRules.get(ruleKey(rule));
+          return previous && !sameRule(previous, rule);
+        }).map((rule) => ({ before: beforeRules.get(ruleKey(rule)), after: rule }))
+      }
+    };
+  };
+
+  const restoreImport = (current, original, imported) => {
+    const settings = normalizeSettings(current);
+    const { before, after, rules } = previewImport(original, imported);
+    for (const key of preferenceKeys) {
+      if (before[key] !== after[key] && settings[key] === after[key]) settings[key] = before[key];
+    }
+    const currentRules = new Map(settings.siteRules.map((rule) => [ruleKey(rule), rule]));
+    // Whole-rule additions/removals are deliberately conservative. A later
+    // edit owns that identity; undo must not remove or overwrite its fields.
+    for (const rule of rules.added) {
+      const currentRule = currentRules.get(ruleKey(rule));
+      if (currentRule && sameRule(currentRule, rule)) currentRules.delete(ruleKey(rule));
+    }
+    for (const rule of rules.removed) {
+      if (!currentRules.has(ruleKey(rule))) currentRules.set(ruleKey(rule), rule);
+    }
+    for (const change of rules.changed) {
+      const currentRule = currentRules.get(ruleKey(change.after));
+      if (!currentRule) continue;
+      for (const key of ["enabled", "scope", "layoutRepair"]) {
+        if (change.before[key] !== change.after[key] && currentRule[key] === change.after[key]) {
+          currentRule[key] = change.before[key];
+        }
+      }
+    }
+    return normalizeSettings({ ...settings, siteRules: [...currentRules.values()] });
   };
 
   const ruleMatches = (rule, hostname) => (
@@ -185,11 +344,13 @@
     const normalizedHostname = normalizeHostname(hostname);
     let enabledRule = null;
     let scopeRule = null;
+    let layoutRepairRule = null;
     for (const rule of settings.siteRules) {
       if (!ruleMatches(rule, normalizedHostname)) continue;
       if (rule.enabled !== null && (!enabledRule || compareRules(rule, enabledRule, normalizedHostname) < 0)) {
         enabledRule = rule;
       }
+      if (typeof rule.layoutRepair === "boolean" && (!layoutRepairRule || compareRules(rule, layoutRepairRule, normalizedHostname) < 0)) layoutRepairRule = rule;
       if (rule.scope !== null && (!scopeRule || compareRules(rule, scopeRule, normalizedHostname) < 0)) {
         scopeRule = rule;
       }
@@ -199,6 +360,9 @@
     return {
       active: settings.enabled && siteEnabled,
       siteEnabled,
+      layoutRepair: settings.layoutRepair || layoutRepairRule?.layoutRepair === true,
+      siteLayoutRepair: layoutRepairRule?.layoutRepair ?? false,
+      layoutRepairRule,
       scope: scopeRule?.scope ?? settings.scope,
       enabledRule: enabledRule ?? null,
       scopeRule: scopeRule ?? null
@@ -245,6 +409,35 @@
     });
   };
 
+  const updateSiteRule = (value, hostname, includeSubdomains = false, changes) => {
+    const settings = normalizeSettings(value);
+    const normalizedHostname = normalizeHostname(hostname);
+    if (!validHostname(normalizedHostname) || typeof includeSubdomains !== "boolean"
+        || !changes || typeof changes !== "object" || Array.isArray(changes)
+        || Object.keys(changes).some((key) => !["includeSubdomains", "enabled", "scope", "layoutRepair"].includes(key))
+        || (Object.hasOwn(changes, "includeSubdomains") && typeof changes.includeSubdomains !== "boolean")
+        || (Object.hasOwn(changes, "enabled") && changes.enabled !== null && typeof changes.enabled !== "boolean")
+        || (Object.hasOwn(changes, "layoutRepair") && changes.layoutRepair !== null && typeof changes.layoutRepair !== "boolean")
+        || (Object.hasOwn(changes, "scope") && changes.scope !== null && !["body", "all"].includes(changes.scope))) {
+      throw settingsError("INVALID_RULE", "Choose valid settings for this site rule.");
+    }
+    const index = settings.siteRules.findIndex((rule) => (
+      rule.hostname === normalizedHostname && rule.includeSubdomains === includeSubdomains
+    ));
+    if (index < 0) throw settingsError("RULE_NOT_FOUND", "This rule was removed. Refresh the rule list before editing it.");
+    const updated = { ...settings.siteRules[index], ...changes };
+    if (settings.siteRules.some((rule, position) => position !== index && ruleKey(rule) === ruleKey(updated))) {
+      throw settingsError("DUPLICATE_RULE", "A rule with that domain and matching mode already exists.");
+    }
+    if (updated.layoutRepair === null) delete updated.layoutRepair;
+    if (updated.enabled === null && updated.scope === null && updated.layoutRepair === undefined) {
+      settings.siteRules.splice(index, 1);
+      return settings;
+    }
+    settings.siteRules[index] = updated;
+    return validateCapacity(settings);
+  };
+
   const toggleSite = (value, hostname) => {
     const settings = normalizeSettings(value);
     const effective = resolveSite(settings, hostname);
@@ -259,13 +452,22 @@
 
   globalThis.LexendSettings = Object.freeze({
     defaults,
+    decodeSettings: normalizeSettings,
+    encodeSettings,
+    encodeSettingsForStorage,
     getDirectRule,
     normalizeSettings,
+    previewImport,
     removeSiteRule,
     resolveSite,
+    restoreImport,
     setSiteRule,
+    settingsEqual,
     toggleSite,
+    updateSiteRule,
     settingsError,
+    storedRuleBytes,
+    ruleStorageBytes,
     validateCapacity,
     validateImport,
     validHostname

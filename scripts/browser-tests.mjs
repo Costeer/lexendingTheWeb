@@ -1,25 +1,51 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { arch, platform, release, tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Builder, By, Key } from "selenium-webdriver";
+import { promisify } from "node:util";
+import { Builder, By, Key, Select } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import firefox from "selenium-webdriver/firefox.js";
 import { unzipSync } from "fflate";
+import { assertBrowserVersion, isPersistedRestoration, parseBrowserArguments } from "./browser-evidence.mjs";
+import { installTemporaryFirefoxAddon } from "./firefox-installation.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const browserName = process.argv[2] ?? "chrome";
-if (!["chrome", "firefox"].includes(browserName)) throw new Error("Choose chrome or firefox.");
+const { browserName, browserVersion, output } = parseBrowserArguments(process.argv.slice(2));
+const headlessFirefox = browserName === "firefox" && process.env.MOZ_HEADLESS === "1";
 const fixture = await readFile(join(root, "scripts/fixtures/compatibility.html"), "utf8");
+const historyFixture = await readFile(join(root, "scripts/fixtures/history.html"), "utf8");
+const oldRuleFixtureBytes = await readFile(join(root, "scripts/fixtures/rule-format-v0.5.0.json"));
+const oldRuleFixture = JSON.parse(oldRuleFixtureBytes);
+assert.equal(oldRuleFixture.revision, "f2670e24aa210b80f6baedfcf09d22a5dd91e640");
+const historicalRuleHashes = {
+  "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
+  "src/preferences.js": "c75df627491bf9ef18e78e7e0276e2ea807cd2da9ed74f4732784f783ff1cb65"
+};
+assert.deepEqual(Object.keys(oldRuleFixture.files).sort(), Object.keys(historicalRuleHashes).sort());
+const oldRuleSources = Object.fromEntries(Object.entries(oldRuleFixture.files).map(([path, file]) => {
+  assert.equal(file.sha256, historicalRuleHashes[path], `Historical rule fixture identity differs: ${path}`);
+  assert.equal(createHash("sha256").update(file.source).digest("hex"), historicalRuleHashes[path], `Historical rule fixture differs: ${path}`);
+  return [path, file.source];
+}));
+// Compile in Node, then send the function body as ordinary WebDriver script.
+// The installed extension page does not need unsafe-eval permission.
+const historicalRuleFactory = new Function("globalThis", oldRuleSources["src/settings.js"] + "\n"
+  + oldRuleSources["src/preferences.js"]
+  + "\nreturn { settings: globalThis.LexendSettings, preferences: globalThis.LexendPreferences };").toString();
+const frameFixture = '<!doctype html><style>html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}</style><p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
+const repairFrameFixture = '<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>';
 const server = createServer((request, response) => {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
-  response.end(request.url === "/frame" ? "<!doctype html><p id='frame-text'>Frame text</p>" : fixture);
+  response.end(request.url === "/frame" ? frameFixture : request.url === "/repair-caption" ? repairFrameFixture : request.url.startsWith("/history-") ? historyFixture : fixture);
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
-const artifactDirectory = join(root, "dist/browser-tests", browserName);
+const artifactDirectory = output ?? join(root, "dist/browser-tests", `${browserName}-${browserVersion}`);
 await mkdir(artifactDirectory, { recursive: true });
 const profile = await mkdtemp(join(tmpdir(), "lexend-browser-tests-"));
 const extensionDirectory = join(profile, "extension");
@@ -27,7 +53,31 @@ const { version } = JSON.parse(await readFile(join(root, "package.json"), "utf8"
 const archive = join(root, "dist/releases", `lexend-the-web-${browserName}-v${version}.zip`);
 let driver;
 const checks = [];
-const check = async (name, run) => { await run(); checks.push(name); console.log(`PASS ${browserName}: ${name}`); };
+const report = {
+  schemaVersion: 1, browserName, requestedBrowserVersion: browserVersion,
+  startedAt: new Date().toISOString(), status: "running", installedExtension: false,
+  environment: { node: process.version, platform: platform(), release: release(), arch: arch(),
+    headlessFirefox, firefoxPointerPreset: headlessFirefox ? "fine-hover" : null },
+  browser: null, artifact: null, checks,
+  limitations: ["No Android add-on surface is exercised by this desktop command.", "Keyboard and layout checks are not manual screen-reader verification."]
+};
+const saveReport = () => writeFile(join(artifactDirectory, "results.json"), JSON.stringify(report, null, 2));
+const unsupported = async (name, reason, evidence) => {
+  checks.push({ name, status: "unsupported", reason, evidence });
+  console.log(`UNSUPPORTED ${browserName}: ${name}: ${reason}`);
+  await saveReport();
+};
+const check = async (name, run) => {
+  const started = performance.now();
+  try {
+    const evidence = await run();
+    checks.push({ name, status: "passed", durationMs: performance.now() - started, ...(evidence === undefined ? {} : { evidence }) });
+    console.log(`PASS ${browserName}: ${name}`);
+  } catch (error) {
+    checks.push({ name, status: "failed", durationMs: performance.now() - started, error: String(error.stack ?? error) });
+    throw error;
+  } finally { await saveReport(); }
+};
 const wait = (expression, description) => driver.wait(() => driver.executeScript(`return (${expression});`), 15000, description, 100);
 const script = (fn, ...args) => driver.executeScript(typeof fn === "string" ? `return (${fn});` : fn, ...args);
 const navigateExtension = async (url) => {
@@ -57,13 +107,19 @@ const extensionCall = async (fn, ...args) => {
   if (result.error) throw new Error(result.error);
   return result.value;
 };
+const historicalRuleCall = (fn, ...args) => extensionCall(`async (...args) => {
+  const old = (${historicalRuleFactory})({});
+  return (${fn.toString()})(old, ...args);
+}`, ...args);
 const patch = (changes) => extensionCall(async (changes) => {
   const api = globalThis.browser ?? globalThis.chrome;
   const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: { type: "patch", changes } });
   if (!result.ok) throw new Error(result.message);
   return result.settings;
 }, changes);
-const saved = () => extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
+const saved = () => extensionCall(async () => LexendSettings.decodeSettings(
+  await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null)
+));
 const measurements = () => script(() => Object.fromEntries(["rem", "nested", "fixed", "ignored-text", "code", "svg-text", "layout"].map((id) => {
   const style = getComputedStyle(document.getElementById(id));
   return [id, { size: parseFloat(style.fontSize), family: style.fontFamily, padding: parseFloat(style.paddingTop) }];
@@ -72,27 +128,61 @@ const measurements = () => script(() => Object.fromEntries(["rem", "nested", "fi
 const createDriver = () => {
   const builder = new Builder().forBrowser(browserName);
   if (browserName === "chrome") {
-    const options = new chrome.Options().setBrowserVersion("stable").addArguments(
+    const options = new chrome.Options().setBrowserVersion(browserVersion).addArguments(
       "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,900",
       `--user-data-dir=${join(profile, "chrome-profile")}`, `--disable-extensions-except=${extensionDirectory}`, `--load-extension=${extensionDirectory}`
     );
     builder.setChromeOptions(options);
   } else {
-    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion("stable"));
+    const options = new firefox.Options().setBrowserVersion(browserVersion);
+    // This desktop suite requires a mouse. Headless Linux Firefox otherwise
+    // reports no pointer, selecting touch layouts even at desktop widths.
+    // Record the emulated input preset above; keep every interaction/assertion.
+    if (headlessFirefox) options.setPreference("ui.primaryPointerCapabilities", 6)
+      .setPreference("ui.allPointerCapabilities", 6);
+    builder.setFirefoxOptions(options);
     builder.setFirefoxService(new firefox.ServiceBuilder().addArguments("--allow-system-access"));
   }
   return builder.build();
 };
 
 try {
-  // Selenium Manager resolves current browser/driver versions. Chrome for
+  // Selenium Manager resolves the requested browser and its matching driver. Chrome for
   // Testing retains unpacked-extension loading support; ordinary Chrome does not.
   process.env.SE_FORCE_BROWSER_DOWNLOAD ??= "true";
   process.env.SE_AVOID_STATS ??= "true";
+  const git = async (...args) => (await promisify(execFile)("git", args, {
+    cwd: root, timeout: 5000, killSignal: "SIGKILL", maxBuffer: 256 * 1024
+  })).stdout.trim();
+  try {
+    report.checkout = { status: "available", commit: await git("rev-parse", "HEAD"), dirty: Boolean(await git("status", "--porcelain")) };
+  } catch (error) {
+    // A mounted worktree can reference a Git directory outside the container.
+    // Missing checkout context must not substitute a fabricated source identity
+    // or prevent testing the independently hashed release artifact.
+    report.checkout = {
+      status: "unavailable", commit: null, dirty: null,
+      reason: String(error.stderr?.trim() || error.message || error).slice(0, 2048)
+    };
+  }
+  // Checkout identity describes the harness run. Packaged build identity and
+  // archive hash below describe the extension actually installed.
+  const archiveBytes = await readFile(archive);
+  const retainedArchive = join(artifactDirectory, basename(archive));
+  await writeFile(retainedArchive, archiveBytes);
+  const files = unzipSync(archiveBytes);
+  const manifest = JSON.parse(Buffer.from(files["manifest.json"]).toString("utf8"));
+  report.artifact = {
+    path: archive, retainedPath: retainedArchive, sha256: createHash("sha256").update(archiveBytes).digest("hex"), manifest,
+    buildIdentity: files["build-identity.json"] ? JSON.parse(Buffer.from(files["build-identity.json"]).toString("utf8")) : null
+  };
+  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/firefox-installation.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html", "scripts/fixtures/rule-format-v0.5.0.json"].map(async (path) =>
+    [path, createHash("sha256").update(await readFile(join(root, path))).digest("hex")])));
+  report.environment.selenium = JSON.parse(await readFile(join(root, "node_modules/selenium-webdriver/package.json"), "utf8")).version;
   if (browserName === "chrome") {
     // Exercise the release artifact rather than assuming the unpackaged build
     // is equivalent. Firefox installs its release ZIP directly below.
-    for (const [path, contents] of Object.entries(unzipSync(await readFile(archive)))) {
+    for (const [path, contents] of Object.entries(files)) {
       assert(!path.startsWith("/") && !path.split("/").includes("..") && !path.includes("\\"), `Unsafe ZIP path: ${path}`);
       const destination = join(extensionDirectory, path);
       await mkdir(dirname(destination), { recursive: true });
@@ -100,13 +190,31 @@ try {
     }
   }
   driver = await createDriver();
+  const capabilities = await driver.getCapabilities();
+  report.browser = {
+    name: capabilities.get("browserName"), version: capabilities.get("browserVersion"),
+    driverVersion: browserName === "chrome" ? capabilities.get("chrome")?.chromedriverVersion : capabilities.get("moz:geckodriverVersion"),
+    platform: capabilities.get("platformName")
+  };
+  await check("launched engine matches the requested version and packaged support floor", async () => {
+    const minimum = browserName === "chrome" ? manifest.minimum_chrome_version : manifest.browser_specific_settings?.gecko?.strict_min_version;
+    assert.equal(report.browser.name, browserName, "The launched engine must match the requested browser");
+    assertBrowserVersion(report.browser.version, browserVersion, minimum);
+    assert(report.browser.driverVersion, "Driver must identify its actual version");
+    return { requested: browserVersion, actual: report.browser.version, manifestMinimum: minimum ?? null };
+  });
   await driver.manage().setTimeouts({ script: 20000 });
   if (browserName === "firefox") {
-    await driver.installAddon(archive, true);
+    // Selenium's installAddon sends base64. With geckodriver 0.37+, older
+    // Firefox releases delete that temporary backing XPI before content scripts
+    // load (Mozilla bug 2045054). The local driver's path endpoint keeps the
+    // exact retained archive available for the whole browser session.
+    report.installation = await installTemporaryFirefoxAddon(driver, retainedArchive);
   }
   await driver.manage().window().setRect({ width: 1280, height: 900 });
   await driver.get(fixtureUrl);
   await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend for the Web')", "Installed content script must style the fixture");
+  report.installedExtension = true;
   const websiteTab = await driver.getWindowHandle();
   const origin = await script(() => {
     const css = [...document.querySelectorAll("style")].map((style) => style.textContent);
@@ -120,6 +228,132 @@ try {
   const optionsTab = await driver.getWindowHandle();
   await navigateExtension(`${origin}options.html`);
   await wait("!document.querySelector('#dark-theme').disabled", "Settings must initialize");
+  await wait("matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches", "The installed desktop suite requires a wide viewport and mouse");
+
+  await check("layout repair is opt-in, persists per site, and the all-sites control preserves rules", async () => {
+    const original = await saved();
+    assert.equal(original.layoutRepair, false, "Fresh installs default to font conversion without layout repair");
+    assert.deepEqual(original.siteRules, []);
+    const state = () => extensionCall(async () => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      // The extension deliberately has no tabs permission. Identify the
+      // content responder without relying on a privileged tab.url field.
+      for (const tab of await api.tabs.query({})) {
+        let current;
+        try { current = await api.tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 }); } catch { continue; }
+        if (current?.hostname === "127.0.0.1") return current;
+      }
+      throw new Error("Fixture content responder not found");
+    });
+    const settled = (expected) => driver.wait(async () => {
+      const current = await state();
+      return current?.ready && current.healthy && current.active && !current.pending && current.layoutRepair === expected;
+    }, 15000, `Runtime layout repair settles ${expected ? "on" : "off"}`, 100);
+    const rule = (value) => extensionCall(async (value) => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE",
+        operation: { type: "setSiteLayoutRepair", hostname: "127.0.0.1", value } });
+      if (!result.ok) throw new Error(result.message);
+      return result.settings;
+    }, value);
+    const rawRules = () => extensionCall(async () => {
+      const raw = await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null);
+      return JSON.stringify({ siteRules: raw.siteRules, disabledSites: raw.disabledSites });
+    });
+    const globalToggle = async (expected) => {
+      await wait(`!document.querySelector('#layout-repair').disabled && document.querySelector('#layout-repair').checked === ${!expected}`, "Global control reflects saved state");
+      const before = await rawRules();
+      await driver.findElement(By.id("layout-repair")).click();
+      await driver.wait(async () => (await saved()).layoutRepair === expected, 15000, "Global control saves", 100);
+      assert.equal(await rawRules(), before, "Global toggling must preserve the exact saved rule representation");
+    };
+    await settled(false);
+    const optedIn = await rule(true);
+    assert.equal(optedIn.enabled, original.enabled);
+    assert.equal(optedIn.scope, original.scope);
+    assert.deepEqual(optedIn.siteRules, [{ hostname: "127.0.0.1", includeSubdomains: false, enabled: null, scope: null, layoutRepair: true }]);
+    await settled(true);
+    await driver.navigate().refresh();
+    await wait("!document.querySelector('#layout-repair').disabled", "Reloaded settings initialize");
+    assert.deepEqual((await saved()).siteRules, optedIn.siteRules, "The site decision survives a settings reload");
+    await globalToggle(true);
+    await settled(true);
+    await rule(false);
+    await settled(true); // The all-sites choice takes priority over saved site choices.
+    await globalToggle(false);
+    await settled(false);
+    await rule(true);
+    await settled(true);
+    await globalToggle(true);
+    await globalToggle(false);
+    await settled(true); // Disabling the global choice restores the saved opt-in.
+    await rule(null);
+    await settled(false);
+    assert.deepEqual(await saved(), original);
+    return { defaultRepair: false, siteDecisionPersists: true, globalPreservesRawRules: true, typographyRemainsActive: true };
+  });
+
+  await check("reenabling parent repair renegotiates sizing with the same opted-in cross-origin child", async () => {
+    const original = await saved();
+    const childRule = (value) => extensionCall(async (value) => {
+      const api = globalThis.browser ?? globalThis.chrome;
+      const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE",
+        operation: { type: "setSiteLayoutRepair", hostname: "localhost", value } });
+      if (!result.ok) throw new Error(result.message);
+    }, value);
+    await childRule(true);
+    await patch({ layoutRepair: true, scope: "all", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 });
+    await driver.switchTo().window(websiteTab);
+    await script((url) => {
+      const fixture = document.createElement("section");
+      fixture.id = "repair-frame-fixture";
+      // Group cleanup without adding a clipping/geometry owner around both
+      // the embed and its independent following navigation.
+      fixture.style.display = "contents";
+      fixture.innerHTML = '<style>#repair-frame-clip{position:fixed;top:0;left:0;width:240px;height:30px;max-height:30px;overflow:hidden}#repair-frame{display:block;width:240px;height:30px;max-height:30px;border:0}#repair-frame-nav{position:fixed;top:30px;height:28px;width:240px}</style><div id="repair-frame-clip"><iframe id="repair-frame" title="Opted-in caption"></iframe></div><nav id="repair-frame-nav"><span>Following navigation</span></nav>';
+      fixture.querySelector("iframe").src = url;
+      document.body.append(fixture);
+    }, `http://localhost:${server.address().port}/repair-caption`);
+    const fits = async () => {
+      await wait("document.querySelector('#repair-frame').clientHeight > 30", "Measured cross-origin caption grows");
+      await driver.switchTo().frame(await driver.findElement(By.id("repair-frame")));
+      try {
+        await wait("getComputedStyle(document.querySelector('span')).fontFamily.includes('Lexend')", "Child remains converted");
+        return await script(() => {
+          window.__optinDocument ??= crypto.randomUUID();
+          const span = document.querySelector("span"), range = document.createRange();
+          range.selectNodeContents(span);
+          const glyphs = range.getBoundingClientRect();
+          return { document: __optinDocument, viewport: innerHeight, top: glyphs.top, bottom: glyphs.bottom };
+        });
+      } finally { await driver.switchTo().defaultContent(); }
+    };
+    const before = await fits();
+    assert(before.top >= 0 && before.bottom <= before.viewport, "Initial caption fits");
+    await driver.switchTo().window(optionsTab);
+    await patch({ layoutRepair: false });
+    await driver.switchTo().window(websiteTab);
+    await wait("document.querySelector('#repair-frame').clientHeight === 30", "Disabling parent repair restores its embedding");
+    assert.deepEqual(await script(() => ["repair-frame", "repair-frame-clip", "repair-frame-nav"].map(id => document.getElementById(id).getAttribute("style"))), [null, null, null]);
+    await driver.switchTo().frame(await driver.findElement(By.id("repair-frame")));
+    try {
+      assert.equal(await script(() => __optinDocument), before.document);
+      assert.match(await script(() => getComputedStyle(document.querySelector("span")).fontFamily), /Lexend/);
+    } finally { await driver.switchTo().defaultContent(); }
+    await driver.switchTo().window(optionsTab);
+    await patch({ layoutRepair: true });
+    await driver.switchTo().window(websiteTab);
+    const after = await fits();
+    assert.equal(after.document, before.document, "The child document must not reload to repair its parent");
+    assert(after.top >= 0 && after.bottom <= after.viewport, "The unchanged opted-in child fits again");
+    assert.equal(await script(() => document.querySelector('#repair-frame-nav').getBoundingClientRect().top >= document.querySelector('#repair-frame-clip').getBoundingClientRect().bottom), true);
+    await script(() => document.querySelector("#repair-frame-fixture").remove());
+    await driver.switchTo().window(optionsTab);
+    await childRule(null);
+    await patch(Object.fromEntries(["layoutRepair", "scope", "textScale", "lineHeight", "letterSpacing"].map(key => [key, original[key]])));
+    assert.deepEqual(await saved(), original);
+    return { before, after, exactFootprintRestoration: true };
+  });
 
   await check("real background serializes concurrent preferences and rule changes", async () => {
     const result = await extensionCall(async () => {
@@ -128,13 +362,13 @@ try {
       const second = LexendPreferences.createClient(api);
       await Promise.all([first.load(), second.load()]);
       await Promise.all([
-        first.mutate({ type: "patch", changes: { textScale: 110, scope: "all" } }),
+        first.mutate({ type: "patch", changes: { textScale: 110, scope: "all", layoutRepair: true } }),
         second.mutate({ type: "patch", changes: { theme: "dark" } }),
         first.mutate({ type: "addRule", rule: { hostname: "keep.example", enabled: false } }),
         second.mutate({ type: "addRule", rule: { hostname: "remove.example", enabled: false } })
       ]);
       await second.mutate({ type: "removeRule", hostname: "remove.example" });
-      return api.storage.sync.get(null);
+      return LexendSettings.decodeSettings(await api.storage.sync.get(null));
     });
     assert.equal(result.textScale, 110);
     assert.equal(result.theme, "dark");
@@ -237,9 +471,54 @@ try {
     assert.equal(await script("document.activeElement.classList.contains('delete-rule')"), true);
   });
 
+  await check("scope-only rules and reversible import use the installed background writer", async () => {
+    const original = await extensionCall(async () => LexendSettings.normalizeSettings(await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null)));
+    const mutate = (operation) => extensionCall(async (operation) => {
+      const client = LexendPreferences.createClient(globalThis.browser ?? globalThis.chrome);
+      await client.load();
+      return client.mutate(operation);
+    }, operation);
+    try {
+      await mutate({ type: "addRule", rule: { hostname: "scope-only.example", enabled: null, scope: "all" } });
+      const row = '[data-hostname="scope-only.example"]';
+      await wait("Boolean(document.querySelector('[data-hostname=\"scope-only.example\"] summary'))", "Scope-only rule appears");
+      await driver.findElement(By.css(`${row} summary`)).click();
+      assert.equal(await driver.findElement(By.css(`${row} select[name="enabled"]`)).getAttribute("value"), "inherit");
+      await new Select(await driver.findElement(By.css(`${row} select[name="enabled"]`))).selectByValue("true");
+      await new Select(await driver.findElement(By.css(`${row} select[name="scope"]`))).selectByValue("inherit");
+      await driver.findElement(By.css(`${row} .rule-editor-save`)).click();
+      await driver.wait(async () => (await saved()).siteRules.some((rule) => rule.hostname === "scope-only.example"
+        && rule.enabled === true && rule.scope === null), 5000, "Edited rule is saved");
+      const edited = await extensionCall(async () => LexendSettings.getDirectRule(await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null), "scope-only.example"));
+      assert.equal(edited.enabled, true);
+      assert.equal(edited.scope, null);
+      const backup = { ...original, textScale: 127, lineHeight: 1.73, letterSpacing: .057, siteRules: [] };
+      const file = join(profile, "replacement-preview.json");
+      await writeFile(file, JSON.stringify({ schemaVersion: 2, settings: backup }));
+      await driver.findElement(By.css('[data-settings-panel="tools-panel"]')).click();
+      await driver.findElement(By.id("import-file")).sendKeys(file);
+      await wait("!document.querySelector('#import-preview').hidden", "Replacement preview opens");
+      assert((await driver.findElement(By.id("import-preview-list")).getText()).includes("scope-only.example"));
+      await driver.findElement(By.id("cancel-import")).click();
+      assert((await saved()).siteRules.some((rule) => rule.hostname === "scope-only.example"));
+      await driver.findElement(By.id("import-file")).sendKeys(file);
+      await wait("!document.querySelector('#import-preview').hidden", "Replacement preview reopens");
+      await driver.findElement(By.id("apply-import")).click();
+      await wait("!document.querySelector('#import-undo').hidden", "Successful import exposes undo");
+      await patch({ textScale: 139 });
+      await driver.findElement(By.id("undo-import")).click();
+      await driver.findElement(By.id("apply-import")).click();
+      await driver.wait(async () => (await saved()).siteRules.some((rule) => rule.hostname === "scope-only.example"), 5000);
+      assert.equal((await saved()).textScale, 139, "Undo preserves the later scale edit");
+      assert.equal((await saved()).lineHeight, original.lineHeight);
+    } finally {
+      await mutate({ type: "replace", settings: original });
+    }
+  });
+
   await check("oversized imports explicitly fail and preserve existing rules", async () => {
     const invalid = join(profile, "oversized.json");
-    const payload = { schemaVersion: 2, settings: { siteRules: Array.from({ length: 250 }, (_, i) => ({ hostname: `site${i}.example.com`, enabled: false })) } };
+    const payload = { schemaVersion: 2, settings: { ...(await saved()), siteRules: Array.from({ length: 251 }, (_, i) => ({ hostname: `site${i}.example.com`, enabled: false })) } };
     await writeFile(invalid, JSON.stringify(payload));
     await driver.findElement(By.css('[data-settings-panel="tools-panel"]')).click();
     await driver.findElement(By.id("import-file")).sendKeys(invalid);
@@ -247,37 +526,139 @@ try {
     assert.deepEqual((await saved()).siteRules.map((rule) => rule.hostname), ["keep.example"]);
   });
 
-  await check("related frames follow global pause and resume", async () => {
-    await patch({ enabled: false });
+  await check("RTL text, keyboard disclosures and ordinary editable controls retain native behavior", async () => {
+    await patch({ textScale: 110, letterSpacing: .12 });
     await driver.switchTo().window(websiteTab);
-    await wait("!getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend')", "Main page pauses");
-    await driver.switchTo().frame(await driver.findElement(By.id("frame")));
-    await wait("!getComputedStyle(document.querySelector('#frame-text')).fontFamily.includes('Lexend')", "Related frame pauses");
-    await driver.switchTo().defaultContent();
+    // Engines may serialize zero tracking as either normal or 0px. A Latin
+    // positive control proves that the requested tracking has actually applied.
+    await wait("['normal', '0px'].includes(getComputedStyle(document.querySelector('#rtl')).letterSpacing) && Math.abs(parseFloat(getComputedStyle(document.querySelector('#rem')).letterSpacing) - 2.64) < .03", "Arabic remains untracked while Latin text receives the requested spacing");
+    assert.equal(await script("getComputedStyle(document.querySelector('#rtl')).direction"), "rtl");
+    assert.equal(await script("document.querySelector('#rtl').scrollWidth <= document.querySelector('#rtl').clientWidth + 1"), true);
+    const input = await driver.findElement(By.id("plain-input"));
+    await input.sendKeys(Key.END, " typed");
+    assert.equal(await input.getAttribute("value"), "Original typed");
+    assert.equal(await script("document.activeElement.id"), "plain-input");
+    const editor = await driver.findElement(By.id("plain-editor"));
+    await editor.click();
+    await editor.sendKeys(Key.END, " typed");
+    assert.equal(await editor.getText(), "Original typed");
+    assert.equal(await script("document.activeElement.id"), "plain-editor");
+    assert.equal(await script("getSelection().isCollapsed && document.querySelector('#plain-editor').contains(getSelection().anchorNode)"), true);
+    const summary = await driver.findElement(By.id("native-summary"));
+    assert.equal(await script("document.querySelector('#native-details').open"), false);
+    await summary.sendKeys(Key.ENTER);
+    await wait("document.querySelector('#native-details').open", "Enter opens the native disclosure");
+    assert.equal(await script("document.activeElement.id"), "native-summary");
+    assert.equal(await driver.findElement(By.id("disclosure-copy")).isDisplayed(), true);
+    assert.equal(await script("document.querySelector('#native-details').scrollHeight <= document.querySelector('#native-details').clientHeight + 1"), true);
+    await summary.sendKeys(Key.SPACE);
+    await wait("!document.querySelector('#native-details').open", "Space closes the native disclosure");
+    assert.equal(await driver.findElement(By.id("disclosure-copy")).isDisplayed(), false);
     await driver.switchTo().window(optionsTab);
-    await patch({ enabled: true });
+    await patch({ textScale: 120, letterSpacing: 0 });
+    return { editableSurface: 'input and contenteditable="true"', disclosure: "native keyboard activation", manualScreenReader: "not exercised" };
   });
 
+  const frameKinds = ["same-origin", "about-blank", "srcdoc", "blob"];
+  const frameState = async (kind, active) => {
+    await driver.switchTo().frame(await driver.findElement(By.id(`frame-${kind}`)));
+    try {
+      const size = active ? 21.6 : 18;
+      await wait(`document.querySelector('#frame-text') && getComputedStyle(document.querySelector('#frame-text')).fontFamily.includes('Lexend for the Web') === ${active} && Math.abs(parseFloat(getComputedStyle(document.querySelector('#frame-text')).fontSize) - ${size}) < .03`, `${kind} must be ${active ? 'active at 120%' : 'paused at native size'}`);
+      const state = await script(() => {
+        const element = document.querySelector("#frame-text"), style = getComputedStyle(element);
+        return { url: location.href, size: parseFloat(style.fontSize), family: style.fontFamily, inlineStyle: element.getAttribute("style") };
+      });
+      if (!active) assert.equal(state.inlineStyle, "letter-spacing: 0.02em;", `${kind} restores the original inline style`);
+      return state;
+    } finally { await driver.switchTo().defaultContent(); }
+  };
+  await driver.switchTo().window(websiteTab);
+  await wait("window.fixtureFramesReady", "Every related-frame document loaded");
+  for (const [stage, active] of [["initial", true], ["paused", false], ["resumed", true]]) {
+    if (stage !== "initial") {
+      await driver.switchTo().window(optionsTab);
+      await patch({ enabled: active });
+      await driver.switchTo().window(websiteTab);
+    }
+    await check(`top document ${stage} typography matches global settings`, async () => {
+      await wait(`getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend for the Web') === ${active} && parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === ${active ? 24 : 20}`, `Top document ${stage}`);
+    });
+    for (const kind of frameKinds) await check(`${kind} frame: ${stage}`, () => frameState(kind, active));
+  }
+  for (const kind of frameKinds) await check(`${kind} replacement frame receives a fresh content script`, async () => {
+    await extensionCall((kind) => window.fixtureCreateFrame(kind), kind);
+    return frameState(kind, true);
+  });
+
+  let historyEvidence;
+  const historyState = () => script(() => ({
+    ...structuredClone(window.fixtureHistory),
+    typography: {
+      size: parseFloat(getComputedStyle(document.querySelector("#rem")).fontSize),
+      family: getComputedStyle(document.querySelector("#rem")).fontFamily
+    },
+    notRestoredReasons: performance.getEntriesByType("navigation")[0]?.notRestoredReasons?.toJSON?.() ?? null
+  }));
   await check("back and forward navigation reconcile preferences changed while away", async () => {
     await driver.switchTo().window(websiteTab);
     await driver.get(`${fixtureUrl}history-start`);
-    await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend')", "History page initializes");
-    await driver.get(`${fixtureUrl}history-next`);
+    await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend') && parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 24", "History page initializes at 120%");
+    await wait("window.fixtureHistory?.pageshow.length > 0", "Initial pageshow recorded");
+    const start = await historyState();
+    await driver.findElement(By.id("history-next")).click();
+    await wait("location.pathname === '/history-next' && window.fixtureHistory?.pageshow.length > 0", "Second document's pageshow recorded");
+    await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend') && parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 24", "Second document initially converts at 120%");
+    const next = await historyState();
     await driver.switchTo().window(optionsTab);
     await patch({ enabled: false, textScale: 120 });
     await driver.switchTo().window(websiteTab);
+    await wait("!getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend') && parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 20", "Second document must pause before it enters history");
+    const nextPaused = await historyState();
     await driver.navigate().back();
     await wait("location.pathname === '/history-start' && !getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend')", "Returning pages honor paused settings");
-    assert.equal((await measurements()).rem.size, 20);
+    assert.equal(await script("parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize)"), 20);
+    const back = await historyState();
     await driver.switchTo().window(optionsTab);
     await patch({ enabled: true });
     await driver.switchTo().window(websiteTab);
     await driver.navigate().forward();
     await wait("location.pathname === '/history-next' && parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) === 24", "Forward navigation scales exactly once");
-    assert((await measurements()).rem.family.includes("Lexend"));
+    assert(await script("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend')"));
     assert.equal(await script("document.querySelectorAll('#lexend-the-web-styles').length <= 1"), true);
+    const forward = await historyState();
+    historyEvidence = { back: { before: start, after: back }, forward: { initial: next, before: nextPaused, after: forward } };
     await driver.switchTo().window(optionsTab);
     await patch({ textScale: 100 });
+    return historyEvidence;
+  });
+  const persisted = Object.values(historyEvidence).map(({ before, after }) => isPersistedRestoration(before, after));
+  if (persisted.every(Boolean)) {
+    await check("genuine BFCache restoration reuses both documents and reconciles paused and active settings", async () => historyEvidence);
+  } else {
+    await unsupported("genuine BFCache restoration", "This installed browser/profile did not restore both history documents from BFCache; ordinary history navigation passed but is not cached-document proof.", { persisted, ...historyEvidence });
+  }
+
+  await check("settings remain operable at actual 200% browser zoom", async () => {
+    await driver.findElement(By.css('[data-settings-panel="appearance-panel"]')).click();
+    const originalWidth = await script("innerWidth");
+    try {
+      const zoom = await extensionCall(async () => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.tabs.setZoom(2);
+        return api.tabs.getZoom();
+      });
+      assert.equal(zoom, 2, "The browser, not a CSS transform, applies zoom");
+      await wait(`innerWidth < ${originalWidth * .75} && document.documentElement.scrollWidth <= innerWidth + 1`, "Zoomed settings reflow within the viewport");
+      await driver.findElement(By.id("dark-theme")).sendKeys(Key.SPACE);
+      await driver.wait(async () => (await saved()).theme === "light", 5000, "Zoomed keyboard control saves its setting");
+      await driver.findElement(By.id("dark-theme")).sendKeys(Key.SPACE);
+      await driver.wait(async () => (await saved()).theme === "dark", 5000, "Zoomed keyboard control restores its setting");
+      return { zoom, originalWidth, zoomedWidth: await script("innerWidth") };
+    } finally {
+      await extensionCall(() => (globalThis.browser ?? globalThis.chrome).tabs.setZoom(1));
+      await wait(`Math.abs(innerWidth - ${originalWidth}) <= 1`, "Browser zoom resets");
+    }
   });
 
   await check("desktop navigation, narrow layout, and dark About navigation remain stable", async () => {
@@ -417,6 +798,161 @@ try {
     assert.equal(result.feedback, "");
   });
 
+  await check("legacy pauses remain older-readable within installed storage quotas and editable", async () => {
+    const original = await extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
+    const evidence = { browserName, browserVersion: (await driver.getCapabilities()).get("browserVersion"),
+      historicalRevision: oldRuleFixture.revision,
+      historicalFixtureSha256: createHash("sha256").update(oldRuleFixtureBytes).digest("hex"),
+      historicalSourceHashes: Object.fromEntries(Object.entries(oldRuleFixture.files).map(([path, file]) => [path, file.sha256])), cases: [] };
+    try {
+      for (const count of [120, 250]) {
+        const result = await historicalRuleCall(async (old, count) => {
+          const api = globalThis.browser ?? globalThis.chrome;
+          const disabledSites = Array.from({ length: count }, (_, index) => `site${index}.example.com`);
+          await api.storage.sync.clear();
+          await api.storage.sync.set({ enabled: false, scope: "all", textScale: 130, disabledSites });
+          const legacy = await api.storage.sync.get(null);
+          const expanded = LexendSettings.decodeSettings(legacy);
+          // Positive control: the browser itself must reject the old expanded
+          // representation. This proves the fixture reaches the real item quota.
+          let expandedWriteError;
+          try { await api.storage.sync.set({ siteRules: expanded.siteRules }); }
+          catch (error) { expandedWriteError = String(error); }
+          if (!expandedWriteError) throw new Error("Expanded legacy rules unexpectedly fit the installed browser quota");
+          const first = LexendPreferences.createClient(api);
+          const second = LexendPreferences.createClient(api);
+          await Promise.all([first.load(), second.load()]);
+          await Promise.all([
+            first.mutate({ type: "patch", changes: { theme: "dark" } }),
+            second.mutate({ type: "patch", changes: { lineHeight: 1.73 } })
+          ]);
+          const afterPatch = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+          await first.mutate({ type: "removeRule", hostname: disabledSites[60], includeSubdomains: false });
+          const raw = await api.storage.sync.get(null);
+          const afterDelete = LexendSettings.decodeSettings(raw);
+          const oldDecoded = old.settings.normalizeSettings(raw);
+          const beforeRejectedEdit = JSON.stringify(raw);
+          let oldExpandedWriteError;
+          try { await old.preferences.createStore(api.storage.sync).mutate({ type: "patch", changes: { theme: "light" } }); }
+          catch (error) { oldExpandedWriteError = String(error); }
+          const oldRejectedWritePreservedRaw = JSON.stringify(await api.storage.sync.get(null)) === beforeRejectedEdit;
+          let unsafeEditError;
+          try { await first.mutate({ type: "updateRule", hostname: disabledSites[0], includeSubdomains: false, changes: { scope: "all" } }); }
+          catch (error) { unsafeEditError = { code: error.code, message: error.message }; }
+          const rawAfterRejectedEdit = await api.storage.sync.get(null);
+          const restartedClient = LexendPreferences.createClient(api);
+          await restartedClient.load();
+          return {
+            count, expandedWriteError,
+            itemQuota: api.storage.sync.QUOTA_BYTES_PER_ITEM,
+            legacyValueBytes: new TextEncoder().encode(JSON.stringify(disabledSites)).length,
+            expandedValueBytes: new TextEncoder().encode(JSON.stringify(expanded.siteRules)).length,
+            persistedRuleItemBytes: new TextEncoder().encode("disabledSites" + JSON.stringify(raw.disabledSites)).length,
+            remainingLegacy: Object.hasOwn(raw, "disabledSites"),
+            hasCanonicalRuleKey: Object.hasOwn(raw, "siteRules"), oldDecoded,
+            oldExpandedWriteError, oldRejectedWritePreservedRaw,
+            unsafeEditError, unsafeEditPreservedRaw: JSON.stringify(rawAfterRejectedEdit) === beforeRejectedEdit,
+            afterPatch, afterDelete, restarted: restartedClient.settings
+          };
+        }, count);
+        assert.match(result.expandedWriteError, /quota/i);
+        assert.equal(result.afterPatch.siteRules.length, count, "An unrelated preference write preserves every legacy pause");
+        assert.equal(result.afterPatch.theme, "dark");
+        assert.equal(result.afterPatch.lineHeight, 1.73);
+        assert.equal(result.afterPatch.enabled, false);
+        assert.equal(result.afterPatch.scope, "all");
+        assert.equal(result.afterPatch.textScale, 130);
+        assert.deepEqual(result.afterDelete.siteRules.map((rule) => rule.hostname),
+          Array.from({ length: count }, (_, index) => `site${index}.example.com`).filter((_, index) => index !== 60));
+        assert(result.afterDelete.siteRules.every((rule) => rule.enabled === false && rule.includeSubdomains === false && rule.scope === null));
+        assert.deepEqual(result.restarted, result.afterDelete);
+        assert.equal(result.remainingLegacy, true, "Large exact pause lists retain their older-readable representation");
+        assert.equal(result.hasCanonicalRuleKey, false, "No compact or oversized canonical key hides the legacy pauses");
+        assert.deepEqual({ ...result.oldDecoded, layoutRepair: false }, result.afterDelete, "The actual published reader retains all historical rules and preferences; repair defaults off");
+        assert.match(result.oldExpandedWriteError, /quota/i, "The old writer's oversized expansion remains an explicit quota failure");
+        assert.equal(result.oldRejectedWritePreservedRaw, true, "An old rejected expansion preserves every stored value");
+        assert.equal(result.unsafeEditError?.code, "RULE_CAPACITY", "An unrepresentable rich edit fails before writing");
+        assert.equal(result.unsafeEditPreservedRaw, true, "The rejected rich edit preserves the exact stored configuration");
+        assert(result.persistedRuleItemBytes <= (result.itemQuota ?? 8192));
+        evidence.cases.push(result);
+      }
+      if (browserName === "chrome") {
+        const before = await saved();
+        await driver.sendDevToolsCommand("ServiceWorker.enable", {});
+        await driver.sendDevToolsCommand("ServiceWorker.stopAllWorkers", {});
+        await patch({ theme: "light" });
+        assert.deepEqual((await saved()).siteRules, before.siteRules, "A restarted worker decodes every migrated pause");
+        await driver.quit();
+        driver = await createDriver();
+        await driver.manage().setTimeouts({ script: 20000 });
+        await navigateExtension(`${origin}options.html`);
+        await wait("!document.querySelector('#dark-theme').disabled", "Migrated settings initialize after a full browser restart");
+        assert.deepEqual(await saved(), { ...before, theme: "light" });
+        await patch({ theme: "dark" });
+        assert.deepEqual(await saved(), before, "All migrated rules remain editable after restart");
+        evidence.workerRestart = true;
+        evidence.browserRestart = true;
+      }
+      await writeFile(join(artifactDirectory, "legacy-quota.json"), JSON.stringify(evidence, null, 2));
+    } finally {
+      await extensionCall(async (original) => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.storage.sync.clear();
+        await api.storage.sync.set(original);
+      }, original);
+    }
+  });
+
+  await check("published old writer preserves compatible rules and the compact loss control remains observable", async () => {
+    const original = await extensionCall(() => (globalThis.browser ?? globalThis.chrome).storage.sync.get(null));
+    try {
+      const result = await historicalRuleCall(async old => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.storage.sync.clear();
+        const initial = LexendSettings.normalizeSettings({ siteRules: [
+          { hostname: "paused.example", enabled: false },
+          { hostname: "scope.example", includeSubdomains: true, scope: "all" }
+        ] });
+        await api.storage.sync.set(initial);
+        const client = LexendPreferences.createClient(api);
+        await client.load();
+        await client.mutate({ type: "patch", changes: { textScale: 127 } });
+        const compatibleRaw = await api.storage.sync.get(null);
+        const compatible = LexendSettings.decodeSettings(compatibleRaw);
+        const oldRead = old.settings.normalizeSettings(compatibleRaw);
+        await old.preferences.createStore(api.storage.sync).mutate({ type: "patch", changes: { theme: "dark" } });
+        const afterOld = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+        await client.mutate({ type: "removeRule", hostname: "scope.example", includeSubdomains: true });
+        const afterCurrent = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+        // Exact old production bytes must still expose the historical defect.
+        await api.storage.sync.set(LexendSettings.encodeSettings(initial));
+        const oldCompactRead = old.settings.normalizeSettings(await api.storage.sync.get(null));
+        await old.preferences.createStore(api.storage.sync).mutate({ type: "patch", changes: { theme: "dark" } });
+        const afterUnsafeOldWrite = LexendSettings.decodeSettings(await api.storage.sync.get(null));
+        return { compatibleArray: Array.isArray(compatibleRaw.siteRules), compatible, oldRead, afterOld, afterCurrent,
+          oldCompactRuleCount: oldCompactRead.siteRules.length,
+          oldCompactResumesPausedSite: old.settings.resolveSite(oldCompactRead, "paused.example").active,
+          lostRuleCount: afterUnsafeOldWrite.siteRules.length };
+      });
+      assert.equal(result.compatibleArray, true, "An unrelated new save retains an older-readable array");
+      assert.deepEqual({ ...result.oldRead, layoutRepair: false }, result.compatible);
+      assert.deepEqual(result.afterOld, { ...result.compatible, theme: "dark" });
+      assert.equal(result.afterCurrent.theme, "dark");
+      assert.deepEqual(result.afterCurrent.siteRules, [result.compatible.siteRules[0]]);
+      assert.equal(result.oldCompactRuleCount, 0);
+      assert.equal(result.oldCompactResumesPausedSite, true);
+      assert.equal(result.lostRuleCount, 0, "The control actually demonstrates old-writer loss, rather than assuming compatibility");
+      return { ...result, historicalRevision: oldRuleFixture.revision,
+        historicalFixtureSha256: createHash("sha256").update(oldRuleFixtureBytes).digest("hex") };
+    } finally {
+      await extensionCall(async original => {
+        const api = globalThis.browser ?? globalThis.chrome;
+        await api.storage.sync.clear();
+        await api.storage.sync.set(original);
+      }, original);
+    }
+  });
+
   if (browserName === "chrome") await check("browser restart preserves custom preferences, site pauses and a working writer", async () => {
     await patch({ theme: "dark", scope: "all", textScale: 127, lineHeight: 1.73, letterSpacing: .057 });
     await extensionCall(async () => {
@@ -451,15 +987,33 @@ try {
     await driver.switchTo().window(restartedWebsite);
     await wait("Math.abs(parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) - 25.4) < .03", "Writer and live page updates work after restarting");
   });
-  await writeFile(join(artifactDirectory, "results.json"), JSON.stringify({ browserName, checks, installedExtension: true }, null, 2));
+  if (browserName === "firefox") {
+    for (const [name, reason] of [
+      ["background service worker restart", "Firefox uses a background page rather than Chrome's service worker."],
+      ["forced colors and reduced motion emulation", "This installed harness uses Chrome DevTools emulation; this run provides no Firefox emulation evidence."],
+      ["actual toolbar popup", "This desktop Firefox harness navigates the popup document; it does not drive Firefox toolbar chrome."],
+      ["full browser restart with installed extension", "Firefox installs a temporary add-on here, which does not survive browser restart."]
+    ]) await unsupported(name, reason);
+  }
+  report.status = "passed";
 } catch (error) {
+  report.status = "failed";
+  report.error = String(error.stack ?? error);
+  if (checks.at(-1)?.status !== "failed") {
+    checks.push({ name: report.installedExtension ? "installed browser verification" : "browser and artifact setup", status: "failed", error: report.error });
+  }
   if (driver) {
     await writeFile(join(artifactDirectory, "failure.png"), await driver.takeScreenshot(), "base64").catch(() => {});
     await writeFile(join(artifactDirectory, "failure.html"), await driver.getPageSource()).catch(() => {});
   }
   throw error;
 } finally {
-  await driver?.quit();
-  await new Promise((resolve) => server.close(resolve));
-  await rm(profile, { recursive: true, force: true });
+  report.finishedAt = new Date().toISOString();
+  report.summary = Object.fromEntries(["passed", "unsupported", "failed"].map((status) => [status, checks.filter((check) => check.status === status).length]));
+  await saveReport();
+  try { await driver?.quit(); }
+  finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(profile, { recursive: true, force: true });
+  }
 }

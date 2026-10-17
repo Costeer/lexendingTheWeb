@@ -25,16 +25,33 @@ export const conversationHtml = ({ turns = 120, feedback = true, containment = f
   ${feedback ? "__authorObserver.observe(label, {attributes:true, attributeFilter:['style']});" : ''}
 </script>`;
 
+// Exact source anchors deliberately fail closed when the runtime is refactored.
+// An absent or ambiguous probe must never turn a zero-work assertion into a pass.
+export const replaceExactlyOnce = (source, needle, replacement, label = needle) => {
+  if (!needle) throw new Error('Instrumentation anchor must not be empty');
+  const count = source.split(needle).length - 1;
+  if (count !== 1) throw new Error(`Cannot instrument ${label}: expected exactly one match, found ${count}`);
+  return source.replace(needle, () => replacement);
+};
+
+const names = ['applyIncomingFonts', 'refresh', 'queueRefresh', 'invalidateAutoContent',
+  'measureTypography', 'applyTypography', 'retainOverwrittenTypography', 'notifyFrameRequirement'];
+export const contentProbeAnchors = {
+  ...Object.fromEntries(names.map(name => [name, `const ${name} =`])),
+  deliveries: '    if (!isActive()) return;\n    // Frameworks',
+  incomingNodes: '    observer.disconnect();\n    try {\n      applyToRoot(document.documentElement);',
+  initialization: '  start()'
+};
+
 // Test/profiling instrumentation only: the production script exposes no DOM
 // references or global counters. Timings are inclusive and must not be summed.
 export const instrumentContent = (source) => {
-  const names = ['applyIncomingFonts', 'refresh', 'queueRefresh', 'invalidateAutoContent',
-    'measureTypography', 'applyTypography', 'retainOverwrittenTypography', 'notifyFrameRequirement'];
+  const insert = (label, replacement) => {
+    source = replaceExactlyOnce(source, contentProbeAnchors[label], replacement, label);
+  };
   let wrappers = '';
   for (const name of names) {
-    const needle = `const ${name} =`;
-    if (!source.includes(needle)) throw new Error(`Cannot instrument ${name}`);
-    source = source.replace(needle, `const original_${name} =`);
+    insert(name, `const original_${name} =`);
     wrappers += `const ${name} = (...args) => {
       const start = performance.now(), s = __probe.calls.${name} ??= {count:0, ms:0, max:0};
       s.count++;
@@ -42,7 +59,7 @@ export const instrumentContent = (source) => {
       finally { const ms = performance.now()-start; s.ms+=ms; s.max=Math.max(s.max,ms); }
     };\n`;
   }
-  source = source.replace('    if (!isActive()) return;\n    // Frameworks', `
+  insert('deliveries', `
     __probe.deliveries++;
     for (const m of mutations) {
       const key = m.type + ':' + (m.attributeName ?? '');
@@ -52,12 +69,12 @@ export const instrumentContent = (source) => {
     }
     if (!isActive()) return;
     // Frameworks`);
-  source = source.replace('    observer.disconnect();\n    try {\n      applyToRoot(document.documentElement);', `
+  insert('incomingNodes', `
     for (const branch of branches) __probe.incomingNodes += 1 + branch.querySelectorAll('*').length;
     observer.disconnect();
     try {
       applyToRoot(document.documentElement);`);
-  return source.replace('  start()', `
+  insert('initialization', `
     globalThis.__probe = {calls:{}, mutations:{}, targets:{}, deliveries:0, incomingNodes:0};
     ${wrappers}
     globalThis.__collections = () => ({
@@ -73,4 +90,5 @@ export const instrumentContent = (source) => {
       authorFamilies: authorFontFamilies.size
     });
     start()`);
+  return source;
 };

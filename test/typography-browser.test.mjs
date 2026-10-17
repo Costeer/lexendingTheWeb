@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -61,7 +61,7 @@ test("typography preserves protected content and refreshes atomic inherited base
     await page.evaluate(() => {
       const shadow = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
       shadow.innerHTML = '<style>p {font:18px/1.4 Arial;letter-spacing:0} code {font:inherit}</style><p id=shadow-text>Shadow prose <code id=shadow-code>code()</code></p>';
-      globalThis.__settings = { enabled: false, scope: "body", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 };
+      globalThis.__settings = { enabled: false, layoutRepair: true, scope: "body", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 };
       globalThis.__listeners = [];
       globalThis.__runtimeListeners = [];
       globalThis.chrome = {
@@ -233,26 +233,47 @@ test("typography preserves protected content and refreshes atomic inherited base
     });
     await page.waitForTimeout(150);
     assert.ok(Math.abs((await page.evaluate(() => __metrics("fit-clone"))).size-fittedSize)<0.05, "cloned fitted heading starts from original authored size, not an already fitted size");
-    await page.evaluate(() => {
+    // Conversion precedes deferred repair. Inspect the wrapper, focus and scroll
+    // in the same task that confirms a newer refresh has completely settled.
+    const settledTable = async (revision) => {
+      const handle = await page.waitForFunction((revision) => {
+        const state = __state();
+        if (!state.healthy || state.pending || state.refreshRevision <= revision || document.fonts.status !== "loaded") return false;
+        const table = document.querySelector("#keyboard-table");
+        return { box: table.getBoundingClientRect().toJSON(), font: getComputedStyle(table.firstChild.firstChild.firstChild).font,
+          repair: table.dataset.lexendLayoutRepair, state, bodyScroll: document.body.scrollTop,
+          role: table.parentElement.getAttribute("role"), focused: document.activeElement === table.parentElement,
+          scroll: table.parentElement.scrollLeft };
+      }, revision);
+      const snapshot = await handle.jsonValue();
+      await handle.dispose();
+      return snapshot;
+    };
+    const tableRevision = await page.evaluate(() => {
+      const revision = __state().refreshRevision;
       const table=document.createElement("table");table.id="keyboard-table";
       table.style.cssText="font:20px Arial;letter-spacing:0;border-collapse:collapse";
       table.innerHTML='<tr><td style="white-space:nowrap">MMMMMMMMMMMMMM</td><td style="white-space:nowrap">MMMMMMMMMMMMMM</td></tr>';
       document.body.append(table);
       table.scrollIntoView({block:"center"});
+      return revision;
     });
-    await page.waitForTimeout(150);
-    const tableDiagnostic = await page.locator("#keyboard-table").evaluate((table) => ({box:table.getBoundingClientRect().toJSON(),font:getComputedStyle(table.firstChild.firstChild.firstChild).font,repair:table.dataset.lexendLayoutRepair,state:__state(),bodyScroll:document.body.scrollTop}));
-    assert.equal(await page.locator("#keyboard-table").evaluate((table) => table.parentElement.getAttribute("role")),"region",JSON.stringify(tableDiagnostic));
+    const tableDiagnostic = await settledTable(tableRevision);
+    assert.equal(tableDiagnostic.role,"region",JSON.stringify(tableDiagnostic));
     await page.locator("#keyboard-table").evaluate((table) => table.parentElement.focus());
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(200);
     const tableX = await page.locator("#keyboard-table").evaluate((table) => table.parentElement.scrollLeft);
     assert.ok(tableX>5,"keyboard ArrowRight scrolls enlarged table: "+JSON.stringify(await page.locator("#keyboard-table").evaluate(table=>({scroll:table.parentElement.scrollLeft,width:table.parentElement.clientWidth,extent:table.parentElement.scrollWidth,active:document.activeElement.tagName,focus:document.activeElement===table.parentElement,rect:table.getBoundingClientRect().toJSON(),style:table.parentElement.style.cssText,state:__state()}))));
-    await page.evaluate(() => {document.querySelector("#wrapper").textContent="Focused table region survives refresh";});
-    await page.waitForTimeout(150);
-    assert.equal(await page.locator("#keyboard-table").evaluate((table) => document.activeElement===table.parentElement),true,"replacement table wrapper retains keyboard focus");
-    assert.ok(Math.abs((await page.locator("#keyboard-table").evaluate((table) => table.parentElement.scrollLeft))-tableX)<1,"replacement table wrapper retains keyboard scroll offset");
+    const focusedRevision = await page.evaluate(() => {
+      const revision = __state().refreshRevision;
+      document.querySelector("#wrapper").textContent="Focused table region survives refresh";
+      return revision;
+    });
+    const focusedTable = await settledTable(focusedRevision);
+    assert.equal(focusedTable.focused,true,"replacement table wrapper retains keyboard focus");
+    assert.ok(Math.abs(focusedTable.scroll-tableX)<1,"replacement table wrapper retains keyboard scroll offset");
     await page.evaluate(() => {
       document.documentElement.style.height=`${innerHeight}px`;
       document.documentElement.style.overflow="hidden";
@@ -337,7 +358,7 @@ test("already focused repaired panel actions remain visible after typography set
     await page.route("http://panel.test/**",async route=>route.fulfill({body:await readFile(resolve(`.${new URL(route.request().url()).pathname}`)),contentType:"font/woff2"}));
     await page.setContent(`<!doctype html><style>body{margin:0;font:16px/20px Arial;min-height:5000px}.panel{position:fixed;left:20px;top:40px;width:300px;height:300px;max-height:300px;overflow:hidden;background:white}p{margin:0}button{font:inherit}</style><main>Document content</main><div class=panel role=dialog aria-label="Instructions">${Array.from({length:12},(_,i)=>`<p>Panel instruction ${i+1}</p>`).join("")}<button id=action>Continue</button></div>`);
     await page.evaluate(()=>{
-      globalThis.__settings={enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};globalThis.__listeners=[];
+      globalThis.__settings={enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};globalThis.__listeners=[];
       globalThis.chrome={runtime:{getURL:p=>`http://panel.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
       globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       globalThis.__focusedBounds=()=>{const p=document.querySelector('.panel'),a=document.querySelector('#action'),r=p.getBoundingClientRect(),q=a.getBoundingClientRect();return{repair:p.dataset.lexendLayoutRepair,paneTop:r.top,paneBottom:r.bottom,actionTop:q.top,actionBottom:q.bottom,scrollTop:p.scrollTop,scrollY,focused:document.activeElement===a};};
@@ -370,11 +391,18 @@ test("small cross-origin announcements resize by measured demand and restore", a
       else await route.fulfill({contentType:"text/html",body:`<!doctype html><style>body{margin:0;font:12px/14px Arial}span{display:inline-block;width:160px}button{position:absolute;right:0;top:0;font:12px Arial}${path.includes("centered") ? "html,body{height:100%}body{display:flex;align-items:center}button{top:50%;transform:translateY(-50%)}" : ""}</style><span>Readable bonus announcement</span><button>Close</button>`});
     });
     await page.setContent('<!doctype html><iframe src="http://frame.test/banner" style="height:150px;max-height:150px;width:240px;border:0"></iframe><nav>Following navigation</nav>');
+    await page.exposeFunction("__relayFrameRecheck", async () => {
+      await Promise.all(page.frames().map(frame => frame.evaluate(() => {
+        for (const listener of globalThis.__runtime ?? []) listener({type:"LEXEND_RECHECK_FRAME_REQUIREMENT"}, {id:"frame-test",url:"http://frame.test/background.js"}, () => {});
+      })));
+    });
     const install=async target=>{
       await target.evaluate(()=>{
-        globalThis.__settings={enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
+        globalThis.__settings={enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
         globalThis.__listeners=[];
-        globalThis.chrome={runtime:{getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT")window.parent.postMessage({type:"lexend-measured-frame-height",requirement:message.requirement},"*");},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
+        globalThis.__runtime=[];
+        globalThis.__frameDemandCount=0;
+        globalThis.chrome={runtime:{id:"frame-test",getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT"){__frameDemandCount++;window.parent.postMessage({type:"lexend-measured-frame-height",requirement:message.requirement},"*");}else if(message.type==="LEXEND_RECHECK_FRAME_REQUIREMENTS")await __relayFrameRecheck();},onMessage:{addListener:f=>__runtime.push(f)}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
         globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       });
       for(const path of ["settings","adaptive-controls","adaptive-layout","content"])await target.addScriptTag({path:resolve(`src/${path}.js`)});
@@ -402,10 +430,28 @@ test("small cross-origin announcements resize by measured demand and restore", a
     await page.waitForTimeout(30);
     assert.deepEqual(pageErrors,[],"malformed messages from the actual embedded window do not throw");
     assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded);
-    await child.evaluate(()=>__update({enabled:false}));
+    await child.evaluate(()=>__update({layoutRepair:false}));
     await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
+    assert.match(await child.locator("span").evaluate(element=>getComputedStyle(element).fontFamily),/Lexend/,"repair opt-out keeps typography active");
+    const offDemandCount=await child.evaluate(()=>__frameDemandCount);
+    await child.evaluate(()=>__relayFrameRecheck());
+    await page.waitForTimeout(30);
+    assert.equal(await child.evaluate(()=>__frameDemandCount),offDemandCount,"repair-off child ignores authenticated recheck without measuring or sending demand");
+    await child.evaluate(()=>__update({layoutRepair:true}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
+    await page.evaluate(()=>__update({layoutRepair:false}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
+    await child.evaluate(()=>window.parent.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:60}},"*"));
+    await page.waitForTimeout(30);
+    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),30,"disabled parent ignores a child's valid resize request");
+    await page.evaluate(()=>__update({layoutRepair:true}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
+    const reenabledGeometry=await child.locator("span").evaluate(element=>({bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
+    assert.ok(reenabledGeometry.bottom<=reenabledGeometry.viewport,"parent re-enable renegotiates with its unchanged opted-in child");
+    await child.evaluate(()=>__update({enabled:false}));
     assert.equal(await page.locator("iframe").getAttribute("style"),"height: 30px; max-height: 30px; width: 240px; border: 0px;");
 
+    await page.evaluate(()=>__update({layoutRepair:true}));
     const centeredNavigation=page.waitForEvent("framenavigated",{predicate:frame=>frame.url().includes("centered-banner")});
     await page.evaluate(()=>{
       document.querySelector("iframe").remove();
@@ -435,20 +481,29 @@ test("small cross-origin announcements resize by measured demand and restore", a
   } finally {await browser.close();}
 });
 
-test("isolated extension frames use authenticated sizing and retain clipped embedding footprints",async()=>{
+test("isolated extension frames use authenticated sizing and retain clipped embedding footprints",async(t)=>{
  const temporary=await mkdtemp(join(tmpdir(),"lexend-isolated-frame-"));
  const extensionPath=join(temporary,"extension"),profile=join(temporary,"profile");
  for(const path of ["src","assets","shared.css","options.html","options.css","options.js","popup.html","popup.css","popup.js"])
   await cp(resolve(path),join(extensionPath,path),{recursive:true});
- await cp(resolve("manifests/manifest.chrome.json"),join(extensionPath,"manifest.json"));
+ const manifest=JSON.parse(await readFile(resolve("manifests/manifest.chrome.json"),"utf8"));
+ manifest.content_scripts.find(entry=>entry.world!=="MAIN").js.push("frame-request-probe.js");
+ await writeFile(join(extensionPath,"manifest.json"),JSON.stringify(manifest));
+ // Test-only observer in the installed isolated world: count actual qualifying
+ // background deliveries without exposing payloads or mutating page markup.
+ await writeFile(join(extensionPath,"frame-request-probe.js"),`chrome.runtime.onMessage.addListener((message,sender)=>{
+  if(sender.id===chrome.runtime.id && message.type==="LEXEND_APPLY_FRAME_REQUIREMENT"
+   && message.requirement?.requiredHeight>message.requirement?.viewportHeight)
+   document.dispatchEvent(new Event("lexend-test-qualified-frame-request"));
+ });`);
  const server=createServer((request,response)=>{
   response.setHeader("content-type","text/html");
   if(request.url==="/banner") response.end('<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>');
-  else if(["/caption","/below-caption","/closed-caption","/hidden-caption"].includes(request.url)) response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}p{margin:0;width:200px}</style><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
+  else if(["/caption","/below-caption","/closed-caption","/hidden-caption","/tall-caption"].includes(request.url)) response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}p{margin:0;width:200px}</style><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
   else if(request.url==="/centered-caption") response.end('<!doctype html><style>html,body{height:100%}body{margin:0;font:16px/20px Arial;display:flex;align-items:center}p{margin:0;width:200px;flex:none}</style><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
   else if(request.url==="/media") response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}img{display:block;width:200px;height:100px}p{margin:0}</style><img alt="" src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'100\'%3E%3Crect width=\'200\' height=\'100\' fill=\'navy\'/%3E%3C/svg%3E"><p>Caption originally outside the native frame.</p>');
   else if(request.url==="/photo") response.end('<!doctype html><style>body{margin:0;font:16px/20px Arial}img{display:block;width:240px;height:100px}p{position:absolute;top:0;margin:0;width:200px;color:white}</style><img alt="" src="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'240\' height=\'100\'%3E%3Crect width=\'240\' height=\'100\' fill=\'navy\'/%3E%3C/svg%3E"><p>Readable first caption line.<br>Readable second caption line.<br>Readable third caption line.</p>');
-  else if(request.url==="/captions") response.end(`<!doctype html><style>body{margin:0;font:16px Arial}.embed{width:240px;height:100px;max-height:100px;overflow:hidden}iframe{display:block;width:240px;height:100px;max-height:100px;border:0}#closed{height:0;max-height:0;overflow:hidden}#hidden{opacity:0}</style><div class="embed"><iframe id="caption" src="http://localhost:${server.address().port}/caption"></iframe></div><div class="embed"><iframe id="media" src="http://localhost:${server.address().port}/media"></iframe></div><div class="embed"><iframe id="photo" src="http://localhost:${server.address().port}/photo"></iframe></div><div class="embed"><iframe id="centered-caption" src="http://localhost:${server.address().port}/centered-caption"></iframe></div><div style="height:1800px"></div><div class="embed"><iframe id="below-caption" src="http://localhost:${server.address().port}/below-caption"></iframe></div><div id="closed" class="embed"><iframe id="closed-caption" src="http://localhost:${server.address().port}/closed-caption"></iframe></div><div id="hidden" class="embed"><iframe id="hidden-caption" src="http://localhost:${server.address().port}/hidden-caption"></iframe></div>`);
+  else if(request.url==="/captions") response.end(`<!doctype html><style>body{margin:0;font:16px Arial}.embed{width:240px;height:100px;max-height:100px;overflow:hidden}iframe{display:block;width:240px;height:100px;max-height:100px;border:0}#closed{height:0;max-height:0;overflow:hidden}#hidden{opacity:0}#tall{height:180px;max-height:180px}</style><div class="embed"><iframe id="caption" src="http://localhost:${server.address().port}/caption"></iframe></div><div class="embed"><iframe id="media" src="http://localhost:${server.address().port}/media"></iframe></div><div class="embed"><iframe id="photo" src="http://localhost:${server.address().port}/photo"></iframe></div><div class="embed"><iframe id="centered-caption" src="http://localhost:${server.address().port}/centered-caption"></iframe></div><div id="tall" class="embed"><iframe id="tall-caption" src="http://localhost:${server.address().port}/tall-caption"></iframe></div><div style="height:1800px"></div><div class="embed"><iframe id="below-caption" src="http://localhost:${server.address().port}/below-caption"></iframe></div><div id="closed" class="embed"><iframe id="closed-caption" src="http://localhost:${server.address().port}/closed-caption"></iframe></div><div id="hidden" class="embed"><iframe id="hidden-caption" src="http://localhost:${server.address().port}/hidden-caption"></iframe></div>`);
   else response.end(`<!doctype html><style>body{margin:0;font:16px Arial}#clip{position:fixed;top:0;left:0;width:240px;height:30px;max-height:30px;overflow:hidden}iframe{display:block;width:240px;height:30px;max-height:30px;border:0}nav{position:fixed;top:30px;height:28px;width:240px;background:white}main{margin-top:80px}</style><div id="clip"><iframe src="http://localhost:${server.address().port}/banner"></iframe></div><nav>Following navigation</nav><main>Readable page prose</main>`);
  });
  await new Promise(resolve=>server.listen(0,"0.0.0.0",resolve));
@@ -456,7 +511,7 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
  try{
   context=await chromium.launchPersistentContext(profile,{channel:"chromium",headless:true,args:[`--disable-extensions-except=${extensionPath}`,`--load-extension=${extensionPath}`]});
   const worker=context.serviceWorkers()[0]??await context.waitForEvent("serviceworker");
-  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true,scope:"all",siteRules:[],textScale:110,lineHeight:1.6,letterSpacing:.02}));
+  await worker.evaluate(()=>chrome.storage.sync.set({enabled:true,layoutRepair:true,scope:"all",siteRules:[],textScale:110,lineHeight:1.6,letterSpacing:.02}));
   const page=await context.newPage();await page.setViewportSize({width:390,height:844});
   await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30,{},{timeout:5000});
@@ -482,6 +537,76 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
   await page.waitForFunction(()=>document.querySelector("nav").style.getPropertyValue("top")==="");
   const removed=await page.evaluate(()=>({clipHeight:document.querySelector("#clip").style.getPropertyValue("height"),clipMaxHeight:document.querySelector("#clip").style.getPropertyValue("max-height"),navTop:getComputedStyle(document.querySelector("nav")).top}));
   assert.deepEqual(removed,{clipHeight:"",clipMaxHeight:"",navTop:"30px"},"removing an embed while enabled restores its wrapper and following navigation without a child null request");
+  // Frame resizing owns a separate restoration group: the iframe, clipping
+  // ancestors, and independently displaced fixed navigation. Entering editor
+  // ownership must release that group even while conversion remains enabled.
+  for (const editorTarget of ["iframe", "#clip", "nav", "designMode"]) {
+   await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
+   await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:"load"});
+   const authored=await page.evaluate((selector)=>{
+    const frame=document.querySelector("iframe"),clip=document.querySelector("#clip"),nav=document.querySelector("nav");
+    frame.style.setProperty("height","30px","important");
+    frame.style.setProperty("max-height","30px");
+    clip.style.setProperty("height","30px");
+    clip.style.setProperty("max-height","30px","important");
+    nav.style.setProperty("top","30px","important");
+    globalThis.__qualifiedFrameRequests=0;
+    document.addEventListener("lexend-test-qualified-frame-request",()=>__qualifiedFrameRequests++);
+    const original={body:document.body.outerHTML,frameStyle:frame.getAttribute("style"),clipStyle:clip.getAttribute("style")};
+    if(selector==="designMode")return original;
+    const clone=document.querySelector(selector).cloneNode(true);
+    clone.setAttribute("contenteditable","true");
+    // The independent action bar also receives a later authored override in
+    // the same task that enters editing. Restoration must preserve that value.
+    if(selector==="nav")clone.style.setProperty("top","33px","important");
+    return{...original,editor:clone.outerHTML};
+   },editorTarget);
+   await worker.evaluate(()=>chrome.storage.sync.set({enabled:true}));
+   await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30
+    && document.querySelector("#clip").clientHeight>30
+    && parseFloat(document.querySelector("nav").style.getPropertyValue("top"))>30,{},{timeout:5000});
+   const applied=await page.evaluate(()=>({
+    frameHeight:document.querySelector("iframe").clientHeight,
+    clipHeight:document.querySelector("#clip").clientHeight,
+    navTop:document.querySelector("nav").style.getPropertyValue("top"),
+    frameMax:document.querySelector("iframe").style.getPropertyValue("max-height"),
+    clipMax:document.querySelector("#clip").style.getPropertyValue("max-height")
+   }));
+   assert.equal(applied.frameMax,"none","a real authenticated child request applied the owned frame constraint");
+   assert.equal(applied.clipMax,"none","the same request repaired its clipping ancestor");
+   if(editorTarget==="designMode"){
+    const synchronous=await page.evaluate(()=>{document.designMode="on";return document.body.outerHTML;});
+    assert.equal(synchronous,authored.body,"designMode releases all frame and surrounding ownership before its setter returns");
+   }else{
+    await page.locator(editorTarget).evaluate(element=>{
+     if(element.tagName==="NAV")element.style.setProperty("top","33px","important");
+     element.setAttribute("contenteditable","true");
+    });
+    await page.waitForFunction(({selector,expected})=>document.querySelector(selector).outerHTML===expected,
+     {selector:editorTarget,expected:authored.editor});
+    assert.equal(await page.locator(editorTarget).evaluate(element=>element.outerHTML),authored.editor,
+     `${editorTarget} entering editor ownership restores author serialization`);
+   }
+   // Require a later real authenticated child request, rather than relying
+   // on a delay. The test-only isolated listener counts only qualifying sizing
+   // deliveries. An unprotected frame can resize again while its action bar is
+   // editing; neither that request nor a protected frame may reclaim editor DOM.
+   const requestsBefore=await page.evaluate(()=>__qualifiedFrameRequests);
+   if(editorTarget==="nav")await page.locator("iframe").evaluate(element=>element.style.setProperty("height","30px","important"));
+   const activeChild=page.frames().find(frame=>frame.url().endsWith("/banner"));
+   await activeChild.evaluate(()=>dispatchEvent(new Event("resize")));
+   await page.waitForFunction(before=>__qualifiedFrameRequests>before,requestsBefore,{timeout:5000});
+   if(editorTarget==="designMode")assert.equal(await page.evaluate(()=>document.body.outerHTML),authored.body);
+   else assert.equal(await page.locator(editorTarget).evaluate(element=>element.outerHTML),authored.editor);
+   assert.deepEqual(await page.locator("nav").evaluate(element=>({value:element.style.getPropertyValue("top"),priority:element.style.getPropertyPriority("top")})),
+    {value:editorTarget==="nav"?"33px":"30px",priority:"important"},
+    "independent navigation retains author values and priorities, including a later override");
+   if(editorTarget!=="nav"){
+    assert.equal(await page.locator("iframe").getAttribute("style"),authored.frameStyle,"frame style serialization returns to the author baseline");
+    assert.equal(await page.locator("#clip").getAttribute("style"),authored.clipStyle,"clipping ancestor style serialization returns to the author baseline");
+   }
+   t.diagnostic(JSON.stringify({editorTransition:editorTarget,applied,requestsBefore,requestsAfter:await page.evaluate(()=>__qualifiedFrameRequests),restoredEditor:editorTarget==="designMode"?authored.body:authored.editor}));
+  }
   await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
   await page.goto(`http://127.0.0.1:${server.address().port}/captions`,{waitUntil:"load"});
   const captionChild=page.frames().find(frame=>frame.url().endsWith("/caption"));
@@ -529,6 +654,25 @@ test("isolated extension frames use authenticated sizing and retain clipped embe
   await page.locator("#below-caption").scrollIntoViewIfNeeded();
   assert.equal(await page.locator("#below-caption").evaluate(element=>element.clientHeight),belowGlyphs.viewport,"native parent scrolling preserves the measured caption height");
   assert.deepEqual(await page.evaluate(()=>({closedFrame:document.querySelector("#closed-caption").clientHeight,closedPane:document.querySelector("#closed").clientHeight,closedStyle:document.querySelector("#closed").style.cssText,hiddenFrame:document.querySelector("#hidden-caption").clientHeight,hiddenStyle:document.querySelector("#hidden").style.cssText})),{closedFrame:100,closedPane:0,closedStyle:"",hiddenFrame:100,hiddenStyle:""},"zero-height closed and transparent ancestor panes retain their authored frame footprints");
+  // A later font settlement or settings update can request more height after
+  // our first repair has already grown the wrapper beyond the native cutoff.
+  // Scrolling to the below-fold caption left these frames offscreen, where
+  // Chromium can suspend animation-frame polling before settings arrive.
+  assert.ok(grownFootprint.parent>160,"the first caption repair exceeds the native ancestor eligibility limit");
+  await worker.evaluate(()=>chrome.storage.sync.set({textScale:120}));
+  await captionChild.waitForFunction(previousHeight=>{
+   const element=document.querySelector("p"),range=document.createRange();
+   range.selectNodeContents(element);
+   return document.fonts.status==="loaded" && parseFloat(getComputedStyle(element).fontSize)===19.2
+    && innerHeight>previousHeight && range.getBoundingClientRect().bottom<=innerHeight;
+  },grownCaption.viewport,{timeout:5000,polling:50});
+  const regrownFootprint=await page.locator("#caption").evaluate(element=>({frame:element.clientHeight,parent:element.parentElement.clientHeight}));
+  assert.ok(regrownFootprint.frame>grownFootprint.frame,"the child issues a larger authenticated sizing request");
+  assert.ok(regrownFootprint.parent>=regrownFootprint.frame,"an owned clipping wrapper keeps growing with subsequent caption requests");
+  const tallChild=page.frames().find(frame=>frame.url().endsWith("/tall-caption"));
+  await tallChild.waitForFunction(()=>innerHeight>180,{},{timeout:5000,polling:50});
+  assert.deepEqual(await page.locator("#tall").evaluate(element=>({height:element.clientHeight,style:element.style.cssText})),
+   {height:180,style:""},"an unowned wrapper above the native eligibility limit retains its authored footprint");
   await worker.evaluate(()=>chrome.storage.sync.set({enabled:false}));
   await page.waitForFunction(()=>document.querySelector("#caption").clientHeight===100);
   assert.equal((await captionGeometry()).fontSize,16);
@@ -548,7 +692,7 @@ test("newly painted automatic content gets a fresh layout baseline without refre
   await page.evaluate(()=>{
    globalThis.__listeners=[];globalThis.__captureCount=0;globalThis.__reveals=0;
    document.addEventListener('contentvisibilityautostatechange',e=>{if(e.target.id==='lazy'&&!e.skipped)__reveals++;},true);
-   globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({enabled:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
+   globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({enabled:true,layoutRepair:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
   });
   for(const name of ['settings','adaptive-controls','adaptive-layout'])await page.addScriptTag({path:resolve(`src/${name}.js`)});
   await page.evaluate(()=>{const create=LexendLayout.create;globalThis.LexendLayout={create:options=>{const controller=create(options);return{...controller,capture:(...args)=>{__captureCount++;return controller.capture(...args);}};}};});
@@ -605,7 +749,7 @@ test("slotted typography overrides inner important rules and loads exact Latin s
     await page.evaluate(() => {
       const shadow = document.querySelector("#host").attachShadow({ mode: "open" });
       shadow.innerHTML = '<style>@layer component {::slotted([slot="title"]){font-family:Arial!important;font-size:var(--author-size)!important;line-height:28px!important;letter-spacing:-.5px!important}::slotted([slot="body"]){font:14px/24px Arial!important}::slotted([slot="code"]){font:13px/19px monospace!important}}</style><slot name="title"></slot><slot name="body"></slot><slot name="code"></slot>';
-      globalThis.__settings = {enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
+      globalThis.__settings = {enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
       globalThis.__listeners=[];
       globalThis.chrome={runtime:{getURL:path=>`http://slotted.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:listener=>__listeners.push(listener)}}};
       globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(listener=>listener(changes,"sync"));};
@@ -656,7 +800,7 @@ test("incoming feed text outruns coalesced animation updates and exposes pending
     await page.setContent('<!doctype html><style>body{font:16px/24px Arial;margin:0}button{font:inherit}#motion{height:10px;width:10px}#feed{font:14px/20px Arial}#spacer{height:6000px}</style><button id="action"><span>Ordinary action</span></button><div id="motion"></div><div id="feed"><p>Initial feed</p></div><div id="spacer"></div>');
     await page.evaluate(()=>{
       globalThis.__runtime=[];
-      globalThis.chrome={runtime:{getURL:path=>`http://feed.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:listener=>__runtime.push(listener)}},storage:{sync:{get:async()=>({enabled:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:()=>{}}}};
+      globalThis.chrome={runtime:{getURL:path=>`http://feed.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:listener=>__runtime.push(listener)}},storage:{sync:{get:async()=>({enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:()=>{}}}};
       globalThis.__state=()=>{let state;__runtime.forEach(listener=>listener({type:"LEXEND_GET_STATE"},null,value=>state=value));return state;};
     });
     for(const name of ["settings","adaptive-controls","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});

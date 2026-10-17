@@ -153,7 +153,17 @@ h3 {
 }
 
 .save-status.is-saved {
-  display: none;
+  /* Keep completed feedback in the live region for assistive technology. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  box-shadow: none;
 }
 
 .save-status svg {
@@ -1787,3 +1797,96 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+/* Custom values stay in the native radio group, with room for a readable label. */
+:root .basic-controls {
+  grid-auto-rows: auto;
+}
+:root .setting-control:has(.custom-choice:not([hidden])) {
+  height: 154px;
+  min-height: 154px;
+}
+:root .segment-group:has(.custom-choice:not([hidden])) {
+  height: auto;
+}
+:root .segment-group .custom-choice {
+  grid-column: 1 / -1;
+}
+:root .segment-group .custom-choice span {
+  border-top: 1px solid var(--ui-border);
+  border-left: 0;
+}
+.custom-settings-link {
+  display: block;
+  margin: 6px 0 14px;
+}
+:root .rule-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  align-self: start;
+}
+.rule-domain { grid-column: 1; }
+:root .rule-status {
+  grid-column: 1;
+  grid-row: 2;
+  text-align: left;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+.rule-row > .delete-rule {
+  grid-column: 2;
+  grid-row: 1;
+}
+.rule-row > .delete-rule[data-action="confirm"] { grid-row: 2; }
+.rule-editor { width: 100%; margin-top: 3px; }
+.rule-editor summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 14px;
+}
+.rule-editor form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.rule-editor label { display: grid; gap: 5px; font-size: 14px; }
+.rule-editor select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.rule-sources {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+:root .tool-card .import-preview {
+  margin-top: 20px;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+.import-preview h4 { margin: 0 0 8px; font-size: 16px; }
+.import-preview p, .import-undo p, .import-preview li { font-size: 14px; line-height: 1.6; }
+.import-preview ul { padding-left: 22px; overflow-wrap: anywhere; }
+.import-preview li + li { margin-top: 8px; }
+.import-undo { margin-top: 18px; }
+
+.layout-repair-setting {
+  margin: 24px 0;
+  padding: 16px;
+  border: var(--control-border);
+  border-radius: 12px;
+}
+.layout-repair-setting label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.layout-repair-setting input { flex: none; margin-top: 4px; accent-color: var(--accent); }
+.layout-repair-setting p { margin: 8px 0 0 26px; font-size: 14px; line-height: 1.5; color: var(--secondary-text); }
