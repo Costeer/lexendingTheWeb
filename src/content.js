@@ -231,7 +231,7 @@
       }
       for (const parent of shortAncestors) {
         const frameBox = frame.getBoundingClientRect(), parentBox = parent.element.getBoundingClientRect();
-        if (!parent.clips || frameBox.bottom <= parentBox.bottom + 2) continue;
+        if (!parent.clips || frameBox.bottom <= parentBox.bottom) continue;
         const height = Math.ceil(parentBox.height + frameBox.bottom - parentBox.bottom);
         if (height > Math.min(320, innerHeight * 0.5)) continue;
         writeFrameProperty(state, parent.element, "height", `${height}px`);

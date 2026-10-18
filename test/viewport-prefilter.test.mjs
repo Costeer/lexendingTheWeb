@@ -427,6 +427,24 @@ test("shadow discovery drains queued authored-empty style provenance before disc
 });
 
 
+test("frame clipping wrappers follow one- and two-pixel sizing increases", async () => {
+  const page = await prepare("candidate", { frameFixture: true });
+  try {
+    const sizes = await page.evaluate(() => {
+      const frame = document.querySelector("#frame-scroll iframe"), wrapper = __find("frame-scroll");
+      return [31, 32, 100, 101, 102].map((requiredHeight) => {
+        __applyFrame(frame, { viewportHeight: 30, baselineHeight: 30, requiredHeight });
+        return { requiredHeight, frame: frame.clientHeight, wrapper: wrapper.clientHeight };
+      });
+    });
+    for (const size of sizes) {
+      assert.equal(size.frame, size.requiredHeight, "the measured frame adopts each requested height");
+      assert.ok(size.wrapper >= size.frame, `the clipping wrapper contains its frame after each increase: ${JSON.stringify(size)}`);
+    }
+    await pauseAndCompare(page);
+  } finally { await page.close(); }
+});
+
 for (const authoredEmpty of [false, true]) test(`frame clipping ownership overlaps typography without contaminating style presence (empty=${authoredEmpty})`, async () => {
   const page = await prepare("candidate", { authoredEmpty, frameFixture: true });
   try {
