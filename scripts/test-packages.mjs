@@ -44,6 +44,6 @@ for (const target of ["chrome", "firefox"]) {
     ...manifest.content_scripts.flatMap(({ js = [], css = [] }) => [...js, ...css]),
     ...manifest.web_accessible_resources.flatMap(({ resources }) => resources)];
   for (const path of runtimeFiles) requireFile(path, "manifest.json");
-  for (const path of ["assets/fonts/LICENSE", "assets/fonts/LICENSE-NERD-FONTS", "assets/fonts/README-NERD-FONTS.md"]) requireFile(path, "font license");
+  for (const path of ["assets/fonts/LICENSE", "assets/fonts/LICENSE-NERD-FONTS", "assets/fonts/NOTICE-NERD-FONTS"]) requireFile(path, "font license or attribution");
   console.log(`PASS ${target}: ${Object.keys(files).length} archived files, runtime references, local assets and font licenses`);
 }

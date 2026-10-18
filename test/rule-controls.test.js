@@ -1,29 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createMemoryStorage } from "./helpers/memory-storage.js";
 import "../src/settings.js";
 import "../src/preferences.js";
 
 const api = globalThis.LexendSettings;
 const fixture = (initial = {}) => {
-  let saved = structuredClone(initial);
+  const memory = createMemoryStorage(initial);
   let failWrite = false;
-  const writes = [];
-  const store = LexendPreferences.createStore({
-    async get() { return structuredClone(saved); },
-    async set(patch) {
-      if (failWrite) throw new Error("Write failed");
-      saved = { ...saved, ...structuredClone(patch) };
-      writes.push(structuredClone(patch));
-    }
-  });
-  return { store, writes, saved: () => api.normalizeSettings(saved), failWrite: (value) => { failWrite = value; } };
+  const store = LexendPreferences.createStore({ ...memory.storage, async set(patch) {
+    if (failWrite) throw new Error("Write failed");
+    await memory.storage.set(patch);
+  } });
+  return { store, writes: memory.writes, saved: () => api.normalizeSettings(memory.saved()), failWrite: (value) => { failWrite = value; } };
 };
 const update = (hostname, changes, includeSubdomains = false) => ({ type: "updateRule", hostname, includeSubdomains, changes });
 const applyPreview = (preview) => ({ type: "replace", settings: preview.after, expected: preview.before });
 const undoPreview = (preview, expected) => ({ type: "undoImport", before: preview.before, after: preview.after, expected });
 
 test("an imported scope-only rule can be edited without losing independent overrides", async () => {
-  const initial = api.validateImport({ schemaVersion: 2, settings: api.normalizeSettings({ siteRules: [
+  const initial = api.validateImport({ schemaVersion: 3, settings: api.normalizeSettings({ siteRules: [
     { hostname: "example.com", includeSubdomains: true, enabled: false, scope: "body" },
     { hostname: "docs.example.com", scope: "all" }
   ] }) });

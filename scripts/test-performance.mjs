@@ -25,7 +25,7 @@ Samples must be an integer from 3 to 15; one extra warm-up per version is discar
 --inject-block-ms 1000 deliberately blocks one measured candidate contention phase.
 Use a block above the max-task limit to verify failure; injection evidence is reported.
 Exit 0: passed. Exit 1: regression, broken workload, or invalid measurement.
-See docs/performance.md for metrics, noise tolerances, and model workflow.`);
+Raw samples, comparison thresholds and source hashes are retained in the output JSON.`);
 } else {
   await main();
 }

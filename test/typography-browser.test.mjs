@@ -391,6 +391,13 @@ test("small cross-origin announcements resize by measured demand and restore", a
       else await route.fulfill({contentType:"text/html",body:`<!doctype html><style>body{margin:0;font:12px/14px Arial}span{display:inline-block;width:160px}button{position:absolute;right:0;top:0;font:12px Arial}${path.includes("centered") ? "html,body{height:100%}body{display:flex;align-items:center}button{top:50%;transform:translateY(-50%)}" : ""}</style><span>Readable bonus announcement</span><button>Close</button>`});
     });
     await page.setContent('<!doctype html><iframe src="http://frame.test/banner" style="height:150px;max-height:150px;width:240px;border:0"></iframe><nav>Following navigation</nav>');
+    await page.exposeBinding("__relayFrameRequirement", async ({frame}, requirement) => {
+      if(frame===page.mainFrame())return;
+      await page.evaluate(message=>{
+        if(message.requirement && document.querySelector("iframe")?.src===message.frameUrl)__frameRequests.push(message.requirement.requiredHeight);
+        for(const listener of __runtime)listener(message,{id:"frame-test",url:"http://frame.test/background.js"},()=>{});
+      },{type:"LEXEND_APPLY_FRAME_REQUIREMENT",frameUrl:frame.url(),sourceFrameId:page.frames().indexOf(frame),requirement});
+    });
     await page.exposeFunction("__relayFrameRecheck", async () => {
       await Promise.all(page.frames().map(frame => frame.evaluate(() => {
         for (const listener of globalThis.__runtime ?? []) listener({type:"LEXEND_RECHECK_FRAME_REQUIREMENT"}, {id:"frame-test",url:"http://frame.test/background.js"}, () => {});
@@ -401,8 +408,9 @@ test("small cross-origin announcements resize by measured demand and restore", a
         globalThis.__settings={enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02};
         globalThis.__listeners=[];
         globalThis.__runtime=[];
+        globalThis.__frameRequests=[];
         globalThis.__frameDemandCount=0;
-        globalThis.chrome={runtime:{id:"frame-test",getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT"){__frameDemandCount++;window.parent.postMessage({type:"lexend-measured-frame-height",requirement:message.requirement},"*");}else if(message.type==="LEXEND_RECHECK_FRAME_REQUIREMENTS")await __relayFrameRecheck();},onMessage:{addListener:f=>__runtime.push(f)}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
+        globalThis.chrome={runtime:{id:"frame-test",getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT"){__frameDemandCount++;await __relayFrameRequirement(message.requirement);}else if(message.type==="LEXEND_RECHECK_FRAME_REQUIREMENTS")await __relayFrameRecheck();},onMessage:{addListener:f=>__runtime.push(f)}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
         globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       });
       for(const path of ["settings","adaptive-controls","adaptive-layout","content"])await target.addScriptTag({path:resolve(`src/${path}.js`)});
@@ -424,11 +432,24 @@ test("small cross-origin announcements resize by measured demand and restore", a
     assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded,"expanded viewport does not oscillate back to its original clipping height");
     await page.evaluate(()=>window.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:9999}},"*"));
     assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded,"unrelated and unbounded frame messages are ignored");
-    await child.evaluate(()=>{
-      for(const requirement of [undefined,"bad",[],{viewportHeight:30,baselineHeight:-1,requiredHeight:60}])window.parent.postMessage({type:"lexend-measured-frame-height",requirement},"*");
+    await child.evaluate(()=>window.parent.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:120}},"*"));
+    await page.waitForTimeout(30);
+    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded,"the embedded page cannot resize its parent through the retired page-message transport");
+    await page.evaluate(()=>{
+      const message={type:"LEXEND_APPLY_FRAME_REQUIREMENT",frameUrl:"http://frame.test/banner",sourceFrameId:1,requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:120}};
+      for(const [patch,sender] of [
+        [{},{id:"unrelated-extension",url:"http://frame.test/background.js"}],
+        [{},{id:"frame-test",url:"http://spoof.test/background.js"}],
+        [{sourceFrameId:0},{id:"frame-test",url:"http://frame.test/background.js"}],
+        [{frameUrl:"http://frame.test/unrelated"},{id:"frame-test",url:"http://frame.test/background.js"}]
+      ])for(const listener of __runtime)listener({...message,...patch},sender,()=>{});
+    });
+    assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded,"runtime sizing requires the background sender and matching child metadata");
+    await child.evaluate(async()=>{
+      for(const requirement of [undefined,"bad",[],{viewportHeight:30,baselineHeight:-1,requiredHeight:60}])await chrome.runtime.sendMessage({type:"LEXEND_FRAME_REQUIREMENT",requirement});
     });
     await page.waitForTimeout(30);
-    assert.deepEqual(pageErrors,[],"malformed messages from the actual embedded window do not throw");
+    assert.deepEqual(pageErrors,[],"malformed runtime requirements from the actual embedded frame do not throw");
     assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),expanded);
     await child.evaluate(()=>__update({layoutRepair:false}));
     await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
@@ -441,7 +462,7 @@ test("small cross-origin announcements resize by measured demand and restore", a
     await page.waitForFunction(()=>document.querySelector("iframe").clientHeight>30);
     await page.evaluate(()=>__update({layoutRepair:false}));
     await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
-    await child.evaluate(()=>window.parent.postMessage({type:"lexend-measured-frame-height",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:60}},"*"));
+    await child.evaluate(()=>chrome.runtime.sendMessage({type:"LEXEND_FRAME_REQUIREMENT",requirement:{viewportHeight:30,baselineHeight:30,requiredHeight:60}}));
     await page.waitForTimeout(30);
     assert.equal(await page.locator("iframe").evaluate(element=>element.clientHeight),30,"disabled parent ignores a child's valid resize request");
     await page.evaluate(()=>__update({layoutRepair:true}));
@@ -449,6 +470,7 @@ test("small cross-origin announcements resize by measured demand and restore", a
     const reenabledGeometry=await child.locator("span").evaluate(element=>({bottom:element.getBoundingClientRect().bottom,viewport:innerHeight}));
     assert.ok(reenabledGeometry.bottom<=reenabledGeometry.viewport,"parent re-enable renegotiates with its unchanged opted-in child");
     await child.evaluate(()=>__update({enabled:false}));
+    await page.waitForFunction(()=>document.querySelector("iframe").clientHeight===30);
     assert.equal(await page.locator("iframe").getAttribute("style"),"height: 30px; max-height: 30px; width: 240px; border: 0px;");
 
     await page.evaluate(()=>__update({layoutRepair:true}));
@@ -460,10 +482,6 @@ test("small cross-origin announcements resize by measured demand and restore", a
       frame.style.cssText="height:30px;max-height:30px;width:240px;border:0";
       document.body.prepend(frame);
       globalThis.__frameRequests=[];
-      window.addEventListener("message",event=>{
-        if(event.source===frame.contentWindow && event.data?.type==="lexend-measured-frame-height" && event.data.requirement)
-          __frameRequests.push(event.data.requirement.requiredHeight);
-      });
     });
     const centeredChild=await centeredNavigation;
     await install(centeredChild);

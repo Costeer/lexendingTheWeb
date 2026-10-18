@@ -44,9 +44,7 @@
         if (!api.validHostname(operation.hostname)) throw api.settingsError("INVALID_RULE", "This page cannot have a site rule.");
         return api.toggleSite(settings, operation.hostname);
       case "replace":
-        if (Object.hasOwn(operation, "expected") && !api.settingsEqual(settings, requireSnapshot(operation.expected))) {
-          throw api.settingsError("STALE_IMPORT", "Settings changed after this preview. Preview the file again before replacing them.");
-        }
+        if (Object.hasOwn(operation, "expected")) requireSnapshot(operation.expected);
         api.validateImport({ schemaVersion: 3, settings: operation.settings });
         return api.validateCapacity(requireSnapshot(operation.settings));
       case "undoImport":

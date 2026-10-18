@@ -3,9 +3,9 @@ import test from "node:test";
 import { assertBrowserVersion, parseBrowserProofOptions } from "../scripts/browser-proof-options.mjs";
 
 test("installed browser CLI retains stable defaults and explicit minimum-engine/custom-module intent", () => {
-  assert.deepEqual(parseBrowserProofOptions(["chrome"]), { browserName: "chrome", requestedBrowserVersion: "stable", output: undefined, checks: undefined, checksOnly: false, negativeBridgeWorld: false });
+  assert.deepEqual(parseBrowserProofOptions(["chrome"]), { browserName: "chrome", requestedBrowserVersion: "stable", output: undefined, checks: undefined, negativeBridgeWorld: false });
   assert.deepEqual(parseBrowserProofOptions(["firefox", "--browser-version", "140", "--output", "/tmp/evidence", "--checks", "scripts/runtime-lifecycle-checks.mjs"]), {
-    browserName: "firefox", requestedBrowserVersion: "140", output: "/tmp/evidence", checks: "scripts/runtime-lifecycle-checks.mjs", checksOnly: false, negativeBridgeWorld: false
+    browserName: "firefox", requestedBrowserVersion: "140", output: "/tmp/evidence", checks: "scripts/runtime-lifecycle-checks.mjs", negativeBridgeWorld: false
   });
   assert.equal(parseBrowserProofOptions(["chrome", "--negative-bridge-world"]).negativeBridgeWorld, true);
 });
@@ -18,7 +18,7 @@ test("installed browser CLI rejects malformed, missing, duplicate and unknown ar
     ["chrome", "--browser-version", "stable", "--browser-version", "140"],
     ["chrome", "--checks"], ["chrome", "--checks", "   "], ["chrome", "--checks", "--output", "/tmp/evidence"],
     ["chrome", "--output", "relative/path"], ["chrome", "--output", "/tmp/one", "--output", "/tmp/two"],
-    ["chrome", "--checks-only"], ["chrome", "--negative-bridge-world", "--negative-bridge-world"],
+    ["chrome", "--checks-only"], ["chrome", "--checks", "diagnostic.mjs", "--checks-only"], ["chrome", "--negative-bridge-world", "--negative-bridge-world"],
     ["chrome", "--checks", "diagnostic.mjs", "--checks-only", "--negative-bridge-world"]
   ]) assert.throws(() => parseBrowserProofOptions(args), Error, JSON.stringify(args));
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
+import { createMemoryStorage, mutationResponse } from "./helpers/memory-storage.js";
 import "../src/settings.js";
 import "../src/preferences.js";
 import "../src/save-recovery.js";
@@ -26,17 +27,13 @@ async function openPopup({ initial = {}, getSettings, failWrite = false, state, 
   custom.value = "custom";
   custom.dataset.custom = "true";
   spacing.push(custom);
-  let stored = structuredClone(initial);
-  let listener;
-  const writes = [];
-  const storage = {
-    async get() { return getSettings ? getSettings() : stored; },
+  const memory = createMemoryStorage(initial);
+  const storage = { ...memory.storage,
+    async get() { return getSettings ? getSettings() : memory.storage.get(); },
     async set(patch) {
       if (failWrite) throw new Error("Storage unavailable");
-      stored = { ...stored, ...patch }; writes.push(patch);
-      listener(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
-    },
-    async remove() {}
+      await memory.storage.set(patch);
+    }
   };
   const store = globalThis.LexendPreferences.createStore(storage);
   const context = {
@@ -44,15 +41,12 @@ async function openPopup({ initial = {}, getSettings, failWrite = false, state, 
       querySelectorAll: (selector) => selector.includes("scope") ? scope : spacing,
       createElement: () => new Element(), createTextNode: (textContent) => ({ textContent }) },
     browser: {
-      storage: { sync: storage, onChanged: { addListener(callback) { listener = callback; } } },
-      runtime: { async sendMessage({ operation }) {
-        try { return { ok: true, settings: await store.mutate(operation) }; }
-        catch (error) { return { ok: false, code: error.code, message: error.message }; }
-      } },
+      storage: { sync: storage, onChanged: memory.onChanged },
+      runtime: { sendMessage: ({ operation }) => mutationResponse(() => store.mutate(operation)) },
       tabs: { async query() { return queryTabs ? queryTabs() : [{ id: 42, url }]; }, async sendMessage() {
         if (state === null) throw new Error("No responder");
         return typeof state === "function" ? state() : state ?? { ready: true, healthy: true, pending: false,
-          hostname: "example.com", ...globalThis.LexendSettings.resolveSite(stored, "example.com") };
+          hostname: "example.com", ...globalThis.LexendSettings.resolveSite(memory.saved(), "example.com") };
       } }
     },
     LexendSaveRecovery: globalThis.LexendSaveRecovery, LexendPreferences: globalThis.LexendPreferences, LexendSettings: globalThis.LexendSettings,
@@ -61,7 +55,7 @@ async function openPopup({ initial = {}, getSettings, failWrite = false, state, 
   };
   runInNewContext(source, context);
   await tick();
-  return { get, writes, scope, spacing, stored: () => globalThis.LexendSettings.decodeSettings(stored) };
+  return { get, writes: memory.writes, scope, spacing, stored: () => globalThis.LexendSettings.decodeSettings(memory.saved()) };
 }
 
 test("popup load failures disable changes and retry the read without writing defaults", async () => {

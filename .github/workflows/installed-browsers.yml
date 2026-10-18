@@ -121,21 +121,34 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-          const path = `${process.env.RUNNER_TEMP}/lexend-browser-tests/results.json`;
+          const directory = `${process.env.RUNNER_TEMP}/lexend-browser-tests`;
           const lines = ['### Installed browser evidence'];
-          if (!existsSync(path)) {
-            lines.push('No browser report was produced; this run does not establish coverage.');
-          } else {
-            const report = JSON.parse(readFileSync(path, 'utf8'));
-            lines.push(`- Result: ${report.status}`);
-            lines.push(`- Browser: ${report.browser?.name ?? report.browserName} ${report.browser?.version ?? 'not started'}`);
-            lines.push(`- Driver: ${report.browser?.driverVersion ?? 'unavailable'}`);
-            lines.push(`- Requested version: ${report.requestedBrowserVersion}`);
-            lines.push(`- ZIP SHA-256: ${report.artifact?.sha256 ?? 'unavailable'}`);
-            lines.push(`- Build source hash: ${report.artifact?.buildIdentity?.sourceHash ?? 'unavailable'}`);
-            for (const check of report.checks ?? []) {
-              if (check.status !== 'passed') lines.push(`- **${check.status}**: ${check.name}: ${check.reason ?? check.error ?? 'See report'}`);
+          for (const [label, path, instrumented] of [
+            ['Exact release artifact', `${directory}/results.json`, false],
+            ['Instrumented shadow discovery and lifecycle', `${directory}/shadow/results.json`, true],
+          ]) {
+            lines.push(`#### ${label}`);
+            if (!existsSync(path)) {
+              lines.push('No report was produced; this experiment does not establish coverage.');
+              continue;
             }
+            let report;
+            try { report = JSON.parse(readFileSync(path, 'utf8')); }
+            catch { lines.push('The report is unreadable; this experiment does not establish coverage.'); continue; }
+            lines.push(`- Result: ${report.status ?? 'unknown (incomplete evidence)'}`);
+            lines.push(`- Run: ${report.runId ?? 'unavailable'}`);
+            lines.push(`- Browser: ${report.browser?.name ?? report.browserName} ${report.browser?.version ?? report.browserVersion ?? 'not started'}`);
+            lines.push(`- Driver: ${report.browser?.driverVersion ?? report.driverVersion ?? 'unavailable'}`);
+            lines.push(`- Requested version: ${report.requestedBrowserVersion}`);
+            lines.push(`- ${instrumented ? 'Instrumented ZIP' : 'Release ZIP'} SHA-256: ${(instrumented ? report.testInstrumentedArchive : report.artifact)?.sha256 ?? 'unavailable'}`);
+            if (instrumented) lines.push(`- Check scope: ${report.checkScope ?? 'unavailable'}`);
+            else lines.push(`- Build source hash: ${report.artifact?.buildIdentity?.sourceHash ?? 'unavailable'}`);
+            if (report.negativeControl) lines.push('- **Negative control:** this run is not release proof.');
+            if (report.error) lines.push(`- Error: ${report.error}`);
+            for (const check of report.checks ?? []) {
+              if (check.status !== 'passed') lines.push(`- **${check.status ?? 'unknown'}**: ${check.name}: ${check.reason ?? check.error ?? 'See report'}`);
+            }
+            for (const failure of report.cleanupErrors ?? []) lines.push(`- **Cleanup failed**: ${failure.operation}: ${failure.error}`);
           }
           appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
           NODE

@@ -990,16 +990,18 @@
       settingsApi.restoreImport(confirmedSettings, undoRecord.before, undoRecord.after)), "undo");
   });
 
-  const finishImport = (draft) => {
-    importSaveStatus = { state: "saved", message: draft.kind === "import" ? "Settings imported" : "Import undone" };
+  const finishImport = (draft, confirmed = true) => {
+    const message = confirmed ? (draft.kind === "import" ? "Settings imported" : "Import undone")
+      : `${draft.kind === "import" ? "Import" : "Undo"} not confirmed; matching settings were observed`;
+    importSaveStatus = { state: "saved", message };
     if (draft.kind === "import") {
       undoRecord = { before: draft.preview.before, after: draft.preview.after };
       importUndo.hidden = false;
-      importUndoMessage.textContent = "Settings imported. Undo restores unchanged imported values and keeps later edits. Undo is available while this settings page stays open.";
+      importUndoMessage.textContent = `${message}. Undo restores unchanged imported values and keeps later edits. Undo is available while this settings page stays open.`;
       undoImportButton.hidden = false;
     } else {
       undoRecord = null;
-      importUndoMessage.textContent = "Import undone. Later changes were kept.";
+      importUndoMessage.textContent = `${message}. Later changes were kept.`;
       undoImportButton.hidden = true;
     }
     importDraft = null;
@@ -1047,7 +1049,7 @@
         // Observe the whole applied state while the request is in flight so
         // a lost reply followed by later edits retains the original recovery.
         // An explicit stale rejection above can never grant this recovery.
-        finishImport(draft);
+        finishImport(draft, false);
       } else {
         // Keep the exact operation and expected snapshot after ambiguous
         // failures; the central writer makes this retry safe.

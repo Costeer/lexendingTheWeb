@@ -1,5 +1,4 @@
 // Reproducible synthetic profile, never an authenticated ChatGPT capture.
-// See docs/performance.md for comparison commands and metric definitions.
 import { chromium } from 'playwright';
 import { readFile, mkdir, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';

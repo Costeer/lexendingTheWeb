@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { test, expect, openInterface, scanAccessibility, assertViewportLayout } from "./fixtures.mjs";
 
 const saved = (page) => page.evaluate(async () => LexendSettings.normalizeSettings(await browser.storage.sync.get(null)));
@@ -7,7 +8,7 @@ const setSettings = (page, settings) => page.evaluate(async (next) => {
 }, settings);
 const importSettings = (page, settings) => page.locator("#import-file").setInputFiles({
   name: "lexend-settings.json", mimeType: "application/json",
-  buffer: Buffer.from(JSON.stringify({ schemaVersion: 2, settings }))
+  buffer: Buffer.from(JSON.stringify({ schemaVersion: 3, settings }))
 });
 
 test("scope-only rules can change matching and inherit each value independently", async ({ page }, testInfo) => {
@@ -83,9 +84,9 @@ test("synced Custom values remain selected through basic and advanced keyboard f
 test("import enumerates replacement, cancellation writes nothing, and undo preserves later intent", async ({ page }, testInfo) => {
   await openInterface(page, "options.html?section=tools-panel");
   const before = await saved(page);
-  const imported = { ...before, textScale: 127, lineHeight: 1.73, letterSpacing: .057, siteRules: [
+  const imported = { ...before, layoutRepair: true, textScale: 127, lineHeight: 1.73, letterSpacing: .057, siteRules: [
     { hostname: "example.com", includeSubdomains: true, enabled: null, scope: "all" },
-    { hostname: "new.example.org", includeSubdomains: false, enabled: false, scope: null }
+    { hostname: "new.example.org", includeSubdomains: false, enabled: false, scope: null, layoutRepair: false }
   ] };
   await importSettings(page, imported);
   await expect(page.locator("#import-preview")).toBeVisible();
@@ -119,6 +120,17 @@ test("import enumerates replacement, cancellation writes nothing, and undo prese
     { hostname: "later.example.org", includeSubdomains: false, enabled: false, scope: null }
   ]));
   expect(restored.siteRules.some((rule) => rule.hostname === "new.example.org")).toBe(false);
+  const requested = page.waitForEvent("download");
+  await page.locator("#export-settings").click();
+  const download = await requested;
+  const path = await download.path();
+  const backup = JSON.parse(await readFile(path, "utf8"));
+  expect(backup.schemaVersion).toBe(3);
+  expect(backup.settings).toEqual(restored);
+  await page.evaluate(async () => browser.storage.sync.set({ layoutRepair: true }));
+  await page.locator("#import-file").setInputFiles(path);
+  await page.locator("#apply-import").click();
+  await expect.poll(() => saved(page)).toEqual(restored);
 });
 
 test("a preview made before a synced edit cannot overwrite that edit", async ({ page }) => {

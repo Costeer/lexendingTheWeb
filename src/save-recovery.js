@@ -13,8 +13,10 @@
       return `rule:${normalized?.hostname ?? rule.hostname}:${Boolean(rule.includeSubdomains)}`;
     };
     const keysFor = (operation) => {
+      if (!["patch", "addRule", "removeRule", "updateRule", "toggleSite", "setSiteLayoutRepair"].includes(operation?.type)) {
+        throw api.settingsError("INVALID_OPERATION", "This operation requires its own recovery flow.");
+      }
       if (operation.type === "patch") return Object.keys(operation.changes);
-      if (operation.type === "replace") return fields;
       if (operation.type === "updateRule") return [ruleKey(operation), ruleKey({
         ...operation, includeSubdomains: operation.changes?.includeSubdomains ?? operation.includeSubdomains
       })];
@@ -36,8 +38,7 @@
           if ([...keys].some((newKey) => overlaps(key, newKey))) entry.keys.delete(key);
         }
         // Toggle and rule operations cannot be split into independent writes.
-        if (!["patch", "replace"].includes(entry.operation.type)
-            && entry.keys.size !== entry.keyCount) entry.keys.clear();
+        if (entry.operation.type !== "patch" && entry.keys.size !== entry.keyCount) entry.keys.clear();
         if (!entry.keys.size && !entry.pending) entries.delete(entry);
       }
     };
@@ -120,15 +121,14 @@
           if (!entries.has(entry) || !entry.keys.size) continue;
           let operation = entry.operation;
           const confirmed = api.normalizeSettings(getConfirmedSettings());
-          if (["patch", "replace"].includes(operation.type)) {
-            const desired = operation.changes ?? operation.settings;
+          if (operation.type === "patch") {
+            const desired = operation.changes;
             for (const key of entry.keys) {
               if (api.settingsEqual(confirmed, { ...confirmed, [key]: desired[key] })) entry.keys.delete(key);
             }
             const changes = Object.fromEntries(Object.entries(desired).filter(([key]) => entry.keys.has(key)));
             const expected = Object.fromEntries([...entry.keys].map((key) => [key, entry.baseline[key]]));
-            if (operation.type === "patch") operation = { type: "patch", changes, expected };
-            else operation = { type: "replace", settings: { ...confirmed, ...changes }, expected: { ...confirmed, ...expected } };
+            operation = { type: "patch", changes, expected };
           } else if (ruleIntentFulfilled(entry, confirmed)) {
             // A write with a lost response or another page already fulfilled
             // the requested state. Replaying a toggle would reverse it.

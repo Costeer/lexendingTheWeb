@@ -5,7 +5,6 @@
   // deliberately does not, because those islands are still saved by the editor.
   const editorSelector = "[contenteditable='true' i],[contenteditable=''],[contenteditable='plaintext-only' i],[role='textbox'][aria-multiline='true'],.CodeMirror,.cm-editor,.monaco-editor,.ace_editor,.code-editor";
   const semanticSelector = "pre,code,kbd,samp,math,svg,[data-lexend-ignore],[role='img']";
-  const parent = (element) => element.parentElement ?? element.getRootNode()?.host ?? null;
   const editorDocument = () => document.designMode?.toLowerCase() === "on";
   const within = (element, selector) => {
     if (editorDocument()) return true;
@@ -15,7 +14,7 @@
     return false;
   };
   const editorOwned = (element) => within(element, editorSelector);
-  globalThis.LexendProtection = Object.freeze({ editorSelector, semanticSelector, parent, editorDocument, editorOwned,
+  globalThis.LexendProtection = Object.freeze({ editorSelector, semanticSelector, editorDocument, editorOwned,
     protected: (element) => within(element, `${semanticSelector},${editorSelector}`) });
   const EPSILON = 2;
   const interactive = (element) => element.matches("button,a[href],[role='button']");

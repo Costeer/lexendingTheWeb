@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createMemoryStorage, mutationResponse } from "./helpers/memory-storage.js";
 import "../src/settings.js";
 import "../src/preferences.js";
 import "../src/save-recovery.js";
@@ -48,29 +49,14 @@ test("multi-field retries retain only fields without newer edits", async () => {
   assert.equal(h.settings().textScale, 130);
 });
 
-test("retrying an import preserves newer scalar edits and rule operations", async () => {
+test("replacement and Undo require dedicated recovery without retiring generic failures", async () => {
   const h = harness();
-  await assert.rejects(h.tracker.mutate({ type: "replace", settings: api.normalizeSettings({ theme: "dark", textScale: 120,
-    siteRules: [{ hostname: "imported.example", enabled: false }] }) }));
-  h.allow();
-  await h.tracker.mutate({ type: "patch", changes: { theme: "light" } });
-  await h.tracker.mutate({ type: "addRule", rule: { hostname: "new.example", enabled: false } });
-  await h.tracker.retry();
-  assert.equal(h.settings().theme, "light");
-  assert.equal(h.settings().textScale, 120);
-  assert.deepEqual(h.settings().siteRules.map((rule) => rule.hostname), ["new.example"]);
-});
-
-test("retrying a failed import does not clear a newer failed field", async () => {
-  const h = harness();
-  await assert.rejects(h.tracker.mutate({ type: "replace", settings: api.normalizeSettings({ textScale: 120 }) }));
   await assert.rejects(h.tracker.mutate({ type: "patch", changes: { theme: "dark" } }));
-  h.allow();
-  await h.tracker.retry();
-  assert.equal(h.settings().theme, "dark");
-  assert.equal(h.settings().textScale, 120);
-  assert.deepEqual(h.operations.at(-1).changes, { theme: "dark" });
-  assert.equal(h.tracker.state.failures.length, 0);
+  for (const type of ["replace", "undoImport"]) {
+    await assert.rejects(h.tracker.mutate({ type }), { code: "INVALID_OPERATION" });
+  }
+  assert.equal(h.operations.length, 1);
+  assert.deepEqual(h.tracker.state.failures[0].keys, ["theme"]);
 });
 
 test("a superseded in-flight failure does not resurrect an obsolete retry", async () => {
@@ -96,7 +82,6 @@ test("retrying an uncertain toggle never reverses a fulfilled target", async () 
   assert.equal(h.tracker.state.failures.length, 0);
 });
 
-
 test("a site toggle does not supersede an unrelated failed global pause", async () => {
   const h = harness();
   await assert.rejects(h.tracker.mutate({ type: "patch", changes: { enabled: false } }));
@@ -117,7 +102,6 @@ test("rule operation supersession uses normalized hostname identity", async () =
   assert.equal(h.settings().siteRules.length, 1);
 });
 
-
 test("already-confirmed rule mutations do not replay after a lost response", async () => {
   for (const type of ["addRule", "removeRule"]) {
     const h = harness();
@@ -131,45 +115,6 @@ test("already-confirmed rule mutations do not replay after a lost response", asy
     assert.equal(h.tracker.state.failures.length, 0);
   }
 });
-
-
-test("retrying a failed import while a newer rule write is pending cannot erase that rule", async () => {
-  let raw = api.normalizeSettings();
-  let confirmed = api.normalizeSettings(raw);
-  let releaseRuleWrite;
-  let first = true;
-  const store = globalThis.LexendPreferences.createStore({
-    get: async () => structuredClone(raw),
-    set: async (patch) => {
-      if (releaseRuleWrite === undefined) await new Promise((resolve) => { releaseRuleWrite = resolve; });
-      raw = { ...raw, ...patch };
-    }
-  });
-  const tracker = globalThis.LexendSaveRecovery.createTracker({ getSettings: () => confirmed,
-    mutate: async (operation) => {
-      if (first) { first = false; throw new Error("Import failed"); }
-      const saved = await store.mutate(operation);
-      confirmed = saved;
-      return saved;
-    } });
-  await assert.rejects(tracker.mutate({ type: "replace", settings: api.normalizeSettings({ textScale: 120,
-    siteRules: [{ hostname: "imported.example", enabled: false }] }) }));
-  const addition = tracker.mutate({ type: "addRule", rule: { hostname: "new.example", enabled: false } });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(typeof releaseRuleWrite, "function");
-  const retry = tracker.retry();
-  releaseRuleWrite();
-  await addition;
-  await retry;
-  assert.deepEqual(api.decodeSettings(raw).siteRules.map((rule) => rule.hostname), ["new.example"]);
-  assert.equal(tracker.state.failures.length, 1, "A stale retry remains visible instead of replacing a newer write");
-  assert.equal(tracker.state.failures[0].error.code, "STALE_IMPORT");
-  await tracker.retry();
-  assert.equal(api.decodeSettings(raw).textScale, 120);
-  assert.deepEqual(api.decodeSettings(raw).siteRules.map((rule) => rule.hostname), ["new.example"]);
-  assert.equal(tracker.state.failures.length, 0);
-});
-
 
 test("a newer confirmed scalar change is never overwritten by an old retry", async () => {
   const h = harness();
@@ -185,19 +130,6 @@ test("a newer confirmed scalar change is never overwritten by an old retry", asy
   assert.equal(h.settings().textScale, 120, "An explicit new edit can intentionally replace the newer value");
   assert.equal(h.tracker.state.failures.length, 0);
 });
-
-test("a newer confirmed import field remains protected across retries", async () => {
-  const h = harness();
-  await assert.rejects(h.tracker.mutate({ type: "replace", settings: api.normalizeSettings({ textScale: 120 }) }));
-  h.remote({ textScale: 130 });
-  h.allow();
-  await h.tracker.retry();
-  assert.equal(h.settings().textScale, 130);
-  assert.equal(h.tracker.state.failures[0].error.code, "STALE_IMPORT");
-  await h.tracker.retry();
-  assert.equal(h.settings().textScale, 130);
-});
-
 
 test("a later global pause cannot fulfil or invert a failed site-pause intent", async () => {
   const h = harness();
@@ -224,28 +156,20 @@ test("a failed rule deletion cannot delete a newer confirmed rule edit", async (
   assert.equal(h.tracker.state.failures[0].error.code, "STALE_SETTINGS");
 });
 
-
-const publicFields = ["enabled", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
+const publicFields = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
 async function directClientHarness(handle) {
-  let raw = api.normalizeSettings();
-  const listeners = [];
+  const memory = createMemoryStorage(api.normalizeSettings());
   const operations = [], writes = [], states = [];
-  const storage = {
-    get: async () => structuredClone(raw),
-    set: async (patch) => {
-      raw = { ...raw, ...structuredClone(patch) };
-      writes.push(api.decodeSettings(raw));
-      const changes = Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }]));
-      listeners.forEach((listener) => listener(changes, "sync"));
-    }
-  };
+  const storage = { ...memory.storage, async set(patch) {
+    await memory.storage.set(patch);
+    writes.push(api.decodeSettings(memory.saved()));
+  } };
   const store = globalThis.LexendPreferences.createStore(storage);
   const client = globalThis.LexendPreferences.createClient({
-    storage: { sync: storage, onChanged: { addListener: (listener) => listeners.push(listener) } },
+    storage: { sync: storage, onChanged: memory.onChanged },
     runtime: { sendMessage: async ({ operation }) => {
       operations.push(structuredClone(operation));
-      try { return { ok: true, settings: await handle(operation, store) }; }
-      catch (error) { return { ok: false, code: error.code ?? "SAVE_FAILED", message: error.message }; }
+      return mutationResponse(() => handle(operation, store));
     } }
   });
   await client.load();
@@ -254,7 +178,7 @@ async function directClientHarness(handle) {
     getConfirmedSettings: () => client.confirmedSettings,
     onChange: (state) => states.push(state)
   });
-  return { client, tracker, operations, writes, states, saved: () => api.decodeSettings(raw) };
+  return { client, tracker, operations, writes, states, saved: () => api.decodeSettings(memory.saved()) };
 }
 
 test("accepted direct import retires an old failed edit even when the imported value equals its baseline", async () => {

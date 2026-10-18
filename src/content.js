@@ -101,7 +101,6 @@
   let requestedFrameHeight = null;
   const resizedFrames = new Map();
   let lastFrameRequest = null;
-  const FRAME_MESSAGE = "lexend-measured-frame-height";
   const FRAME_RECHECK = "LEXEND_RECHECK_FRAME_REQUIREMENT";
   const FRAME_RUNTIME_RECHECK = "LEXEND_RECHECK_FRAME_REQUIREMENTS";
   const FRAME_RUNTIME_REQUEST = "LEXEND_FRAME_REQUIREMENT";
@@ -114,8 +113,7 @@
     const owned = viewportStyleGuards.get(element)?.hadStyle
       ?? managedElements.get(element)?.hadStyle ?? layout?.getStylePresence(element);
     if (owned !== undefined) return owned;
-    for (const [frame, state] of resizedFrames) {
-      if (frame === element) return state.hadStyle;
+    for (const state of resizedFrames.values()) {
       if (state.elements.has(element)) return state.elements.get(element).hadStyle;
     }
     return element.hasAttribute("style");
@@ -138,15 +136,6 @@
   const restoreFrame = (frame) => {
     const state = resizedFrames.get(frame);
     if (!state) return;
-    for (const [name, original] of state.properties) {
-      if (frame.style.getPropertyValue(name) !== original.applied
-          || frame.style.getPropertyPriority(name) !== "important") continue;
-      mutateAttribute(frame, "style", () => {
-        if (original.value) frame.style.setProperty(name, original.value, original.priority);
-        else frame.style.removeProperty(name);
-      });
-    }
-    if (!state.hadStyle && !frame.getAttribute("style")) mutateAttribute(frame, "style", () => frame.removeAttribute("style"));
     for (const [element, properties] of state.elements) {
       for (const [name, original] of properties.values) {
         if (element.style.getPropertyValue(name) !== original.applied || element.style.getPropertyPriority(name) !== "important") continue;
@@ -177,11 +166,10 @@
     extension.runtime.sendMessage({ type: FRAME_RUNTIME_REQUEST, requirement }).catch(() => {});
   };
   const frameTouchesEditor = (frame, state = resizedFrames.get(frame)) => {
-    if (protection.editorOwned(frame)) return true;
     // A measured frame can own clipping ancestors and independent fixed action
     // bars. Any of those entering an editor invalidates the whole repair group;
     // restore with the same author-override checks used for pause/removal.
-    for (const element of state?.elements.keys() ?? []) if (protection.editorOwned(element)) return true;
+    for (const element of state?.elements.keys() ?? [frame]) if (protection.editorOwned(element)) return true;
     return false;
   };
   const applyFrameRequirement = (frame, requirement) => {
@@ -223,7 +211,7 @@
     disconnectObserver();
     try {
       if (!state) {
-        state = { hadStyle: getStylePresence(frame), properties: new Map(), elements: new Map() };
+        state = { elements: new Map([[frame, { hadStyle: getStylePresence(frame), values: new Map() }]]) };
         resizedFrames.set(frame, state);
       }
       const shortAncestors = [];
@@ -239,16 +227,7 @@
       const borderBoxExtra = css.boxSizing === "border-box"
         ? [css.borderTopWidth, css.borderBottomWidth, css.paddingTop, css.paddingBottom].reduce((total, value) => total + (parseFloat(value) || 0), 0) : 0;
       for (const [name, value] of [["height", `${Math.ceil(requiredHeight + borderBoxExtra)}px`], ["max-height", "none"]]) {
-        let original = state.properties.get(name);
-        if (!original) {
-          original = { value: frame.style.getPropertyValue(name), priority: frame.style.getPropertyPriority(name) };
-          state.properties.set(name, original);
-        } else if (frame.style.getPropertyValue(name) !== original.applied) {
-          original.value = frame.style.getPropertyValue(name);
-          original.priority = frame.style.getPropertyPriority(name);
-        }
-        original.applied = value;
-        if (frame.style.getPropertyValue(name) !== value || frame.style.getPropertyPriority(name) !== "important") mutateAttribute(frame, "style", () => frame.style.setProperty(name, value, "important"));
+        writeFrameProperty(state, frame, name, value);
       }
       for (const parent of shortAncestors) {
         const frameBox = frame.getBoundingClientRect(), parentBox = parent.element.getBoundingClientRect();
@@ -269,11 +248,6 @@
         }
       }
     } finally { if (!refreshing) observeRoots(); }
-  };
-  const receiveFrameRequirement = (event) => {
-    if (event.data?.type !== FRAME_MESSAGE || !event.source) return;
-    const frame = [...document.querySelectorAll("iframe")].find((candidate) => candidate.contentWindow === event.source);
-    if (frame) applyFrameRequirement(frame, event.data.requirement);
   };
   const isBackgroundSender = (sender) => {
     if (sender?.id !== extension.runtime.id) return false;
@@ -1419,8 +1393,9 @@
         // close-state mutations, even when typography remains enabled.
         if (hidden) restoreFrame(frame);
       }
-      layout?.restore({ preserveHidden: isLayoutRepairActive() && preserveHidden });
-      if (!isLayoutRepairActive()) layout?.dispose();
+      const layoutRetained = isLayoutRepairActive() && !protection.editorDocument();
+      if (layoutRetained) layout?.restore({ preserveHidden });
+      else layout?.dispose();
       recoverClonedTypography(new Set([document.documentElement, ...styledRoots]));
       clearTypography();
       knownEditorBoundaries = new WeakSet();
@@ -1430,7 +1405,7 @@
         styledRoots.delete(root);
       }
       if (!isActive() || protection.editorDocument()) {
-        layout?.dispose();
+        if (layoutRetained) layout?.dispose();
         for (const root of styledRoots) for (const id of ownStyleIds) root.querySelector(`#${id}`)?.remove();
         styledRoots.clear(); knownAutoContent.clear();
         return;
@@ -1626,13 +1601,12 @@
         const anchor = change.properties.get("overflow-anchor");
         if (anchor) { guard.value = anchor.value; guard.priority = anchor.priority; }
       }
-      for (const [frame, state] of resizedFrames) {
-        const properties = frame === element ? state.properties : state.elements.get(element)?.values;
-        const owner = frame === element ? state : state.elements.get(element);
+      for (const state of resizedFrames.values()) {
+        const owner = state.elements.get(element);
         if (!owner) continue;
         owner.hadStyle = change.stylePresent;
         for (const [name, value] of change.properties) {
-          const property = properties.get(name);
+          const property = owner.values.get(name);
           if (property) { property.value = value.value; property.priority = value.priority; }
         }
       }
@@ -2046,7 +2020,6 @@
       queueRefresh();
     }, true);
     window.addEventListener("resize", invalidateAutoContent, { passive: true });
-    window.addEventListener("message", receiveFrameRequirement);
     document.addEventListener("focusin", (event) => {
       if (!isActive() || protection.editorOwned(event.target)) return;
       queueRefresh();

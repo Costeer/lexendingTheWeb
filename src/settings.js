@@ -361,7 +361,6 @@
       active: settings.enabled && siteEnabled,
       siteEnabled,
       layoutRepair: settings.layoutRepair || layoutRepairRule?.layoutRepair === true,
-      siteLayoutRepair: layoutRepairRule?.layoutRepair ?? false,
       layoutRepairRule,
       scope: scopeRule?.scope ?? settings.scope,
       enabledRule: enabledRule ?? null,

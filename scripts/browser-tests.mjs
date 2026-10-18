@@ -2,155 +2,103 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { arch, platform, release, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { Builder, By, Key, Select } from "selenium-webdriver";
-import chrome from "selenium-webdriver/chrome.js";
-import firefox from "selenium-webdriver/firefox.js";
+import { By, Key, Select } from "selenium-webdriver";
 import { unzipSync } from "fflate";
 import { assertBrowserVersion, isPersistedRestoration, parseBrowserArguments } from "./browser-evidence.mjs";
 import { installTemporaryFirefoxAddon } from "./firefox-installation.mjs";
+import { createBrowserCalls, createBrowserDriver, findExtensionOrigin } from "./browser-session.mjs";
+import { captureBrowserFailure, finishBrowserRun, startBrowserReport } from "./browser-run.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { browserName, browserVersion, output } = parseBrowserArguments(process.argv.slice(2));
 const headlessFirefox = browserName === "firefox" && process.env.MOZ_HEADLESS === "1";
-const fixture = await readFile(join(root, "scripts/fixtures/compatibility.html"), "utf8");
-const historyFixture = await readFile(join(root, "scripts/fixtures/history.html"), "utf8");
-const oldRuleFixtureBytes = await readFile(join(root, "scripts/fixtures/rule-format-v0.5.0.json"));
-const oldRuleFixture = JSON.parse(oldRuleFixtureBytes);
-assert.equal(oldRuleFixture.revision, "f2670e24aa210b80f6baedfcf09d22a5dd91e640");
-const historicalRuleHashes = {
-  "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
-  "src/preferences.js": "c75df627491bf9ef18e78e7e0276e2ea807cd2da9ed74f4732784f783ff1cb65"
-};
-assert.deepEqual(Object.keys(oldRuleFixture.files).sort(), Object.keys(historicalRuleHashes).sort());
-const oldRuleSources = Object.fromEntries(Object.entries(oldRuleFixture.files).map(([path, file]) => {
-  assert.equal(file.sha256, historicalRuleHashes[path], `Historical rule fixture identity differs: ${path}`);
-  assert.equal(createHash("sha256").update(file.source).digest("hex"), historicalRuleHashes[path], `Historical rule fixture differs: ${path}`);
-  return [path, file.source];
-}));
-// Compile in Node, then send the function body as ordinary WebDriver script.
-// The installed extension page does not need unsafe-eval permission.
-const historicalRuleFactory = new Function("globalThis", oldRuleSources["src/settings.js"] + "\n"
-  + oldRuleSources["src/preferences.js"]
-  + "\nreturn { settings: globalThis.LexendSettings, preferences: globalThis.LexendPreferences };").toString();
-const frameFixture = '<!doctype html><style>html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}</style><p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
-const repairFrameFixture = '<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>';
-const server = createServer((request, response) => {
-  response.setHeader("Content-Type", "text/html; charset=utf-8");
-  response.end(request.url === "/frame" ? frameFixture : request.url === "/repair-caption" ? repairFrameFixture : request.url.startsWith("/history-") ? historyFixture : fixture);
-});
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
 const artifactDirectory = output ?? join(root, "dist/browser-tests", `${browserName}-${browserVersion}`);
-await mkdir(artifactDirectory, { recursive: true });
-const profile = await mkdtemp(join(tmpdir(), "lexend-browser-tests-"));
-const extensionDirectory = join(profile, "extension");
-const { version } = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-const archive = join(root, "dist/releases", `lexend-the-web-${browserName}-v${version}.zip`);
-let driver;
+let driver, profile, server, runError;
 const checks = [];
 const report = {
   schemaVersion: 1, browserName, requestedBrowserVersion: browserVersion,
-  startedAt: new Date().toISOString(), status: "running", installedExtension: false,
+  installedExtension: false,
   environment: { node: process.version, platform: platform(), release: release(), arch: arch(),
     headlessFirefox, firefoxPointerPreset: headlessFirefox ? "fine-hover" : null },
   browser: null, artifact: null, checks,
   limitations: ["No Android add-on surface is exercised by this desktop command.", "Keyboard and layout checks are not manual screen-reader verification."]
 };
-const saveReport = () => writeFile(join(artifactDirectory, "results.json"), JSON.stringify(report, null, 2));
-const unsupported = async (name, reason, evidence) => {
-  checks.push({ name, status: "unsupported", reason, evidence });
-  console.log(`UNSUPPORTED ${browserName}: ${name}: ${reason}`);
-  await saveReport();
-};
-const check = async (name, run) => {
-  const started = performance.now();
-  try {
-    const evidence = await run();
-    checks.push({ name, status: "passed", durationMs: performance.now() - started, ...(evidence === undefined ? {} : { evidence }) });
-    console.log(`PASS ${browserName}: ${name}`);
-  } catch (error) {
-    checks.push({ name, status: "failed", durationMs: performance.now() - started, error: String(error.stack ?? error) });
-    throw error;
-  } finally { await saveReport(); }
-};
-const wait = (expression, description) => driver.wait(() => driver.executeScript(`return (${expression});`), 15000, description, 100);
-const script = (fn, ...args) => driver.executeScript(typeof fn === "string" ? `return (${fn});` : fn, ...args);
-const navigateExtension = async (url) => {
-  if (browserName === "firefox") {
-    // WebDriver intentionally disallows privileged URL navigation from content
-    // context. Open our page through browser chrome in this isolated profile.
-    await driver.setContext(firefox.Context.CHROME);
-    try {
-      await driver.executeScript(function (url) {
-        window.gBrowser.selectedBrowser.loadURI(Services.io.newURI(url), {
-          triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
-        });
-      }, url);
-    } finally {
-      await driver.setContext(firefox.Context.CONTENT);
-    }
-    await wait(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete'`, "Extension page opens");
-  } else await driver.get(url);
-};
-const extensionCall = async (fn, ...args) => {
-  const result = await driver.executeAsyncScript(`
-    const done = arguments[arguments.length - 1];
-    Promise.resolve().then(() => (${fn.toString()})(...Array.from(arguments).slice(0, -1))).then(
-      value => done({ value }), error => done({ error: String(error) })
-    );
-  `, ...args);
-  if (result.error) throw new Error(result.error);
-  return result.value;
-};
-const historicalRuleCall = (fn, ...args) => extensionCall(`async (...args) => {
-  const old = (${historicalRuleFactory})({});
-  return (${fn.toString()})(old, ...args);
-}`, ...args);
-const patch = (changes) => extensionCall(async (changes) => {
-  const api = globalThis.browser ?? globalThis.chrome;
-  const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: { type: "patch", changes } });
-  if (!result.ok) throw new Error(result.message);
-  return result.settings;
-}, changes);
-const saved = () => extensionCall(async () => LexendSettings.decodeSettings(
-  await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null)
-));
-const measurements = () => script(() => Object.fromEntries(["rem", "nested", "fixed", "ignored-text", "code", "svg-text", "layout"].map((id) => {
-  const style = getComputedStyle(document.getElementById(id));
-  return [id, { size: parseFloat(style.fontSize), family: style.fontFamily, padding: parseFloat(style.paddingTop) }];
-})));
-
-const createDriver = () => {
-  const builder = new Builder().forBrowser(browserName);
-  if (browserName === "chrome") {
-    const options = new chrome.Options().setBrowserVersion(browserVersion).addArguments(
-      "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,900",
-      `--user-data-dir=${join(profile, "chrome-profile")}`, `--disable-extensions-except=${extensionDirectory}`, `--load-extension=${extensionDirectory}`
-    );
-    builder.setChromeOptions(options);
-  } else {
-    const options = new firefox.Options().setBrowserVersion(browserVersion);
-    // This desktop suite requires a mouse. Headless Linux Firefox otherwise
-    // reports no pointer, selecting touch layouts even at desktop widths.
-    // Record the emulated input preset above; keep every interaction/assertion.
-    if (headlessFirefox) options.setPreference("ui.primaryPointerCapabilities", 6)
-      .setPreference("ui.allPointerCapabilities", 6);
-    builder.setFirefoxOptions(options);
-    builder.setFirefoxService(new firefox.ServiceBuilder().addArguments("--allow-system-access"));
-  }
-  return builder.build();
-};
+const saveReport = await startBrowserReport(artifactDirectory, report);
 
 try {
-  // Selenium Manager resolves the requested browser and its matching driver. Chrome for
-  // Testing retains unpacked-extension loading support; ordinary Chrome does not.
-  process.env.SE_FORCE_BROWSER_DOWNLOAD ??= "true";
-  process.env.SE_AVOID_STATS ??= "true";
+  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/browser-proof-options.mjs", "scripts/browser-session.mjs", "scripts/browser-run.mjs", "scripts/firefox-installation.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html", "scripts/fixtures/rule-format-v0.5.0.json"].map(async (path) =>
+    [path, createHash("sha256").update(await readFile(join(root, path))).digest("hex")])));
+  const fixture = await readFile(join(root, "scripts/fixtures/compatibility.html"), "utf8");
+  const historyFixture = await readFile(join(root, "scripts/fixtures/history.html"), "utf8");
+  const oldRuleFixtureBytes = await readFile(join(root, "scripts/fixtures/rule-format-v0.5.0.json"));
+  const oldRuleFixture = JSON.parse(oldRuleFixtureBytes);
+  assert.equal(oldRuleFixture.revision, "f2670e24aa210b80f6baedfcf09d22a5dd91e640");
+  const historicalRuleHashes = {
+    "src/settings.js": "c272dc5e054fb24f8aa388df822891d386086fea79c73e14ad5b6acd01916a9b",
+    "src/preferences.js": "c75df627491bf9ef18e78e7e0276e2ea807cd2da9ed74f4732784f783ff1cb65"
+  };
+  assert.deepEqual(Object.keys(oldRuleFixture.files).sort(), Object.keys(historicalRuleHashes).sort());
+  const oldRuleSources = Object.fromEntries(Object.entries(oldRuleFixture.files).map(([path, file]) => {
+    assert.equal(file.sha256, historicalRuleHashes[path], `Historical rule fixture identity differs: ${path}`);
+    assert.equal(createHash("sha256").update(file.source).digest("hex"), historicalRuleHashes[path], `Historical rule fixture differs: ${path}`);
+    return [path, file.source];
+  }));
+  // Compile in Node, then send the function body as ordinary WebDriver script.
+  // The installed extension page does not need unsafe-eval permission.
+  const historicalRuleFactory = new Function("globalThis", oldRuleSources["src/settings.js"] + "\n"
+    + oldRuleSources["src/preferences.js"]
+    + "\nreturn { settings: globalThis.LexendSettings, preferences: globalThis.LexendPreferences };").toString();
+  const frameFixture = '<!doctype html><style>html{font-size:18px}body{font-family:Georgia,serif}p{font-size:1rem}</style><p id="frame-text" style="letter-spacing: 0.02em;">Frame text</p>';
+  const repairFrameFixture = '<!doctype html><style>html,body{height:100%}body{margin:0;font:12px/14px Arial;display:flex;align-items:center}span{display:inline-block;width:160px}button{position:absolute;right:0;top:50%;transform:translateY(-50%);font:12px Arial}</style><span>Readable bonus announcement</span><button>Close</button>';
+  server = createServer((request, response) => {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(request.url === "/frame" ? frameFixture : request.url === "/repair-caption" ? repairFrameFixture : request.url.startsWith("/history-") ? historyFixture : fixture);
+  });
+  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+  const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
+  profile = await mkdtemp(join(tmpdir(), "lexend-browser-tests-"));
+  const extensionDirectory = join(profile, "extension");
+  const { version } = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+  const archive = join(root, "dist/releases", `lexend-the-web-${browserName}-v${version}.zip`);
+  const unsupported = async (name, reason, evidence) => {
+    checks.push({ name, status: "unsupported", reason, evidence });
+    console.log(`UNSUPPORTED ${browserName}: ${name}: ${reason}`);
+    await saveReport();
+  };
+  const check = async (name, run) => {
+    const started = performance.now();
+    try {
+      const evidence = await run();
+      checks.push({ name, status: "passed", durationMs: performance.now() - started, ...(evidence === undefined ? {} : { evidence }) });
+      console.log(`PASS ${browserName}: ${name}`);
+    } catch (error) {
+      checks.push({ name, status: "failed", durationMs: performance.now() - started, error: String(error.stack ?? error) });
+      await saveReport().catch(() => {});
+      throw error;
+    }
+    await saveReport();
+  };
+  const { script, wait, extensionCall, navigateExtension, mutate } = createBrowserCalls(() => driver, browserName);
+  const historicalRuleCall = (fn, ...args) => extensionCall(`async (...args) => {
+    const old = (${historicalRuleFactory})({});
+    return (${fn.toString()})(old, ...args);
+  }`, ...args);
+  const patch = (changes) => mutate({ type: "patch", changes });
+  const saved = () => extensionCall(async () => LexendSettings.decodeSettings(
+    await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null)
+  ));
+  const measurements = () => script(() => Object.fromEntries(["rem", "nested", "fixed", "ignored-text", "code", "svg-text", "layout"].map((id) => {
+    const style = getComputedStyle(document.getElementById(id));
+    return [id, { size: parseFloat(style.fontSize), family: style.fontFamily, padding: parseFloat(style.paddingTop) }];
+  })));
+
+  const createDriver = () => createBrowserDriver({ browserName, browserVersion, profile, extensionDirectory, headlessFirefox });
+
   const git = async (...args) => (await promisify(execFile)("git", args, {
     cwd: root, timeout: 5000, killSignal: "SIGKILL", maxBuffer: 256 * 1024
   })).stdout.trim();
@@ -168,7 +116,7 @@ try {
   // Checkout identity describes the harness run. Packaged build identity and
   // archive hash below describe the extension actually installed.
   const archiveBytes = await readFile(archive);
-  const retainedArchive = join(artifactDirectory, basename(archive));
+  const retainedArchive = join(artifactDirectory, `${report.runId}-${basename(archive)}`);
   await writeFile(retainedArchive, archiveBytes);
   const files = unzipSync(archiveBytes);
   const manifest = JSON.parse(Buffer.from(files["manifest.json"]).toString("utf8"));
@@ -176,8 +124,6 @@ try {
     path: archive, retainedPath: retainedArchive, sha256: createHash("sha256").update(archiveBytes).digest("hex"), manifest,
     buildIdentity: files["build-identity.json"] ? JSON.parse(Buffer.from(files["build-identity.json"]).toString("utf8")) : null
   };
-  report.harness = Object.fromEntries(await Promise.all(["scripts/browser-tests.mjs", "scripts/browser-evidence.mjs", "scripts/firefox-installation.mjs", "scripts/fixtures/compatibility.html", "scripts/fixtures/history.html", "scripts/fixtures/rule-format-v0.5.0.json"].map(async (path) =>
-    [path, createHash("sha256").update(await readFile(join(root, path))).digest("hex")])));
   report.environment.selenium = JSON.parse(await readFile(join(root, "node_modules/selenium-webdriver/package.json"), "utf8")).version;
   if (browserName === "chrome") {
     // Exercise the release artifact rather than assuming the unpackaged build
@@ -216,13 +162,7 @@ try {
   await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend for the Web')", "Installed content script must style the fixture");
   report.installedExtension = true;
   const websiteTab = await driver.getWindowHandle();
-  const origin = await script(() => {
-    const css = [...document.querySelectorAll("style")].map((style) => style.textContent);
-    for (const sheet of document.adoptedStyleSheets) {
-      try { css.push([...sheet.cssRules].map((rule) => rule.cssText).join("\n")); } catch {}
-    }
-    return css.join("\n").match(/(?:chrome|moz)-extension:\/\/[^/"\s]+\//)?.[0];
-  });
+  const origin = await findExtensionOrigin(script);
   assert(origin, "Installed font URLs identify the extension's real origin");
   await driver.switchTo().newWindow("tab");
   const optionsTab = await driver.getWindowHandle();
@@ -249,13 +189,7 @@ try {
       const current = await state();
       return current?.ready && current.healthy && current.active && !current.pending && current.layoutRepair === expected;
     }, 15000, `Runtime layout repair settles ${expected ? "on" : "off"}`, 100);
-    const rule = (value) => extensionCall(async (value) => {
-      const api = globalThis.browser ?? globalThis.chrome;
-      const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE",
-        operation: { type: "setSiteLayoutRepair", hostname: "127.0.0.1", value } });
-      if (!result.ok) throw new Error(result.message);
-      return result.settings;
-    }, value);
+    const rule = (value) => mutate({ type: "setSiteLayoutRepair", hostname: "127.0.0.1", value });
     const rawRules = () => extensionCall(async () => {
       const raw = await (globalThis.browser ?? globalThis.chrome).storage.sync.get(null);
       return JSON.stringify({ siteRules: raw.siteRules, disabledSites: raw.disabledSites });
@@ -295,12 +229,7 @@ try {
 
   await check("reenabling parent repair renegotiates sizing with the same opted-in cross-origin child", async () => {
     const original = await saved();
-    const childRule = (value) => extensionCall(async (value) => {
-      const api = globalThis.browser ?? globalThis.chrome;
-      const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE",
-        operation: { type: "setSiteLayoutRepair", hostname: "localhost", value } });
-      if (!result.ok) throw new Error(result.message);
-    }, value);
+    const childRule = (value) => mutate({ type: "setSiteLayoutRepair", hostname: "localhost", value });
     await childRule(true);
     await patch({ layoutRepair: true, scope: "all", textScale: 110, lineHeight: 1.6, letterSpacing: 0.02 });
     await driver.switchTo().window(websiteTab);
@@ -494,7 +423,7 @@ try {
       assert.equal(edited.scope, null);
       const backup = { ...original, textScale: 127, lineHeight: 1.73, letterSpacing: .057, siteRules: [] };
       const file = join(profile, "replacement-preview.json");
-      await writeFile(file, JSON.stringify({ schemaVersion: 2, settings: backup }));
+      await writeFile(file, JSON.stringify({ schemaVersion: 3, settings: backup }));
       await driver.findElement(By.css('[data-settings-panel="tools-panel"]')).click();
       await driver.findElement(By.id("import-file")).sendKeys(file);
       await wait("!document.querySelector('#import-preview').hidden", "Replacement preview opens");
@@ -518,7 +447,7 @@ try {
 
   await check("oversized imports explicitly fail and preserve existing rules", async () => {
     const invalid = join(profile, "oversized.json");
-    const payload = { schemaVersion: 2, settings: { ...(await saved()), siteRules: Array.from({ length: 251 }, (_, i) => ({ hostname: `site${i}.example.com`, enabled: false })) } };
+    const payload = { schemaVersion: 3, settings: { ...(await saved()), siteRules: Array.from({ length: 251 }, (_, i) => ({ hostname: `site${i}.example.com`, enabled: false })) } };
     await writeFile(invalid, JSON.stringify(payload));
     await driver.findElement(By.css('[data-settings-panel="tools-panel"]')).click();
     await driver.findElement(By.id("import-file")).sendKeys(invalid);
@@ -955,12 +884,7 @@ try {
 
   if (browserName === "chrome") await check("browser restart preserves custom preferences, site pauses and a working writer", async () => {
     await patch({ theme: "dark", scope: "all", textScale: 127, lineHeight: 1.73, letterSpacing: .057 });
-    await extensionCall(async () => {
-      const result = await chrome.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: {
-        type: "addRule", rule: { hostname: "127.0.0.1", enabled: false, includeSubdomains: false }
-      } });
-      if (!result.ok) throw new Error(result.message);
-    });
+    await mutate({ type: "addRule", rule: { hostname: "127.0.0.1", enabled: false, includeSubdomains: false } });
     const before = await saved();
     await driver.quit();
     driver = await createDriver();
@@ -978,12 +902,7 @@ try {
     assert(!((await measurements()).rem.family.includes("Lexend")), "Saved site pause survives restart");
     assert.equal((await measurements()).rem.size, 20);
     await driver.switchTo().window(restartedOptions);
-    await extensionCall(async () => {
-      const result = await chrome.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: {
-        type: "removeRule", hostname: "127.0.0.1"
-      } });
-      if (!result.ok) throw new Error(result.message);
-    });
+    await mutate({ type: "removeRule", hostname: "127.0.0.1" });
     await driver.switchTo().window(restartedWebsite);
     await wait("Math.abs(parseFloat(getComputedStyle(document.querySelector('#rem')).fontSize) - 25.4) < .03", "Writer and live page updates work after restarting");
   });
@@ -997,23 +916,14 @@ try {
   }
   report.status = "passed";
 } catch (error) {
+  runError = error;
   report.status = "failed";
   report.error = String(error.stack ?? error);
   if (checks.at(-1)?.status !== "failed") {
     checks.push({ name: report.installedExtension ? "installed browser verification" : "browser and artifact setup", status: "failed", error: report.error });
   }
-  if (driver) {
-    await writeFile(join(artifactDirectory, "failure.png"), await driver.takeScreenshot(), "base64").catch(() => {});
-    await writeFile(join(artifactDirectory, "failure.html"), await driver.getPageSource()).catch(() => {});
-  }
-  throw error;
+  await captureBrowserFailure(driver, artifactDirectory);
 } finally {
-  report.finishedAt = new Date().toISOString();
   report.summary = Object.fromEntries(["passed", "unsupported", "failed"].map((status) => [status, checks.filter((check) => check.status === status).length]));
-  await saveReport();
-  try { await driver?.quit(); }
-  finally {
-    await new Promise((resolve) => server.close(resolve));
-    await rm(profile, { recursive: true, force: true });
-  }
+  await finishBrowserRun({ error: runError, report, saveReport, driver, server, profile });
 }

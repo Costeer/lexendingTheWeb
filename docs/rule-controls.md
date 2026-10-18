@@ -5,14 +5,15 @@ explanation names the matching rules that supply enablement and scope; these can
 come from different rules. Turning Lexend off globally pauses every site, even
 when a site rule is enabled.
 
-In Settings → Site rules, open **Edit rule** to change enablement, scope or whether
-the rule includes subdomains. Each value can inherit independently. Removing an
+In Settings → Site rules, open **Edit rule** to change enablement, scope, layout
+repair or whether the rule includes subdomains. Each value can inherit independently. Removing an
 override lets the next matching rule supply that value, or uses the global default
-when no rule supplies it. If both values inherit, the empty rule is removed.
+when no rule supplies it. If all three values inherit, the empty rule is removed.
 Changing matching mode cannot overwrite another saved rule for that identity.
 
 Precedence is unchanged: an exact-host rule wins first, followed by the most
-specific matching hostname. Enablement and scope resolve separately. For example,
+specific matching hostname. Enablement, scope and layout repair resolve separately.
+For example,
 if `example.com` and its subdomains are paused and an exact `news.example.com`
 rule changes only scope, that site remains paused. Enabling the exact rule
 changes enablement while its inherited scope can still come from `example.com`.
@@ -29,7 +30,7 @@ Applying an import also replaces earlier unsaved intentions for every imported
 preference, including values the backup keeps unchanged. An older failed save
 cannot reappear through the ordinary Retry control after Apply.
 
-After a successful import, **Undo import** is available while that Settings page
+After a confirmed import, **Undo import** is available while that Settings page
 remains open. It restores imported changes only where the imported value is
 still present, preserving later edits to other settings and rules. A changed
 existing rule is recovered field by field; newly imported rules are removed only
@@ -45,24 +46,21 @@ their own preview's Apply control.
 Recovery compares normalized values, not a durable edit history. An external
 change away from an imported value and then back to that identical value cannot
 be distinguished from an unchanged value. After an uncertain connection failure,
-observing the imported values keeps the original recovery available even if an
-unrelated edit follows. Identical concurrent writes cannot be attributed to a
-particular writer without durable receipts. Closing the Settings page discards
-its undo snapshot. Export a backup when recovery must remain available later.
+if current settings match the file, Settings labels the import as unconfirmed
+and keeps conditional recovery available even if an unrelated edit follows.
+Matching values cannot establish which writer saved them. Closing the Settings
+page discards its undo snapshot. Export a backup when recovery must remain available later.
 
 ## Optional layout repair
 
-Layout repair starts off for existing and new profiles. Font conversion keeps its
-existing activation and scope settings. Save an exact-site repair decision with
-`{ type: "setSiteLayoutRepair", hostname, value: true }`; `false` saves an explicit
-site refusal and `null` clears only that decision. Rules may also include a
-`layoutRepair` boolean and apply it to subdomains. Matching decisions resolve
-independently from activation and scope, with the nearest matching rule winning.
+Layout repair starts off for new and existing profiles. Enable it for the
+current site in the popup, or edit a rule in Settings. Repair decisions inherit
+independently from enablement and scope. A repair-only rule remains meaningful.
 
-The `layoutRepair` preference enables repair on all sites while on. It never
-creates site rules or modifies saved site decisions; switching it off restores
-those decisions. The extension master switch still gates page work. Imports and
-exports use schema 3, while schema 1 and 2 backups without this preference load
-with repair off. Undo restores changed fields only when later edits have not
-claimed them. Diagnostics include only the global repair boolean, never rules
-or hostnames.
+**Enable layout repair on all sites** in Settings temporarily takes precedence
+over saved site repair choices. It does not create or change rules; switching it
+off restores those choices. The master switch still pauses Lexend everywhere.
+See [layout adjustments](adaptive-layout.md) for the effects of repair.
+
+New backups include layout repair choices. Older supported backups without
+these settings import with repair off. Current-format backups must be complete.

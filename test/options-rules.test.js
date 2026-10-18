@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
+import { createMemoryStorage, mutationResponse } from "./helpers/memory-storage.js";
 import "../src/settings.js";
 import "../src/preferences.js";
 import "../src/save-recovery.js";
@@ -49,7 +50,7 @@ class Element {
   focus() { this.focused = true; }
 }
 
-async function openSettings({ count = 6, desktop = false, cachedTheme = "light", initial, getSettings, failWrite, silentWrites = false, beforeOperation, afterWrite, allowErrors = false, sendOperation, confirm = () => true } = {}) {
+async function openSettings({ count = 6, desktop = false, cachedTheme = "light", initial, getSettings, failWrite, silentWrites = false, beforeOperation, afterWrite, allowErrors = false, sendOperation } = {}) {
   const elements = new Map();
   const get = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new Element());
@@ -82,19 +83,16 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   const errors = [];
   const root = { dataset: {} };
   const cache = new Map([["lexend-ui-theme", cachedTheme]]);
-  let stored = initial ?? { siteRules: Array.from({ length: count }, (_, index) => ({
+  const memory = createMemoryStorage(initial ?? { siteRules: Array.from({ length: count }, (_, index) => ({
     hostname: `site${index + 1}.example.com`, includeSubdomains: false, enabled: false
-  })) };
-  let changeListener;
-  const storage = {
-    async get() { return getSettings ? getSettings(stored) : stored; },
+  })) }, { silentWrites });
+  const storage = { ...memory.storage,
+    async get() { return getSettings ? getSettings(memory.saved()) : memory.storage.get(); },
     async set(patch) {
       if (failWrite?.()) throw new Error("Storage unavailable");
-      stored = { ...stored, ...patch };
-      writes.push(globalThis.LexendSettings.decodeSettings(stored));
-      if (!silentWrites) changeListener?.(Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { newValue }])), "sync");
-    },
-    async remove() {}
+      await memory.storage.set(patch);
+      writes.push(globalThis.LexendSettings.decodeSettings(memory.saved()));
+    }
   };
   const store = globalThis.LexendPreferences.createStore(storage);
   const context = {
@@ -116,19 +114,16 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
     LexendSettings: globalThis.LexendSettings,
     LexendPreferences: globalThis.LexendPreferences,
     LexendSaveRecovery: globalThis.LexendSaveRecovery,
-    window: { confirm },
-    setTimeout: () => 0, clearTimeout() {},
     LexendQuotes: { random: () => ({ text: "Preview", author: "Author", lang: "en", url: "https://example.com" }) },
     browser: {
       runtime: { async sendMessage({ operation }) {
         await beforeOperation?.(operation, storage);
-        let settings;
-        try { settings = await (sendOperation ? sendOperation(operation, store) : store.mutate(operation)); }
-        catch (error) { return { ok: false, code: error.code, message: error.message }; }
+        const result = await mutationResponse(() => sendOperation ? sendOperation(operation, store) : store.mutate(operation));
+        if (!result.ok) return result;
         const response = await afterWrite?.(operation, storage);
-        return response ?? { ok: true, settings };
+        return response ?? result;
       } },
-      storage: { sync: storage, onChanged: { addListener(listener) { changeListener = listener; } } }
+      storage: { sync: storage, onChanged: memory.onChanged }
     },
     matchMedia: (query) => query.includes("min-width") ? media : { matches: false },
     location: { search: "" },
@@ -144,16 +139,13 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
   if (!allowErrors) assert.deepEqual(errors, []);
   return {
     get, writes, panels, navigation, root, cache, inputs,
-    stored: () => globalThis.LexendSettings.decodeSettings(stored),
-    rawStored: () => stored,
+    stored: () => globalThis.LexendSettings.decodeSettings(memory.saved()),
+    rawStored: memory.saved,
     async import(settings) {
-      get("#import-file").files = [{ size: 500, async text() { return JSON.stringify({ schemaVersion: 2, settings: globalThis.LexendSettings.normalizeSettings(settings) }); } }];
+      get("#import-file").files = [{ size: 500, async text() { return JSON.stringify({ schemaVersion: 3, settings: globalThis.LexendSettings.normalizeSettings(settings) }); } }];
       await get("#import-file").emit("change");
     },
-    change(changes) {
-      stored = { ...stored, ...Object.fromEntries(Object.entries(changes).map(([key, change]) => [key, change.newValue])) };
-      changeListener(changes, "sync");
-    },
+    change: memory.change,
     rows: () => get("#rule-list").children,
     resize(desktopMode) { media.matches = desktopMode; media.listener(); }
   };
@@ -759,7 +751,7 @@ for (const changedOverride of [{ enabled: true }, { scope: "all" }, { includeSub
 
 test("import replacement is disclosed and cancelling leaves settings untouched", async () => {
   const page = await openSettings();
-  page.get("#import-file").files = [{ size: 200, text: async () => JSON.stringify({ schemaVersion: 2,
+  page.get("#import-file").files = [{ size: 200, text: async () => JSON.stringify({ schemaVersion: 3,
     settings: globalThis.LexendSettings.normalizeSettings({ theme: "dark" }) }) }];
   await page.get("#import-file").emit("change");
   assert.equal(page.get("#import-preview").hidden, false);
@@ -770,30 +762,34 @@ test("import replacement is disclosed and cancelling leaves settings untouched",
   assert.equal(page.get("#dark-theme").checked, false);
 });
 
-test("invalid partial imports never reach confirmation or the writer", async () => {
-  let prompts = 0;
-  const page = await openSettings({ confirm: () => { prompts++; return true; } });
+test("invalid partial imports never open a preview or reach the writer", async () => {
+  const page = await openSettings();
   for (const settings of [{}, { theme: "dark" }]) {
-    page.get("#import-file").files = [{ size: 100, text: async () => JSON.stringify({ schemaVersion: 2, settings }) }];
+    page.get("#import-file").files = [{ size: 100, text: async () => JSON.stringify({ schemaVersion: 3, settings }) }];
     await page.get("#import-file").emit("change");
     assert.match(page.get("#import-error").textContent, /missing|complete/i);
   }
-  assert.equal(prompts, 0);
+  assert.notEqual(page.get("#import-preview").hidden, false);
   assert.equal(page.writes.length, 0);
 });
 
-test("supported legacy import also requires reviewed Apply", async () => {
-  const page = await openSettings();
-  page.get("#import-file").files = [{ size: 100, text: async () => JSON.stringify({ schemaVersion: 1,
-    settings: { disabledSites: ["legacy.example"], enabled: false } }) }];
-  await page.get("#import-file").emit("change");
-  assert.equal(page.get("#import-preview").hidden, false);
-  assert.equal(page.writes.length, 0);
-  await page.get("#apply-import").emit("click");
-  assert.equal(page.writes.length, 1);
-  assert.equal(page.writes[0].enabled, false);
-  assert.deepEqual(page.writes[0].siteRules.map((rule) => rule.hostname), ["legacy.example"]);
-});
+for (const schemaVersion of [1, 2]) {
+  test(`schema ${schemaVersion} import also requires reviewed Apply`, async () => {
+    const page = await openSettings();
+    const settings = schemaVersion === 1 ? { disabledSites: ["legacy.example"], enabled: false }
+      : globalThis.LexendSettings.normalizeSettings({ enabled: false, siteRules: [{ hostname: "legacy.example", enabled: false }] });
+    delete settings.layoutRepair;
+    page.get("#import-file").files = [{ size: 200, text: async () => JSON.stringify({ schemaVersion, settings }) }];
+    await page.get("#import-file").emit("change");
+    assert.equal(page.get("#import-preview").hidden, false);
+    assert.equal(page.writes.length, 0);
+    await page.get("#apply-import").emit("click");
+    assert.equal(page.writes.length, 1);
+    assert.equal(page.writes[0].enabled, false);
+    assert.equal(page.writes[0].layoutRepair, false);
+    assert.deepEqual(page.writes[0].siteRules.map((rule) => rule.hostname), ["legacy.example"]);
+  });
+}
 
 test("corrupt synchronized settings expose read recovery instead of a saved status", async () => {
   const page = await openSettings();
@@ -949,9 +945,41 @@ test("a committed import with a lost reply keeps its original recovery snapshot"
   assert.equal(page.stored().textScale, 127);
   assert.equal(page.get("#import-preview").hidden, true);
   assert.equal(page.get("#import-undo").hidden, false);
+  assert.match(page.get("#save-status-text").textContent, /Import not confirmed; matching settings were observed/);
   page.get("#undo-import").emit("click");
   await page.get("#apply-import").emit("click");
   assert.equal(page.stored().textScale, 110);
+});
+
+test("a matching concurrent writer after transport loss offers recovery without confirming this import", async () => {
+  let ownImportWriterCalls = 0;
+  const page = await openSettings({ initial: { textScale: 110 },
+    async beforeOperation(operation, storage) {
+      if (operation.type === "replace") {
+        await storage.set({ textScale: 127 });
+        throw new Error("Transport failed before import reached the writer");
+      }
+    },
+    sendOperation(operation, store) {
+      if (operation.type === "replace") ownImportWriterCalls++;
+      return store.mutate(operation);
+    }
+  });
+  await page.import({ textScale: 127 });
+  await page.get("#apply-import").emit("click");
+  assert.equal(ownImportWriterCalls, 0);
+  assert.equal(page.writes.length, 1, "only the independent writer committed");
+  assert.equal(page.stored().textScale, 127);
+  assert.equal(page.get("#import-preview").hidden, true);
+  assert.equal(page.get("#import-undo").hidden, false);
+  assert.equal(page.get("#save-status-text").textContent, "Import not confirmed; matching settings were observed");
+  assert.match(page.get("#import-undo-message").textContent, /^Import not confirmed; matching settings were observed\. Undo restores unchanged imported values/);
+  page.change({ theme: { newValue: "dark" } });
+  page.get("#undo-import").emit("click");
+  await page.get("#apply-import").emit("click");
+  assert.equal(page.stored().textScale, 110, "the unchanged matching value remains eligible for guarded recovery");
+  assert.equal(page.stored().theme, "dark", "recovery preserves later independent edits");
+  assert.equal(page.writes.length, 2);
 });
 
 test("older asynchronous file reads cannot replace the latest import preview", async () => {
@@ -960,7 +988,7 @@ test("older asynchronous file reads cannot replace the latest import preview", a
   page.get("#import-file").files = [{ size: 200, text: () => new Promise((resolve) => { finishFirst = resolve; }) }];
   const first = page.get("#import-file").emit("change");
   await page.import({ textScale: 127 });
-  finishFirst(JSON.stringify({ schemaVersion: 2, settings: globalThis.LexendSettings.normalizeSettings({ textScale: 139 }) }));
+  finishFirst(JSON.stringify({ schemaVersion: 3, settings: globalThis.LexendSettings.normalizeSettings({ textScale: 139 }) }));
   await first;
   const lines = page.get("#import-preview-list").children.map((item) => item.textContent).join("\n");
   assert.match(lines, /127%/);
@@ -1372,7 +1400,7 @@ test("250 existing compact pauses survive rule editing, complete import and guar
   assert.equal(api.getDirectRule(edited, disabledSites[0], true).scope, "all");
   assert.match(page.rawStored().siteRules, /^@1\n/);
   assert.ok(Buffer.byteLength("siteRules" + JSON.stringify(page.rawStored().siteRules)) <= 8192);
-  const backup = JSON.parse(JSON.stringify({ schemaVersion: 2, settings: edited }));
+  const backup = JSON.parse(JSON.stringify({ schemaVersion: 3, settings: edited }));
   assert.deepEqual(api.validateImport(backup), edited);
   await page.import({ ...edited, theme: "dark", textScale: 127 });
   await page.get("#apply-import").emit("click");

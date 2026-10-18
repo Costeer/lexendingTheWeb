@@ -1,114 +1,108 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { Builder } from "selenium-webdriver";
-import chrome from "selenium-webdriver/chrome.js";
-import firefox from "selenium-webdriver/firefox.js";
-import { zipSync } from "fflate";
 import { assertBrowserVersion, parseBrowserProofOptions } from "./browser-proof-options.mjs";
 import { installTemporaryFirefoxAddon } from "./firefox-installation.mjs";
+import { createBrowserCalls, createBrowserDriver, findExtensionOrigin } from "./browser-session.mjs";
+import { captureBrowserFailure, finishBrowserRun, startBrowserReport } from "./browser-run.mjs";
+import { collectFiles } from "./build-identity.mjs";
+import { createArchive } from "./package-archive.mjs";
 
 // Installed-extension lifecycle proof. Unlike addScriptTag tests, the fixture
 // creates its roots in the page world and the runtime runs in ISOLATED.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const options = parseBrowserProofOptions(process.argv.slice(2));
-const { browserName, requestedBrowserVersion, checksOnly, negativeBridgeWorld } = options;
+const { browserName, requestedBrowserVersion, negativeBridgeWorld } = options;
 const output = options.output ?? join(root, "dist/shadow-browser-tests", browserName);
-await mkdir(output, { recursive: true });
-const profile = await mkdtemp(join(tmpdir(), "lexend-shadow-tests-"));
-const extensionDirectory = join(profile, "extension");
 const checks = [];
-const artifactEvidence = {
-  requestedBrowserVersion,
+const headlessFirefox = browserName === "firefox" && process.env.MOZ_HEADLESS === "1";
+const report = {
+  schemaVersion: 1, browserName, requestedBrowserVersion, installedExtension: false, testOnlyIsolatedProbe: true,
+  environment: { headlessFirefox, firefoxPointerPreset: headlessFirefox ? "fine-hover" : null },
+  checks,
   sourceHashes: {},
-  checkScope: checksOnly ? "custom-only" : "shadow-only",
+  checkScope: options.checks ? "shadow-and-custom" : "shadow-only",
   negativeControl: negativeBridgeWorld ? { kind: "bridge-world", world: "ISOLATED", releaseProof: false } : null
 };
-let driver;
-let optionsTab;
-let websiteTab;
-let origin;
-const check = async (name, run) => {
-  const evidence = await run();
-  checks.push({ name, evidence: evidence ?? null });
-  console.log(`PASS ${browserName}: ${name}`);
-};
-const script = (fn, ...args) => driver.executeScript(typeof fn === "string" ? `return (${fn});` : fn, ...args);
-const wait = (expression, description) => driver.wait(() => script(expression), 15000, description, 100);
-const delay = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
-const extensionCall = async (fn, ...args) => {
-  const result = await driver.executeAsyncScript(`
-    const done = arguments[arguments.length - 1];
-    Promise.resolve().then(() => (${fn.toString()})(...Array.from(arguments).slice(0, -1))).then(
-      value => done({ value }), error => done({ error: String(error) })
-    );
-  `, ...args);
-  if (result.error) throw new Error(result.error);
-  return result.value;
-};
-const patch = async (changes) => {
-  await driver.switchTo().window(optionsTab);
-  const result = await extensionCall(async (changes) => {
-    const api = globalThis.browser ?? globalThis.chrome;
-    const result = await api.runtime.sendMessage({ type: "LEXEND_SETTINGS_MUTATE", operation: { type: "patch", changes } });
-    if (!result.ok) throw new Error(result.message);
-    return result.settings;
-  }, changes);
-  await driver.switchTo().window(websiteTab);
-  return result;
-};
-const probe = (command = "read") => script((command) => {
-  let result;
-  document.addEventListener("lexend-test-probe-response", (event) => { result = JSON.parse(event.detail); }, { once: true });
-  document.dispatchEvent(new CustomEvent("lexend-test-probe-request", { detail: command }));
-  return result;
-}, command);
-const settle = async () => {
-  await script(() => document.fonts.ready);
-  let previous = await probe();
-  for (let attempt = 0; attempt < 40; attempt++) {
-    await delay(150);
-    const next = await probe();
-    if (previous.reads === next.reads && previous.scans === next.scans) {
-      await delay(750);
-      const confirmed = await probe();
-      if (confirmed.reads === next.reads && confirmed.scans === next.scans) return confirmed;
-    }
-    previous = next;
-  }
-  throw new Error("Installed runtime did not settle");
-};
-const fixture = `<!doctype html><meta charset="utf-8"><style>body{font:20px Arial}p{margin:0}</style>
-  <p id="prose">Ordinary initial text</p><div id="host"></div><div id="isolated-host"></div>
-  <div id="paused-host"></div><div id="closed-host"></div><div id="expando-host"></div>
-  <script>window.fixturePageAttach = Element.prototype.attachShadow;</script>`;
-const server = createServer((_request, response) => {
-  response.setHeader("Content-Type", "text/html; charset=utf-8");
-  response.end(fixture);
-});
-await new Promise((done) => server.listen(0, "127.0.0.1", done));
-const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
-
+const saveReport = await startBrowserReport(output, report);
+let driver, profile, server, runError;
 try {
-  const harnessPaths = ["scripts/shadow-browser-tests.mjs", "scripts/browser-proof-options.mjs", "scripts/firefox-installation.mjs"];
+  const harnessPaths = ["scripts/shadow-browser-tests.mjs", "scripts/browser-proof-options.mjs", "scripts/browser-session.mjs", "scripts/browser-run.mjs", "scripts/firefox-installation.mjs", "scripts/build-identity.mjs", "scripts/package-archive.mjs"];
   if (options.checks) harnessPaths.push(relative(root, resolve(options.checks)));
-  artifactEvidence.harnessHashes = Object.fromEntries(await Promise.all(harnessPaths.map(async (path) =>
+  report.harnessHashes = Object.fromEntries(await Promise.all(harnessPaths.map(async (path) =>
     [path, createHash("sha256").update(await readFile(resolve(root, path))).digest("hex")])));
-  artifactEvidence.customChecks = options.checks ? relative(root, resolve(options.checks)) : null;
+  report.customChecks = options.checks ? relative(root, resolve(options.checks)) : null;
+  profile = await mkdtemp(join(tmpdir(), "lexend-shadow-tests-"));
+  const extensionDirectory = join(profile, "extension");
+  let optionsTab;
+  let websiteTab;
+  let origin;
+  const check = async (name, run) => {
+    try {
+      const evidence = await run();
+      checks.push({ name, status: "passed", evidence: evidence ?? null });
+      console.log(`PASS ${browserName}: ${name}`);
+    } catch (error) {
+      checks.push({ name, status: "failed", error: String(error.stack ?? error) });
+      throw error;
+    }
+  };
+  const { script, wait, extensionCall, navigateExtension, mutate } = createBrowserCalls(() => driver, browserName);
+  const delay = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
+  const patch = async (changes) => {
+    await driver.switchTo().window(optionsTab);
+    const result = await mutate({ type: "patch", changes });
+    await driver.switchTo().window(websiteTab);
+    return result;
+  };
+  const probe = (command = "read") => script((command) => {
+    let result;
+    document.addEventListener("lexend-test-probe-response", (event) => { result = JSON.parse(event.detail); }, { once: true });
+    document.dispatchEvent(new CustomEvent("lexend-test-probe-request", { detail: command }));
+    return result;
+  }, command);
+  const settle = async () => {
+    await script(() => document.fonts.ready);
+    let previous = await probe();
+    for (let attempt = 0; attempt < 40; attempt++) {
+      await delay(150);
+      const next = await probe();
+      if (previous.reads === next.reads && previous.scans === next.scans) {
+        await delay(750);
+        const confirmed = await probe();
+        if (confirmed.reads === next.reads && confirmed.scans === next.scans) return confirmed;
+      }
+      previous = next;
+    }
+    throw new Error("Installed runtime did not settle");
+  };
+  const fixture = `<!doctype html><meta charset="utf-8"><style>body{font:20px Arial}p{margin:0}</style>
+    <p id="prose">Ordinary initial text</p><div id="host"></div><div id="isolated-host"></div>
+    <div id="paused-host"></div><div id="closed-host"></div><div id="expando-host"></div>
+    <script>window.fixturePageAttach = Element.prototype.attachShadow;</script>`;
+  server = createServer((_request, response) => {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(fixture);
+  });
+  await new Promise((done, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", done); });
+  const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
+
+  report.fixtureUrl = fixtureUrl;
+
   await cp(join(root, "dist", browserName), extensionDirectory, { recursive: true });
   const builtManifest = await readFile(join(extensionDirectory, "manifest.json"), "utf8");
   const manifest = JSON.parse(builtManifest);
-  artifactEvidence.originalManifestHash = createHash("sha256").update(builtManifest).digest("hex");
+  report.originalManifestHash = createHash("sha256").update(builtManifest).digest("hex");
   const productionPaths = new Set([
     ...manifest.content_scripts.flatMap((entry) => entry.js ?? []),
     ...manifest.web_accessible_resources.flatMap((entry) => entry.resources ?? [])
   ]);
   for (const path of productionPaths) {
-    artifactEvidence.sourceHashes[path] = createHash("sha256").update(await readFile(join(extensionDirectory, path))).digest("hex");
+    report.sourceHashes[path] = createHash("sha256").update(await readFile(join(extensionDirectory, path))).digest("hex");
   }
   assert(manifest.content_scripts.some((entry) => entry.world === "MAIN" && entry.js.includes("src/shadow-discovery.js")), "Build must include the actual MAIN bridge");
   if (negativeBridgeWorld) {
@@ -121,7 +115,7 @@ try {
   const isolated = manifest.content_scripts.find((entry) => entry.world !== "MAIN");
   isolated.js.unshift("shadow-test-probe.js");
   await writeFile(join(extensionDirectory, "manifest.json"), JSON.stringify(manifest));
-  artifactEvidence.testInstrumentedManifestHash = createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
+  report.testInstrumentedManifestHash = createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
   await writeFile(join(extensionDirectory, "shadow-test-probe.js"), `(() => {
     let isolatedAttachCalls = 0, reads = 0, scans = 0, hints = 0, trustedHints = 0;
     const attach = Element.prototype.attachShadow;
@@ -138,78 +132,44 @@ try {
       document.dispatchEvent(new CustomEvent("lexend-test-probe-response", { detail: JSON.stringify({ isolatedAttachCalls, reads, scans, hints, trustedHints }) }));
     });
   })();`);
-  artifactEvidence.testProbeHash = createHash("sha256").update(await readFile(join(extensionDirectory, "shadow-test-probe.js"))).digest("hex");
-  process.env.SE_FORCE_BROWSER_DOWNLOAD ??= "true";
-  process.env.SE_AVOID_STATS ??= "true";
-  const builder = new Builder().forBrowser(browserName);
-  if (browserName === "chrome") {
-    builder.setChromeOptions(new chrome.Options().setBrowserVersion(requestedBrowserVersion).addArguments(
-      "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1280,900",
-      `--user-data-dir=${join(profile, "chrome-profile")}`, `--disable-extensions-except=${extensionDirectory}`, `--load-extension=${extensionDirectory}`
-    ));
-  } else {
-    builder.setFirefoxOptions(new firefox.Options().setBrowserVersion(requestedBrowserVersion));
-    builder.setFirefoxService(new firefox.ServiceBuilder().addArguments("--allow-system-access"));
-  }
-  driver = await builder.build();
+  report.testProbeHash = createHash("sha256").update(await readFile(join(extensionDirectory, "shadow-test-probe.js"))).digest("hex");
+  driver = await createBrowserDriver({ browserName, browserVersion: requestedBrowserVersion, profile, extensionDirectory, headlessFirefox });
   const capabilities = await driver.getCapabilities();
-  artifactEvidence.browserVersion = capabilities.get("browserVersion");
-  artifactEvidence.driverVersion = capabilities.get("moz:geckodriverVersion") ?? capabilities.get("chrome")?.chromedriverVersion;
-  artifactEvidence.minimumBrowserVersion = assertBrowserVersion({ browserName, requestedBrowserVersion, actualBrowserVersion: artifactEvidence.browserVersion, manifest });
+  report.browserVersion = capabilities.get("browserVersion");
+  report.driverVersion = capabilities.get("moz:geckodriverVersion") ?? capabilities.get("chrome")?.chromedriverVersion;
+  report.minimumBrowserVersion = assertBrowserVersion({ browserName, requestedBrowserVersion, actualBrowserVersion: report.browserVersion, manifest });
   await driver.manage().setTimeouts({ script: 20000 });
   if (browserName === "firefox") {
-    const files = {};
-    const collect = async (path = "") => {
-      for (const entry of await readdir(join(extensionDirectory, path), { withFileTypes: true })) {
-        const relative = path ? `${path}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) await collect(relative);
-        else files[relative] = new Uint8Array(await readFile(join(extensionDirectory, relative)));
-      }
-    };
-    await collect();
-    const archive = join(output, "test-instrumented-extension.zip");
-    const archiveBytes = zipSync(files);
+    const archive = join(output, `${report.runId}-test-instrumented-extension.zip`);
+    const archiveBytes = createArchive(await collectFiles(extensionDirectory));
     await writeFile(archive, archiveBytes);
-    artifactEvidence.testInstrumentedArchive = {
+    report.testInstrumentedArchive = {
       path: archive, sha256: createHash("sha256").update(archiveBytes).digest("hex")
     };
     // Keep the exact archive available throughout the local driver session.
     // Older Firefox can remove Selenium's base64-backed temporary XPI before
     // content scripts load (Mozilla bug 2045054); the path endpoint retains it.
-    artifactEvidence.installation = {
+    report.installation = {
       method: "geckodriver-path", temporary: true, path: archive,
-      archiveSha256: artifactEvidence.testInstrumentedArchive.sha256, addonId: null
+      archiveSha256: report.testInstrumentedArchive.sha256, addonId: null
     };
-    artifactEvidence.installation = { ...artifactEvidence.installation,
+    report.installation = { ...report.installation,
       ...await installTemporaryFirefoxAddon(driver, archive) };
   }
   await driver.get(fixtureUrl);
   await wait("getComputedStyle(document.querySelector('#prose')).fontFamily.includes('Lexend')", "Installed extension applies initial typography");
+  report.installedExtension = true;
   websiteTab = await driver.getWindowHandle();
-  origin = await script(() => {
-    const css = [...document.querySelectorAll("style")].map((style) => style.textContent);
-    for (const sheet of document.adoptedStyleSheets) {
-      try { css.push([...sheet.cssRules].map((rule) => rule.cssText).join("\n")); } catch {}
-    }
-    return css.join("\n").match(/(?:chrome|moz)-extension:\/\/[^/"\s]+\//)?.[0];
-  });
+  origin = await findExtensionOrigin(script);
   assert(origin, "Installed font resource reveals extension origin");
   await driver.switchTo().newWindow("tab");
   optionsTab = await driver.getWindowHandle();
-  if (browserName === "firefox") {
-    await driver.setContext(firefox.Context.CHROME);
-    try {
-      await driver.executeScript(function (url) {
-        window.gBrowser.selectedBrowser.loadURI(Services.io.newURI(url), { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
-      }, `${origin}options.html`);
-    } finally { await driver.setContext(firefox.Context.CONTENT); }
-  } else await driver.get(`${origin}options.html`);
+  await navigateExtension(`${origin}options.html`);
   await wait("document.querySelector('#dark-theme')?.disabled === false", "Installed settings initialize");
   await patch({ scope: "all", layoutRepair: true, textScale: 110 });
   await wait("getComputedStyle(document.querySelector('#prose')).fontSize === '22px'", "110% scale applies");
   await settle();
 
-  if (!checksOnly) {
   await check("page-world delayed attach is detected while isolated prototype patch sees zero calls", async () => {
     const before = await probe();
     await script(() => {
@@ -332,23 +292,18 @@ try {
     await settle();
     return result;
   });
-  }
 
   if (options.checks) {
     const { runLifecycleChecks } = await import(pathToFileURL(resolve(options.checks)).href);
     await runLifecycleChecks({ driver, browserName, script, wait, check, patch, setSettings: patch, settle, probe, delay, fixtureUrl, websiteTab, optionsTab, extensionCall });
-    if (!checksOnly) artifactEvidence.checkScope = "shadow-and-custom";
   }
-  await writeFile(join(output, "results.json"), JSON.stringify({ browserName, installedExtension: true, testOnlyIsolatedProbe: true, fixtureUrl, ...artifactEvidence, checks }, null, 2));
+  report.status = "passed";
 } catch (error) {
-  await writeFile(join(output, "failure.json"), JSON.stringify({ browserName, error: String(error), stack: error.stack, ...artifactEvidence, checks }, null, 2));
-  if (driver) {
-    await writeFile(join(output, "failure.png"), await driver.takeScreenshot(), "base64").catch(() => {});
-    await writeFile(join(output, "failure.html"), await driver.getPageSource()).catch(() => {});
-  }
-  throw error;
+  runError = error;
+  report.status = "failed";
+  report.error = String(error.stack ?? error);
+  if (checks.at(-1)?.status !== "failed") checks.push({ name: "installed shadow verification", status: "failed", error: report.error });
+  await captureBrowserFailure(driver, output);
 } finally {
-  await driver?.quit();
-  await new Promise((done) => server.close(done));
-  await rm(profile, { recursive: true, force: true });
+  await finishBrowserRun({ error: runError, report, saveReport, driver, server, profile });
 }

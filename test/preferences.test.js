@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
+import { createMemoryStorage, mutationResponse } from "./helpers/memory-storage.js";
 import "../src/settings.js";
 import "../src/preferences.js";
 
@@ -16,46 +17,33 @@ const oldApi = (() => {
   return { settings: context.LexendSettings, preferences: context.LexendPreferences };
 })();
 const fixture = (initial = {}, { quota = false, silentWrites = false } = {}) => {
-  let saved = structuredClone(initial);
+  const memory = createMemoryStorage(initial, { silentWrites });
   let failRead = false;
   let failWrite = false;
   let failCleanup = false;
-  const listeners = [];
-  const writes = [];
-  const storage = {
-    async get() { if (failRead) throw new Error("Read failed"); return structuredClone(saved); },
+  const storage = { ...memory.storage,
+    async get() { if (failRead) throw new Error("Read failed"); return memory.storage.get(); },
     async set(patch) {
       if (failWrite) throw new Error("Write failed");
       if (quota && Object.entries(patch).some(([key, value]) => Buffer.byteLength(key + JSON.stringify(value)) > 8192)) {
         throw new Error("QUOTA_BYTES_PER_ITEM quota exceeded");
       }
-      const changes = Object.fromEntries(Object.entries(patch).map(([key, newValue]) => [key, { oldValue: saved[key], newValue }]));
-      saved = { ...saved, ...structuredClone(patch) };
-      writes.push(structuredClone(patch));
-      if (!silentWrites) listeners.forEach((listener) => listener(changes, "sync"));
+      await memory.storage.set(patch);
     },
     async remove(keys) {
       if (failCleanup) throw new Error("Cleanup interrupted");
-      const changes = {};
-      for (const key of keys) {
-        if (Object.hasOwn(saved, key)) changes[key] = { oldValue: saved[key] };
-        delete saved[key];
-      }
-      if (!silentWrites && Object.keys(changes).length) listeners.forEach((listener) => listener(changes, "sync"));
+      await memory.storage.remove(keys);
     }
   };
   const store = preferences.createStore(storage);
   const extension = {
-    storage: { sync: storage, onChanged: { addListener(listener) { listeners.push(listener); } } },
-    runtime: { async sendMessage({ operation }) {
-      try { return { ok: true, settings: await store.mutate(operation) }; }
-      catch (error) { return { ok: false, code: error.code, message: error.message }; }
-    } }
+    storage: { sync: storage, onChanged: memory.onChanged },
+    runtime: { sendMessage: ({ operation }) => mutationResponse(() => store.mutate(operation)) }
   };
-  return { store, extension, storage, writes, saved: () => saved,
+  return { store, extension, storage, writes: memory.writes, saved: memory.saved,
     failRead(value) { failRead = value; }, failWrite(value) { failWrite = value; },
     failCleanup(value) { failCleanup = value; },
-    emit(changes) { listeners.forEach((listener) => listener(changes, "sync")); } };
+    emit: memory.emit };
 };
 
 test("old-reader controls retain the exact published and audit-baseline source identities", () => {
@@ -570,7 +558,7 @@ test("a corrupt storage event exposes actionable read failure and blocks writes 
   assert.deepEqual(client.settings, before);
 });
 
-test("schema2 replacement rejects every missing field and empty imports without modifying storage", async () => {
+test("current replacement rejects every missing field and old imports reject empty settings", async () => {
   const initial = api.normalizeSettings({ enabled: false, siteRules: [{ hostname: "saved.example", enabled: false }] });
   const f = fixture(initial);
   for (const key of Object.keys(api.defaults)) {
@@ -627,6 +615,22 @@ test("replacement guards compare normalized rule identities and values rather th
   assert.deepEqual(api.decodeSettings(f.saved()), replacement);
   await f.store.mutate({ type: "replace", settings: initial });
   assert.deepEqual(api.decodeSettings(f.saved()), initial, "existing callers without a guard retain replacement semantics");
+});
+
+test("replacement guards retain malformed and stale snapshot error precedence", async () => {
+  const initial = api.normalizeSettings({ theme: "dark" });
+  const f = fixture(initial);
+  const incomplete = { ...initial }; delete incomplete.layoutRepair;
+  for (const [expected, code] of [
+    [undefined, "INVALID_OPERATION"], [null, "INVALID_OPERATION"], [[], "INVALID_OPERATION"],
+    [incomplete, "INVALID_OPERATION"], [{}, "STALE_IMPORT"],
+    [{ ...incomplete, textScale: 127 }, "STALE_IMPORT"]
+  ]) {
+    await assert.rejects(f.store.mutate({ type: "replace", expected, settings: {} }), { code });
+  }
+  await assert.rejects(f.store.mutate({ type: "replace", expected: initial, settings: {} }), { code: "INVALID_IMPORT" });
+  assert.equal(f.writes.length, 0);
+  assert.deepEqual(f.saved(), initial);
 });
 
 test("a guarded scalar retry preserves a newer value from another client", async () => {
