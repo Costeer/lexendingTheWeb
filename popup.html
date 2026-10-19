@@ -54,22 +54,26 @@
         <div class="site-strip-copy">
           <p id="site-status-text"></p>
           <p id="site-message" class="site-message"></p>
-          <p id="site-sources" class="site-message"></p>
           <label class="site-layout-control"><input id="site-layout-repair" type="checkbox" aria-describedby="site-layout-repair-help" /> <span>Layout repair on this site</span></label>
           <p id="site-layout-repair-help" class="site-message">Adjust containers to fit enlarged text.</p>
           <button id="use-inherited-site" class="text-link" type="button" hidden>Use inherited site settings</button>
+          <details class="site-details">
+            <summary>Setting sources</summary>
+            <p id="site-sources" class="site-message"></p>
+          </details>
         </div>
-        <button id="toggle-site" class="text-link" type="button">Pause here</button>
+        <button id="toggle-site" class="site-action" type="button">Pause here</button>
       </section>
 
       <fieldset id="scope-fieldset" class="popup-section scope-section">
-        <legend>Global scope</legend>
+        <legend class="section-label">Global scope</legend>
         <label class="choice-card">
           <input type="radio" name="scope" value="body" />
           <span class="choice-copy">
             <strong>Body text</strong>
             <span>Paragraphs, links, labels, controls</span>
           </span>
+          <span class="choice-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" /></svg></span>
         </label>
         <label class="choice-card">
           <input type="radio" name="scope" value="all" />
@@ -77,11 +81,12 @@
             <strong>Body and headings</strong>
             <span>Include page titles and section headings</span>
           </span>
+          <span class="choice-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" /></svg></span>
         </label>
       </fieldset>
 
       <fieldset id="spacing-fieldset" class="popup-section spacing-section">
-        <legend>Global spacing</legend>
+        <legend class="section-label">Global spacing</legend>
         <div class="segments" aria-label="Letter spacing">
           <label>
             <input type="radio" name="spacing" value="0" />

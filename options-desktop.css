@@ -8,8 +8,8 @@
   display: contents;
 }
 
-:root body.settings-page {
-  background: var(--settings-muted);
+body.settings-page {
+  background: var(--surface-sunken);
 }
 
 .settings-card {
@@ -33,12 +33,21 @@
   pointer-events: none;
 }
 
+/* Paper tears into soft scallops. */
+:root[data-design="paper"] .settings-card::after {
+  background: radial-gradient(circle at 12px 0, var(--surface) 11.5px, transparent 12px) 0 0 / 24px 12px repeat-x;
+}
+
+.page-attribution {
+  padding: 24px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
 /* Use the same mobile layout as the panels, including wide touch screens. */
 @media not all and (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  :root .mobile-intro {
+  .mobile-intro {
     display: block;
-    padding-right: max(20px, env(safe-area-inset-right, 0px));
-    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
   }
 
   :root body.settings-page {
@@ -47,98 +56,84 @@
     min-height: 100vh;
     min-height: 100dvh;
     padding: 0;
-    background: var(--settings-muted);
   }
 
-  :root .settings-page .settings-card {
+  .settings-page .settings-card {
     display: flex;
     flex: 1;
     flex-direction: column;
     width: 100%;
-    margin: 0 0 12px;
+    margin: 0 0 16px;
   }
 
-  :root .settings-page .settings-layout {
+  .settings-page .settings-layout {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-width: 0;
   }
 
-  :root .settings-page .settings-layout main {
+  .settings-page .settings-layout main {
     flex: 1;
     width: 100%;
     min-width: 0;
-    margin: 0;
     overflow: visible;
-    border: 0;
-    box-shadow: none;
   }
 
-  :root .settings-page .settings-panel {
+  .settings-page .settings-panel {
     padding-right: max(20px, env(safe-area-inset-right, 0px));
     padding-left: max(20px, env(safe-area-inset-left, 0px));
   }
 
-  :root .settings-page .readability-title-row {
+  .settings-page .readability-title-row {
     flex-wrap: wrap;
-    gap: 12px 20px;
   }
 
-  :root .settings-page .desktop-settings-header {
+  .settings-page .desktop-settings-header {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    width: 100%;
-    margin: 0;
     padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px));
-    border-bottom: 1px solid var(--ui-border);
+    border-bottom: var(--divider);
     background: var(--surface);
   }
 
-  :root .settings-page .desktop-settings-header h1 {
+  .settings-page .desktop-settings-header h1 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 500;
+    font-size: calc(var(--fs-read) + 4px);
+    font-weight: var(--wght-heading);
     line-height: 1.2;
-    letter-spacing: .015em;
+    letter-spacing: var(--track-heading);
   }
 
-  :root .settings-page .mobile-about-link {
+  .settings-page .mobile-about-link {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
     margin-left: auto;
-    padding: 0 4px;
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 500;
+    font-size: var(--fs-read);
+    font-weight: var(--wght-strong);
     text-underline-offset: 3px;
   }
 
-  :root .settings-page .page-attribution {
+  .settings-page .add-rule .primary-button {
     width: 100%;
-    margin: 0;
-    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   }
 }
 
 /* Touch devices keep the stacked settings page, including in landscape. */
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  :root {
+    --row-h: calc(var(--target) + 56px);
+  }
+
   :root body.settings-page {
-    --ui-radius: 5px;
-    --control-border: 1px solid var(--ui-border);
-    --active-shadow: none;
     padding: 0 0 32px;
-    color: var(--ink);
-    background: var(--settings-muted);
-    font-size: 16px;
-    line-height: 1.6;
   }
 
   .settings-card {
-    padding: 28px 40px 32px;
+    padding: 28px 40px 40px;
   }
 
   .desktop-settings-header {
@@ -146,30 +141,30 @@
     align-items: center;
     gap: 16px;
     width: min(1160px, 100%);
-    margin: 0 auto 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--ui-border);
+    margin: 0 auto 28px;
+    padding-bottom: 18px;
+    border-bottom: var(--divider);
   }
 
   .desktop-settings-header h1 {
     margin: 0;
-    font-size: 22px;
-    font-weight: 500;
+    font-size: calc(var(--fs-read) + 6px);
+    font-weight: var(--wght-heading);
     line-height: 1.2;
-    letter-spacing: .015em;
+    letter-spacing: var(--track-heading);
   }
 
   .settings-layout {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 250px minmax(0, 1fr);
     align-items: start;
-    gap: 56px;
+    gap: 52px;
     width: min(1160px, 100%);
     min-height: 560px;
     margin: 0 auto;
   }
 
-  .desktop-settings-nav {
+    .desktop-settings-nav {
     position: sticky;
     top: 32px;
     display: grid;
@@ -179,28 +174,31 @@
   .desktop-settings-nav :is(button, a) {
     display: flex;
     align-items: center;
-    gap: 12px;
     width: 100%;
-    min-height: 48px;
-    padding: 6px 11px;
-    border: 6px solid transparent;
-    border-radius: 0;
+    min-height: max(48px, var(--target));
+    padding: 6px 12px;
+    border: var(--frame-width) solid transparent;
+    border-radius: var(--radius-control);
     color: var(--ink);
-    background: var(--surface);
-    font-size: 16px;
-    /* Selection changes the border, not the label's wrapping or row height. */
-    font-weight: 500;
-    line-height: 1.5;
+    background: transparent;
+    font-size: var(--fs-read);
+    /* Selection changes the frame, not the label's wrapping or row height. */
+    font-weight: var(--wght-strong);
+    line-height: 1.4;
     text-align: left;
     text-decoration: none;
   }
 
   .desktop-settings-nav :is(button, a):hover {
-    border-color: var(--ui-border);
+    border-color: var(--line);
   }
 
   .desktop-settings-nav :is(button, a)[aria-current="page"] {
     border-color: var(--accent);
+  }
+
+  :root[data-design="paper"] .desktop-settings-nav :is(button, a)[aria-current="page"] {
+    background: var(--accent-tint);
   }
 
   /* Animate the contents, never the hit area or the selected border. */
@@ -226,321 +224,145 @@
     height: 20px;
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.6;
+    stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
 
-  :root .settings-layout main {
-    width: 100%;
-    min-width: 0;
-    margin: 0;
+  .settings-layout main {
     overflow: visible;
-    border: 0;
-    background: var(--surface);
-    box-shadow: none;
   }
 
-  :root .settings-layout .settings-panel {
+  .settings-layout .settings-panel {
     padding: 0;
     border: 0;
   }
 
-  :root .settings-layout .settings-panel[hidden] {
-    display: none;
-  }
-
-  :root .settings-layout h2 {
-    color: var(--ink);
-    font-size: 28px;
-    font-weight: 550;
-    line-height: 1.3;
-    letter-spacing: .015em;
-  }
-
-  :root .settings-layout h2:focus {
+  .settings-layout h2:focus {
     outline: none;
   }
 
-  :root .settings-layout .section-heading {
+  .settings-layout .section-heading {
     margin-bottom: 30px;
   }
 
-  :root .settings-layout .helper {
-    margin-top: 12px;
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 400;
-    line-height: 1.7;
-  }
-
-  :root .settings-layout .advanced-control {
-    align-self: center;
-    font-size: 15px;
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  :root .settings-layout .control-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-auto-rows: 96px;
-    gap: 0;
-  }
-
-  :root .settings-layout .setting-control,
-  :root .settings-layout .slider-control {
+  /* Readability rows: label column, then the control. */
+  .settings-layout .setting-control {
     position: relative;
-    height: 96px;
-    min-height: 96px;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid var(--row-divider);
-    background: transparent;
-    box-shadow: none;
-    transform: none;
+    padding: calc((var(--row-h) - var(--target) - 2 * var(--line-width)) / 2) 0 calc((var(--row-h) - var(--target) - 2 * var(--line-width)) / 2) 34%;
   }
 
-  :root .settings-layout .setting-control legend {
+  .settings-layout .setting-control legend {
     position: absolute;
-    top: 35px;
+    top: 50%;
     left: 0;
     width: 32%;
     margin: 0;
-    padding: 0;
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 500;
-    line-height: 26px;
-    letter-spacing: 0;
+    transform: translateY(-50%);
   }
 
-  :root .settings-layout .segment-group {
-    position: absolute;
-    inset: 26px 0 auto 34%;
-    height: 44px;
-    overflow: visible;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
-    background: var(--surface);
-  }
-
-  :root .settings-layout .segment-group span {
-    height: 42px;
-    min-height: 42px;
-    padding: 8px 6px;
-    border: 0;
-    border-left: 1px solid var(--ui-border);
-    color: var(--ink);
-    font-size: 15px;
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  :root .settings-layout .segment-group label:first-child span {
-    border-left: 0;
-  }
-
-  :root .settings-layout .slider-control {
-    display: grid;
+  .settings-layout .slider-control {
     grid-template-columns: 32% minmax(0, 1fr);
-    grid-template-rows: 28px 20px;
+    grid-template-rows: auto auto;
     align-content: center;
     column-gap: 2%;
-    row-gap: 8px;
+    row-gap: 4px;
+    padding-block: 12px;
   }
 
-  :root .settings-layout .slider-heading {
-    display: flex;
+  .settings-layout .slider-heading {
+    flex-direction: column;
     grid-column: 1;
     grid-row: 1 / 3;
-    flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    gap: 2px;
-  }
-
-  :root .settings-layout .slider-heading strong {
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: 0;
-  }
-
-  :root .settings-layout .slider-heading output {
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    color: var(--ink);
-    background: transparent;
-    font-size: 15px;
-    text-align: left;
-  }
-
-  :root .settings-layout .slider-control input[type="range"],
-  :root .settings-layout .slider-limits {
-    grid-column: 2;
-    width: 100%;
-  }
-
-  :root .settings-layout .slider-limits {
-    font-size: 15px;
-    line-height: 20px;
-  }
-
-  :root .settings-layout .readability-preview {
-    margin-top: 30px;
-    padding: 0;
-    border: 0;
-    background: var(--surface);
-  }
-
-  :root .settings-layout .preview-heading {
-    margin-bottom: 26px;
-  }
-
-  :root .settings-layout .preview-heading > span {
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: 0;
-  }
-
-  :root .settings-layout .preview-attribution {
-    font-size: 15px;
-    letter-spacing: 0;
-  }
-
-  :root .settings-layout .appearance-section {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
     gap: 0;
-    color: var(--ink);
-    background: var(--surface);
   }
 
-  :root .settings-layout .appearance-copy {
-    max-width: 64ch;
-  }
-
-  :root .settings-layout .appearance-control {
-    flex-direction: row;
-    gap: 16px;
-    width: 100%;
-    margin-top: 30px;
-    padding: 22px 0;
-    border-top: 1px solid var(--ui-border);
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  :root .settings-layout .appearance-label {
+  .settings-layout .slider-heading output {
+    font-weight: var(--wght-body);
     text-align: left;
   }
 
-  :root .settings-layout .appearance-label strong {
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: 0;
+  .settings-layout .slider-control input[type="range"],
+  .settings-layout .slider-limits {
+    grid-column: 2;
   }
 
-  :root .settings-layout .appearance-label small {
-    display: none;
+  .settings-layout .readability-preview {
+    margin-top: 8px;
   }
 
-  :root .settings-layout .add-rule {
+  /* Rules. */
+  .settings-layout .add-rule {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 16px 20px;
-    padding: 0;
-    border: 0;
-    background: var(--surface);
+    gap: 14px 16px;
   }
 
-  :root .settings-layout .hostname-field {
+  .settings-layout .hostname-field {
     grid-column: 1;
   }
 
-  :root .settings-layout #add-rule-button {
+  .settings-layout #add-rule-button {
     grid-column: 2;
     grid-row: 1;
   }
 
-  :root .settings-layout .check-label {
+  .settings-layout .check-label {
     grid-column: 1 / -1;
-    font-size: 15px;
-    letter-spacing: 0;
   }
 
-  :root .settings-layout .rule-row {
-    gap: 10px;
-    padding: 12px;
+  .settings-layout .rule-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  :root .settings-layout .rule-hostname {
-    color: var(--ink);
-    font-size: 16px;
+  .settings-layout .rule-row:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
-  :root .settings-layout .rule-status {
-    letter-spacing: 0;
+  /* Appearance. */
+  .settings-layout .design-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  :root .settings-layout .tools-grid {
-    grid-template-columns: minmax(0, 1fr);
+  /* Backup and shortcut: open sections separated by dividers. */
+  .settings-layout .tools-grid {
     gap: 28px;
   }
 
-  :root .settings-layout .tool-card {
+  .settings-layout .tool-card {
     padding: 0 0 28px;
     border: 0;
-    border-bottom: 1px solid var(--ui-border);
+    border-bottom: var(--divider);
     border-radius: 0;
+    background: transparent;
   }
 
-  :root .settings-layout .tool-card h3 {
-    font-size: 18px;
-    font-weight: 500;
-    letter-spacing: 0;
+  /* Paper keeps its cards on desktop. */
+  :root[data-design="paper"] .settings-layout .tool-card {
+    padding: 24px;
+    border: 0;
+    border-radius: var(--radius-card);
+    background: var(--surface-sunken);
   }
 
-  :root .settings-layout .primary-button,
-  :root .settings-layout .secondary-button {
-    min-height: 44px;
-    border-radius: var(--ui-radius);
-    font-size: 15px;
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  :root .settings-page .page-attribution {
+  .settings-page .page-attribution {
     width: min(1160px, 100%);
     margin-top: 36px;
   }
 
   @media (max-width: 1080px) {
     .settings-layout {
-      grid-template-columns: 200px minmax(0, 1fr);
-      gap: 32px;
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 30px;
     }
 
-    :root .settings-layout .rule-list {
+    .settings-layout .rule-list {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    :root .settings-layout .rule-row:last-child:nth-child(odd) {
+    .settings-layout .rule-row:last-child:nth-child(odd) {
       grid-column: auto;
     }
   }
-}
-
-@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  :root .settings-layout .basic-controls { grid-auto-rows: auto; }
-  :root .settings-layout .setting-control:has(.custom-choice:not([hidden])) {
-    height: 140px;
-    min-height: 140px;
-  }
-  :root .settings-layout .segment-group:has(.custom-choice:not([hidden])) { height: auto; }
-  :root .settings-layout .segment-group .custom-choice span { border-left: 0; }
 }

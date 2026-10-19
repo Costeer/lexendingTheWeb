@@ -233,6 +233,50 @@ test("mobile About is in the header and the desktop tab remains Appearance", asy
   assert.match(options.match(/<footer\b[\s\S]*?<\/footer>/)?.[0], /href="about\.html"/);
 });
 
+test("Appearance offers each design as a labelled radio with a sample rendered in that design", async () => {
+  const options = await read("options.html");
+  const appearance = options.match(/<section id="appearance-panel"[\s\S]*?<\/section>/)?.[0];
+  const picker = appearance.match(/<fieldset class="design-picker">[\s\S]*?<\/fieldset>/)?.[0];
+  assert.ok(picker, "designs are one radio group");
+  assert.match(picker, /<legend class="section-label">Design<\/legend>/);
+  for (const design of settingsApi.designs) {
+    const option = picker.match(new RegExp(`<label class="design-option">\\s*<input type="radio" name="design" value="${design}" />[\\s\\S]*?<\\/label>`))?.[0];
+    assert.ok(option, `${design} has its own label`);
+    assert.match(option, new RegExp(`class="design-sample" data-design="${design}" aria-hidden="true"`));
+    assert.match(option, /<strong>[A-Z]\w+<\/strong>\s*<span>[^<]{20,}<\/span>/, `${design} has a name and description`);
+  }
+});
+
+test("designs share the red accent and Lexend while varying shape and spacing", async () => {
+  const css = await read("shared.css");
+  assert.equal([...css.matchAll(/--accent:\s*#/g)].length, 1, "every design keeps the same accent");
+  assert.equal([...css.matchAll(/--font-ui:/g)].length, 1, "every design keeps Lexend");
+  for (const design of settingsApi.designs) {
+    const block = css.match(new RegExp(`\\[data-design="${design}"\\]\\s*\\{([^}]*)\\}`))?.[1];
+    assert.ok(block, `${design} declares its tokens`);
+    for (const token of ["--radius-control", "--line-width", "--target", "--wght-body", "--track-body", "--fs-body"]) {
+      assert.match(block, new RegExp(`${token}:`), `${design} sets ${token}`);
+    }
+    assert.doesNotMatch(block, /--wght-body:\s*[123]\d\d;/, `${design} body text is never lighter than Regular`);
+  }
+});
+
+test("designs normalize, and imports accept a missing design but reject unknown ones", () => {
+  assert.equal(settingsApi.defaults.design, "signal");
+  assert.equal(settingsApi.normalizeSettings({ design: "paper" }).design, "paper");
+  // Wide was folded into Signal, so a stored "wide" falls back to Signal.
+  for (const retired of ["classic", "wide"]) assert.equal(settingsApi.normalizeSettings({ design: retired }).design, "signal");
+  const complete = settingsApi.normalizeSettings({ design: "paper" });
+  const { design, ...older } = complete;
+  assert.equal(design, "paper");
+  for (const schemaVersion of [2, 3]) {
+    assert.equal(settingsApi.validateImport({ schemaVersion, settings: older }).design, "signal");
+    assert.equal(settingsApi.validateImport({ schemaVersion, settings: complete }).design, "paper");
+    assert.throws(() => settingsApi.validateImport({ schemaVersion, settings: { ...complete, design: "neon" } }),
+      { code: "INVALID_IMPORT", message: /invalid design/ });
+  }
+});
+
 test("Appearance contains theme settings while About owns the project introduction", async () => {
   const [options, about] = await Promise.all([read("options.html"), read("about.html")]);
   const appearance = options.match(/<section id="appearance-panel"[\s\S]*?<\/section>/)?.[0];
@@ -286,13 +330,15 @@ test("preset controls use equal fixed slots with one sliding selection layer", a
   const [sharedCss, optionsCss, desktopCss, popupCss, popupJs] = await Promise.all([
     read("shared.css"), read("options.css"), read("options-desktop.css"), read("popup.css"), read("popup.js")
   ]);
-  assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\)\s*\{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
-  assert.match(sharedCss, /:root body :is\(\.segment-group, \.segments\) label span\s*\{[^}]*pointer-events: none;[^}]*background: transparent;[^}]*transform: scale\(1\);/);
-  assert.match(sharedCss, /:root :is\(\.segment-group, \.segments\)::before\s*\{[^}]*opacity: 0;[^}]*transition: transform 220ms/);
+  assert.match(sharedCss, /\n:is\(\.segment-group, \.segments\)\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);[^}]*overflow: visible;/);
+  assert.match(sharedCss, /\n:is\(\.segment-group, \.segments\) label span\s*\{[^}]*pointer-events: none;[^}]*transform: scale\(1\);/);
+  assert.match(sharedCss, /\n:is\(\.segment-group, \.segments\)::before\s*\{[^}]*opacity: 0;[^}]*transition: transform 220ms/);
   assert.match(sharedCss, /:has\(input:checked\)::before\s*\{\s*opacity: 1;/);
+  // Signal stacks the same equal slots vertically when narrow; the layer then slides on Y.
+  assert.match(sharedCss, /:root\[data-design="signal"\] :is\(\.segments, \.control-grid \.segment-group\)::before\s*\{[^}]*transform: translateY\(calc\(var\(--segment-index\) \* 100%\)\);/);
   for (const css of [optionsCss, desktopCss, popupCss]) {
     assert.doesNotMatch(css, /grid-template-columns: \.9fr 1\.2fr \.9fr;/);
-    assert.match(css, /:root [^{]*\.(?:segment-group|segments)\s*\{[^}]*overflow: visible;/);
+    assert.doesNotMatch(css, /:is\(\.segment-group, \.segments\)::before/, "pages reuse the shared selection layer");
   }
   for (const css of [optionsCss, popupCss]) {
     assert.match(css, /transform var\(--motion-base\) var\(--motion-ease\)/);
@@ -304,7 +350,7 @@ test("preset controls use equal fixed slots with one sliding selection layer", a
 test("settings paper has a receipt edge on desktop and mobile, with an About footer outside", async () => {
   const css = await read("options-desktop.css");
   const sharedLayout = css.split("@media")[0];
-  assert.match(sharedLayout, /body\.settings-page\s*\{\s*background: var\(--settings-muted\);/);
+  assert.match(sharedLayout, /body\.settings-page\s*\{\s*background: var\(--surface-sunken\);/);
   assert.match(sharedLayout, /\.settings-card\s*\{[^}]*position: relative;[^}]*background: var\(--surface\);/);
   assert.match(sharedLayout, /\.settings-card::after\s*\{[^}]*bottom: -12px;[^}]*linear-gradient\(135deg, var\(--surface\)[^}]*linear-gradient\(225deg, var\(--surface\)[^}]*pointer-events: none;/);
   assert.doesNotMatch(css, /main::after|sidebar-support|support-heart-pulse/);

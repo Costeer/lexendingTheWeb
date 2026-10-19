@@ -45,6 +45,21 @@ test("theme bootstrap defaults to light for missing or invalid cache values", ()
   }
 });
 
+test("design bootstrap applies the cached design synchronously and normalizes unknown values", () => {
+  const cache = new Map([["lexend-ui-design", "paper"]]);
+  const page = openPage(cache);
+  assert.equal(page.root.dataset.design, "paper");
+  assert.deepEqual([...page.theme.designs], ["signal", "paper"]);
+  assert.equal(page.theme.applyDesign("signal"), "signal");
+  assert.equal(openPage(cache).root.dataset.design, "signal");
+  for (const value of [undefined, "classic", "wide", "<script>"]) {
+    const fresh = new Map(value ? [["lexend-ui-design", value]] : []);
+    assert.equal(openPage(fresh).root.dataset.design, "signal");
+    assert.equal(fresh.get("lexend-ui-design"), "signal");
+  }
+  assert.equal(openPage(new Map([["lexend-ui-design", "paper"]]), { readFails: true }).root.dataset.design, "signal");
+});
+
 test("theme application works even when cache reads or writes are unavailable", () => {
   const cache = new Map([["lexend-ui-theme", "dark"]]);
   const unavailable = openPage(cache, { readFails: true, writeFails: true });

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const settingKeys = Object.freeze(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const settingKeys = Object.freeze(["enabled", "layoutRepair", "scope", "theme", "design", "textScale", "lineHeight", "letterSpacing"]);
   const numericVersion = (value) => typeof value === "string" && /^\d{1,5}(?:\.\d{1,10}){0,3}$/.test(value) ? value : null;
   const sanitizeBuildIdentity = (value) => {
     if (value?.schemaVersion !== 1 || !numericVersion(value.version)

@@ -75,7 +75,7 @@ for (const surface of ["about", "popup"]) test(`${surface} saves private diagnos
   const report = JSON.parse(serialized);
   expect(report.build.sourceHash).toBe("0123456789abcdef".repeat(4));
   expect(report.settings).toEqual({ status: "available", enabled: true, layoutRepair: false, scope: "all", theme: "dark",
-    textScale: 125, lineHeight: 1.7, letterSpacing: .05 });
+    design: "signal", textScale: 125, lineHeight: 1.7, letterSpacing: .05 });
   expect(report.runtime).toEqual(surface === "about" ? { status: "unavailable" } : {
     status: "available", ready: true, pending: false, healthy: false, active: true,
     refreshRevision: 7, scope: "all", hasError: true });
@@ -93,4 +93,48 @@ test("popup remains accessible and visually stable", async ({ page }, testInfo) 
   if (testInfo.project.use.isMobile) await containFullPageScreenshot(page, testInfo);
   await expect(page).toHaveScreenshot("popup.png", { fullPage: true });
   await assertViewportLayout(page, testInfo);
+});
+
+test.describe("paper design", () => {
+  const design = "paper";
+  test.use({ design });
+
+  test(`${design} popup remains accessible, fits and is visually stable`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: testInfo.project.use.isMobile ? 320 : 360, height: 800 });
+    await openInterface(page, "popup.html");
+    await expect(page.locator("html")).toHaveAttribute("data-design", design);
+    await expect(page.locator("#site-strip")).toBeVisible();
+    await scanAccessibility(page, testInfo);
+    if (testInfo.project.use.isMobile) await containFullPageScreenshot(page, testInfo);
+    await expect(page).toHaveScreenshot(`popup-${design}.png`, { fullPage: true });
+    await assertViewportLayout(page, testInfo);
+  });
+
+  for (const section of ["readability", "rules", "appearance"]) {
+    test(`${design} ${section} settings remain accessible and visually stable`, async ({ page }, testInfo) => {
+      await openInterface(page, `options.html?section=${section}-panel`);
+      await expect(page.locator("html")).toHaveAttribute("data-design", design);
+      await scanAccessibility(page, testInfo);
+      await assertViewportLayout(page, testInfo);
+      await expect(page).toHaveScreenshot(`settings-${section}-${design}.png`, { fullPage: true });
+    });
+  }
+});
+
+test("choosing a design restyles settings immediately and saves it for every page", async ({ page }) => {
+  await openInterface(page, "options.html?section=appearance-panel");
+  await expect(page.locator("html")).toHaveAttribute("data-design", "signal");
+  const radius = () => page.locator(".design-option").first().evaluate((element) => getComputedStyle(element).borderTopLeftRadius);
+  // The fixture reseeds storage on navigation, so check what the popup will read.
+  const saved = () => page.evaluate(async () => [(await browser.storage.sync.get()).design, localStorage.getItem("lexend-ui-design")]);
+  expect(await radius()).toBe("0px");
+  await page.locator(".design-option", { hasText: "Paper" }).click();
+  await expect(page.locator('input[name="design"][value="paper"]')).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-design", "paper");
+  expect(await radius()).toBe("18px");
+  await expect.poll(saved).toEqual(["paper", "paper"]);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator("html")).toHaveAttribute("data-design", "signal");
+  expect(await radius()).toBe("0px");
+  await expect.poll(saved).toEqual(["signal", "signal"]);
 });
