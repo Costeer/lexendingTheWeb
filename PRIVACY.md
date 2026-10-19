@@ -19,7 +19,7 @@ Your browser remembers:
 - Whether Lexend is on or off
 - Whether it applies to body text only or headings too
 - Your text size, line height, and letter spacing
-- Your light or dark interface theme
+- Your interface design (Signal, Paper, or Wide) and light or dark theme
 - The site rules you create, including hostnames, on/off choices, text scope,
   and whether to include subdomains
 
@@ -27,11 +27,11 @@ These use your browser's synchronized extension storage. If browser sync is on,
 your browser provider may sync them between signed-in profiles. The developer
 has no server and no access to your sync account.
 
-The extension pages also keep a local copy of the interface theme so it can be
-applied before pages are painted. They remember the index of the last displayed
+The extension pages also keep a local copy of the interface design and theme so
+they can be applied before pages are painted. They remember the index of the last displayed
 quotation to avoid showing the same quotation twice in a row. This index refers
 only to the quotations included with the extension, not to pages you visit.
-The theme cache and quotation index stay in the browser's local storage; they
+The design and theme cache and quotation index stay in the browser's local storage; they
 are not synced or sent to the developer.
 
 ## You control your settings

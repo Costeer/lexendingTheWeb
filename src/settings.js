@@ -7,6 +7,7 @@
     scope: "body",
     siteRules: [],
     theme: "light",
+    design: "signal",
     textScale: 100,
     lineHeight: 0,
     letterSpacing: 0
@@ -14,7 +15,10 @@
   const MAX_SITE_RULE_BYTES = 8192;
   const ruleStoragePrefix = "@1\n";
   const repairRuleStoragePrefix = "@2\n";
-  const preferenceKeys = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"];
+  const preferenceKeys = ["enabled", "layoutRepair", "scope", "theme", "design", "textScale", "lineHeight", "letterSpacing"];
+  // Interface designs only restyle extension pages. Keep in sync with src/ui-theme.js.
+  // Stored as "design": older versions delete the retired "uiStyle" key on every write.
+  const designs = Object.freeze(["signal", "paper", "wide"]);
   const ruleKey = (rule) => `${rule.hostname}\n${rule.includeSubdomains}`;
   const sameRule = (left, right) => left.enabled === right.enabled && left.scope === right.scope && left.layoutRepair === right.layoutRepair;
   const legacySpacingValues = Object.freeze({
@@ -163,6 +167,7 @@
       scope: value.scope === "all" ? "all" : defaults.scope,
       siteRules,
       theme: value.theme === "dark" ? "dark" : defaults.theme,
+      design: designs.includes(value.design) ? value.design : defaults.design,
       textScale: clampNumber(value.textScale, defaults.textScale, 80, 140),
       lineHeight: (value.lineHeight === 0 || value.lineHeight === "0")
         ? 0
@@ -217,7 +222,9 @@
     if (![1, 2, 3].includes(payload?.schemaVersion) || !value || typeof value !== "object" || Array.isArray(value)) {
       throw settingsError("INVALID_IMPORT", "Choose a valid Lexend settings file.");
     }
-    if (payload.schemaVersion >= 2 && Object.keys(defaults).filter((key) => payload.schemaVersion === 3 || key !== "layoutRepair").some((key) => !Object.hasOwn(value, key))) {
+    // Backups made before interface designs existed remain complete without one.
+    const optionalKey = (key) => key === "design" || (key === "layoutRepair" && payload.schemaVersion !== 3);
+    if (payload.schemaVersion >= 2 && Object.keys(defaults).filter((key) => !optionalKey(key)).some((key) => !Object.hasOwn(value, key))) {
       throw settingsError("INVALID_IMPORT", "This settings backup is incomplete. Nothing was imported.");
     }
     if (payload.schemaVersion >= 2 && !Array.isArray(value.siteRules)) {
@@ -247,11 +254,12 @@
       ["layoutRepair", (v) => typeof v === "boolean"],
       ["scope", (v) => ["body", "all"].includes(v)],
       ["theme", (v) => ["light", "dark"].includes(v)],
+      ["design", (v) => designs.includes(v)],
       ["textScale", (v) => typeof v === "number" && v >= 80 && v <= 140],
       ["lineHeight", (v) => typeof v === "number" && (v === 0 || (v >= 1 && v <= 2.4))],
       ["letterSpacing", (v) => typeof v === "number" && v >= 0 && v <= 0.2]
     ]) {
-      if (((payload.schemaVersion >= 2 && (key !== "layoutRepair" || payload.schemaVersion === 3)) || Object.hasOwn(value, key)) && !valid(value[key])) {
+      if (((payload.schemaVersion >= 2 && !optionalKey(key)) || Object.hasOwn(value, key)) && !valid(value[key])) {
         throw settingsError("INVALID_IMPORT", `The settings file contains an invalid ${key} value. Nothing was imported.`);
       }
     }
@@ -451,6 +459,7 @@
 
   globalThis.LexendSettings = Object.freeze({
     defaults,
+    designs,
     decodeSettings: normalizeSettings,
     encodeSettings,
     encodeSettingsForStorage,

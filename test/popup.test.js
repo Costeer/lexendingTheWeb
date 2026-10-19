@@ -50,7 +50,7 @@ async function openPopup({ initial = {}, getSettings, failWrite = false, state, 
       } }
     },
     LexendSaveRecovery: globalThis.LexendSaveRecovery, LexendPreferences: globalThis.LexendPreferences, LexendSettings: globalThis.LexendSettings,
-    LexendTheme: { apply() {} }, LexendQuotes: { random: () => ({ text: "Preview", author: "Author" }) },
+    LexendTheme: { apply() {}, applyDesign() {} }, LexendQuotes: { random: () => ({ text: "Preview", author: "Author" }) },
     setTimeout: () => 0, clearTimeout() {}, console: { error() {} }, URL
   };
   runInNewContext(source, context);

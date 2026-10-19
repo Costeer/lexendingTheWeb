@@ -66,7 +66,7 @@ test("default rule writes remain readable by the actual old reader and survive i
   const f = fixture({}, { quota: true });
   await f.store.mutate({ type: "replace", settings: { ...api.defaults, siteRules: rules } });
   assert.ok(Array.isArray(f.saved().siteRules));
-  assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false }, api.decodeSettings(f.saved()));
+  assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false, design: api.defaults.design }, api.decodeSettings(f.saved()));
   await oldApi.preferences.createStore(f.storage).mutate({ type: "patch", changes: { theme: "dark" } });
   assert.deepEqual(api.decodeSettings(f.saved()).siteRules, rules);
   await oldApi.preferences.createStore(f.storage).mutate({ type: "addRule", rule: { hostname: "added.example", enabled: false } });
@@ -118,7 +118,7 @@ test("large legacy pause edits stay compatible and rich changes reject before an
   assert.equal(f.saved().enabled, true);
   assert.equal(f.saved().disabledSites.length, 249);
   assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
-  assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false }, api.decodeSettings(f.saved()));
+  assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false, design: api.defaults.design }, api.decodeSettings(f.saved()));
   await f.store.mutate({ type: "replace", settings: api.normalizeSettings({ disabledSites, theme: "dark" }) });
   assert.deepEqual(f.saved().disabledSites, disabledSites);
 });
@@ -420,7 +420,7 @@ test("authentic 120 and 250 legacy pauses remain compatible and editable under t
     assert.deepEqual(f.saved().disabledSites, disabledSites.filter((_, i) => i !== 1));
     assert.equal(Object.hasOwn(f.saved(), "siteRules"), false);
     assert.ok(Buffer.byteLength("disabledSites" + JSON.stringify(f.saved().disabledSites)) <= 8192);
-    assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false }, saved);
+    assert.deepEqual({ ...JSON.parse(JSON.stringify(oldApi.settings.normalizeSettings(f.saved()))), layoutRepair: false, design: api.defaults.design }, saved);
     const restarted = preferences.createClient(f.extension);
     await restarted.load();
     assert.deepEqual(restarted.settings, saved);
@@ -564,7 +564,9 @@ test("current replacement rejects every missing field and old imports reject emp
   for (const key of Object.keys(api.defaults)) {
     const partial = { ...api.defaults };
     delete partial[key];
-    await assert.rejects(f.store.mutate({ type: "replace", settings: partial }), { code: "INVALID_IMPORT" });
+    // Files may omit the newer design, but an applied snapshot must be complete.
+    await assert.rejects(f.store.mutate({ type: "replace", settings: partial }),
+      { code: key === "design" ? "INVALID_OPERATION" : "INVALID_IMPORT" });
   }
   for (const settings of [{}, { textScale: 120 }, { ...api.defaults, siteRules: undefined }, { ...api.defaults, enabled: undefined }]) {
     assert.throws(() => api.validateImport({ schemaVersion: 2, settings }), { code: "INVALID_IMPORT" });

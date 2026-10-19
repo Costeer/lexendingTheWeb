@@ -1,42 +1,23 @@
-:root body.about-page {
+body.about-page {
   min-height: 100vh;
   min-height: 100dvh;
-}
-
-.about-page-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: min(1160px, 100%);
-  margin: 0 auto 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.about-page-header h1 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: .015em;
 }
 
 .about-back-link {
   display: inline-block;
   min-height: 44px;
   margin-bottom: 16px;
+  font-size: var(--fs-read);
+  font-weight: var(--wght-strong);
 }
 
 .about-page .settings-panel {
-  font-size: 16px;
-  line-height: 1.7;
+  font-size: var(--fs-read);
+  line-height: var(--lh-body);
 }
 
 .about-block h3 {
-  margin: 0 0 12px;
-  font-size: 18px;
-  font-weight: 500;
-  letter-spacing: .015em;
+  margin: 0 0 10px;
 }
 
 .about-block p {
@@ -45,7 +26,11 @@
 }
 
 .about-diagnostics {
-  margin-top: 32px;
+  margin-top: 36px;
+}
+
+.about-block .about-fingerprint {
+  margin-top: 10px;
 }
 
 .about-fingerprint span,
@@ -53,9 +38,15 @@
   display: block;
 }
 
+.about-fingerprint span {
+  font-size: var(--fs-small);
+  font-weight: var(--wght-label);
+  letter-spacing: var(--track-label);
+}
+
 .about-fingerprint code {
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .about-diagnostics .helper {
@@ -66,6 +57,11 @@
   margin-top: 16px;
 }
 
+#diagnostics-status:not(:empty) {
+  margin-top: 10px;
+  font-weight: var(--wght-strong);
+}
+
 .about-links {
   display: flex;
   flex-wrap: wrap;
@@ -74,23 +70,18 @@
 }
 
 .about-links a,
-.about-lexend-link,
-.about-back-link {
-  color: var(--ink);
+.about-lexend-link {
+  display: inline-block;
+  font-weight: var(--wght-strong);
   text-underline-offset: 3px;
 }
 
-.about-links a {
-  display: inline-block;
-}
-
 .about-lexend-link {
-  display: inline-block;
   margin-top: 16px;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--fs-read);
 }
 
+/* The word opens up along Lexend's spacing, like the wider Lexend styles. */
 .about-lexend-word {
   letter-spacing: 0;
   transition: letter-spacing 320ms var(--motion-ease);

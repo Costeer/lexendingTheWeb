@@ -4,7 +4,8 @@ import AxeBuilder from "@axe-core/playwright";
 // Only browser APIs are simulated here. The HTML, CSS, scripts, preferences
 // writer and fonts come from the packaged build; Selenium covers real APIs.
 export const test = base.extend({
-  page: async ({ page }, use, testInfo) => {
+  design: ["signal", { option: true }],
+  page: async ({ page, design }, use, testInfo) => {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("response", (response) => {
@@ -22,12 +23,13 @@ export const test = base.extend({
       expect(identity.sourceHash).toMatch(/^[a-f0-9]{64}$/);
       await route.fulfill({ response, json: { ...identity, sourceHash: "0123456789abcdef".repeat(4) } });
     });
-    await page.addInitScript(({ theme }) => {
+    await page.addInitScript(({ theme, design }) => {
       Math.random = () => 0;
       localStorage.removeItem("lexendLastQuoteIndex");
       localStorage.setItem("lexend-ui-theme", theme);
+      localStorage.setItem("lexend-ui-design", design);
       let settings = {
-        enabled: true, scope: "body", theme, textScale: 110, lineHeight: 1.6, letterSpacing: .04,
+        enabled: true, scope: "body", theme, design, textScale: 110, lineHeight: 1.6, letterSpacing: .04,
         siteRules: [
           { hostname: "example.com", includeSubdomains: true, enabled: false, scope: null },
           { hostname: "docs.example.com", includeSubdomains: false, enabled: true, scope: "all" },
@@ -65,7 +67,7 @@ export const test = base.extend({
         },
         commands: { getAll: async () => [{ name: "toggle-current-site", shortcut: "Ctrl+Shift+L" }] }
       };
-    }, { theme: testInfo.project.use.colorScheme });
+    }, { theme: testInfo.project.use.colorScheme, design });
     await use(page);
     expect(errors, "The built interface must not throw or load missing assets").toEqual([]);
   }

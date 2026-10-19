@@ -4,8 +4,12 @@
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
   let themeRevision = 0;
+  let designRevision = 0;
   const applyTheme = (value) => {
     globalThis.LexendTheme.apply(settingsApi.normalizeSettings(value).theme);
+  };
+  const applyDesign = (value) => {
+    globalThis.LexendTheme.applyDesign(settingsApi.normalizeSettings(value).design);
   };
 
   const supportCard = document.getElementById("donate-link");
@@ -82,18 +86,25 @@
   }
 
   extension?.storage?.onChanged?.addListener((changes, areaName) => {
-    if (areaName === "sync" && Object.hasOwn(changes, "theme")) {
+    if (areaName !== "sync") return;
+    if (Object.hasOwn(changes, "theme")) {
       themeRevision += 1;
       applyTheme({ theme: changes.theme.newValue });
+    }
+    if (Object.hasOwn(changes, "design")) {
+      designRevision += 1;
+      applyDesign({ design: changes.design.newValue });
     }
   });
 
   const start = async () => {
     const revision = themeRevision;
+    const designAt = designRevision;
     try {
       if (extension?.storage?.sync) {
-        const saved = await extension.storage.sync.get(["theme"]);
+        const saved = await extension.storage.sync.get(["theme", "design"]);
         if (themeRevision === revision) applyTheme(saved);
+        if (designRevision === designAt) applyDesign(saved);
       }
     } catch (error) {
       console.error("Lexend for the Web could not load the interface theme.", error);

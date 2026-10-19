@@ -4,7 +4,7 @@
   const api = globalThis.LexendSettings;
   const messageType = "LEXEND_SETTINGS_MUTATE";
   const connectionName = "lexend-settings";
-  const preferenceKeys = new Set(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const preferenceKeys = new Set(["enabled", "layoutRepair", "scope", "theme", "design", "textScale", "lineHeight", "letterSpacing"]);
   const legacyKeys = ["disabledSites", "spacing", "uiStyle"];
   const requireSnapshot = (value) => {
     const normalized = api.normalizeSettings(value);
@@ -129,9 +129,10 @@
     };
   };
 
-  const createClient = (extension, { theme = "light", onChange = () => {} } = {}) => {
-    let confirmed = api.normalizeSettings({ theme });
-    let confirmedRaw = { theme };
+  const createClient = (extension, { theme = "light", design = api.defaults.design, onChange = () => {} } = {}) => {
+    // Start from the cached appearance so loading never repaints the interface.
+    let confirmed = api.normalizeSettings({ theme, design });
+    let confirmedRaw = { theme, design };
     let loaded = false;
     let loading = false;
     let readError = null;

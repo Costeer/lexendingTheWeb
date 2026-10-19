@@ -47,13 +47,15 @@
   const retrySave = document.querySelector("#retry-save");
   const retryPage = document.querySelector("#retry-page");
 
-  let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
+  const { theme, design } = document.documentElement.dataset;
+  let settings = settingsApi.normalizeSettings({ theme, design });
   let site = null;
   let layoutRepairSaving = false;
   let feedbackTimer;
   const quote = quotesApi.random();
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
+    design: settings.design,
     onChange(value, _loaded, readError) {
       settings = value;
       render();
@@ -85,6 +87,7 @@
 
   const renderSettings = () => {
     globalThis.LexendTheme.apply(settings.theme);
+    globalThis.LexendTheme.applyDesign(settings.design);
     enabledInput.checked = settings.enabled;
     enabledInput.setAttribute(
       "aria-label",
@@ -126,6 +129,7 @@
     if (!supported) return;
 
     if (site.status !== "ready") {
+      siteStrip.dataset.state = site.status === "pending" ? "updating" : "unavailable";
       siteStatusText.textContent = site.status === "pending" ? "Page is updating" : "Page unavailable";
       siteMessage.textContent = site.message;
       toggleSiteButton.hidden = true;
@@ -143,6 +147,7 @@
     useInheritedSite.setAttribute("aria-label", `Remove exact overrides for ${site.hostname} and use inherited settings`);
     const confirmed = site.state.active === effective.active && (!effective.active || site.state.scope === effective.scope)
       && (!effective.active || typeof site.state.layoutRepair !== "boolean" || site.state.layoutRepair === effective.layoutRepair);
+    siteStrip.dataset.state = !confirmed ? "updating" : effective.active ? "active" : "paused";
     if (!settings.enabled && confirmed) {
       siteStatusText.textContent = "Off";
       siteMessage.textContent = "Lexend is paused everywhere.";

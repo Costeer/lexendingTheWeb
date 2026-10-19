@@ -308,7 +308,7 @@
 
                 <div class="readability-preview">
                     <div class="preview-heading">
-                        <span>Preview</span>
+                        <span class="section-label">Preview</span>
                         <button
                             id="reset-readability"
                             class="inline-link"
@@ -338,13 +338,18 @@
                         </figure>
                     </div>
                     <div id="preview-glyphs" class="preview-glyphs" hidden>
-                        <p class="preview-font-label">A closer look <span>Letterforms &amp; weights</span></p>
+                        <p class="preview-font-label">A closer look <span>Letterforms, weights &amp; features</span></p>
                         <div class="glyph-pairs" aria-label="Similar letterforms">
                             <span>Il1</span><span>O0Q</span><span>rn m</span><span>bd pq</span>
                         </div>
+                        <div class="glyph-axis">
+                            <span>Weight axis · 300–900</span>
+                            <p aria-label="Lexend from light to black weight"><span>Aa</span><span>Aa</span><span>Aa</span><span>Aa</span><span>Aa</span><span>Aa</span><span>Aa</span></p>
+                        </div>
                         <div class="glyph-weight"><span>Regular · 400</span><p class="preview-specimen" lang="en">The quick brown fox jumps over the lazy dog.</p></div>
-                        <div class="glyph-weight"><span>Semibold · 600</span><p class="preview-specimen">0123456789 &amp; @ # % ? !</p></div>
-                        <div class="glyph-weight"><span>Bold · 800</span><p class="preview-specimen" lang="vi">À É Ö ß Ł · Tiếng Việt</p></div>
+                        <div class="glyph-weight glyph-weight-600"><span>Semibold · 600</span><p class="preview-specimen">0123456789 &amp; @ # % ? !</p></div>
+                        <div class="glyph-weight glyph-weight-800"><span>Bold · 800</span><p class="preview-specimen" lang="vi">À É Ö ß Ł · Tiếng Việt</p></div>
+                        <div class="glyph-weight glyph-fractions"><span>Fractions · frac</span><p class="preview-specimen" lang="en">1/2 cup · 3/4 mile · 7/8 inch</p></div>
                     </div>
                     <p id="preview-attribution" class="preview-attribution">
                             —
@@ -450,9 +455,62 @@
                 <div class="appearance-copy">
                     <h2 id="appearance-title">Appearance</h2>
                     <p id="appearance-description" class="helper">
-                        Change the popup and settings theme without changing website colors.
+                        Change how the popup and settings look. Website colors stay unchanged.
                     </p>
                 </div>
+                <fieldset class="design-picker">
+                    <legend class="section-label">Design</legend>
+                    <div class="design-options">
+                        <label class="design-option">
+                            <input type="radio" name="design" value="signal" />
+                            <span class="design-sample" data-design="signal" aria-hidden="true">
+                                <span class="design-sample-bar">
+                                    <span class="design-sample-mark">LXND</span>
+                                    <span class="design-sample-switch"><span></span></span>
+                                </span>
+                                <span class="design-sample-title">Easy reading</span>
+                                <span class="design-sample-segments"><span></span><span></span><span></span></span>
+                            </span>
+                            <span class="design-copy">
+                                <strong>Signal</strong>
+                                <span>Square red frames and spaced bold labels. The original look.</span>
+                                <span class="choice-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" /></svg></span>
+                            </span>
+                        </label>
+                        <label class="design-option">
+                            <input type="radio" name="design" value="paper" />
+                            <span class="design-sample" data-design="paper" aria-hidden="true">
+                                <span class="design-sample-bar">
+                                    <span class="design-sample-mark">LXND</span>
+                                    <span class="design-sample-switch"><span></span></span>
+                                </span>
+                                <span class="design-sample-title">Easy reading</span>
+                                <span class="design-sample-segments"><span></span><span></span><span></span></span>
+                            </span>
+                            <span class="design-copy">
+                                <strong>Paper</strong>
+                                <span>Rounded cards on warm paper with softer black ink, for long sessions.</span>
+                                <span class="choice-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" /></svg></span>
+                            </span>
+                        </label>
+                        <label class="design-option">
+                            <input type="radio" name="design" value="wide" />
+                            <span class="design-sample" data-design="wide" aria-hidden="true">
+                                <span class="design-sample-bar">
+                                    <span class="design-sample-mark">LXND</span>
+                                    <span class="design-sample-switch"><span></span></span>
+                                </span>
+                                <span class="design-sample-title">Easy reading</span>
+                                <span class="design-sample-segments"><span></span><span></span><span></span></span>
+                            </span>
+                            <span class="design-copy">
+                                <strong>Wide</strong>
+                                <span>Larger text with extra letter spacing, heavier strokes and big targets.</span>
+                                <span class="choice-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" /></svg></span>
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
                 <label class="appearance-control ui-switch">
                     <span class="appearance-label">
                         <strong>Dark theme</strong>

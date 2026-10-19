@@ -1,19 +1,29 @@
 .popup-diagnostics {
-  padding: 0 16px 12px;
-  border-top: 1px solid var(--ui-border);
+  display: grid;
+  gap: 4px;
+  padding: 14px 20px 16px;
+  border-top: var(--divider);
+}
+
+:root[data-design="paper"] .popup-diagnostics {
+  margin: 12px 12px 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
 
 .popup-diagnostics button {
-  min-height: 44px;
-  color: var(--ink);
+  justify-self: start;
+  min-height: 32px;
 }
 
 .popup-diagnostics p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-small);
   line-height: 1.5;
 }
 
 .popup-diagnostics [role="status"]:not(:empty) {
-  margin-top: 8px;
+  margin-top: 4px;
+  font-weight: var(--wght-strong);
 }

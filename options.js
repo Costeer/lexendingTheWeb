@@ -10,6 +10,7 @@
   const layoutRepairInput = document.querySelector("#layout-repair");
   const darkThemeInput = document.querySelector("#dark-theme");
   const appearanceState = document.querySelector("#appearance-state");
+  const designInputs = [...document.querySelectorAll('input[name="design"]')];
   const advancedModeInput = document.querySelector("#advanced-mode");
   const readabilityControlStage = document.querySelector("#readability-control-stage");
   const basicReadability = document.querySelector("#basic-readability");
@@ -123,7 +124,8 @@
   });
   renderSettingsNavigation();
 
-  let settings = settingsApi.normalizeSettings({ theme: document.documentElement.dataset.theme });
+  const { theme, design } = document.documentElement.dataset;
+  let settings = settingsApi.normalizeSettings({ theme, design });
   let confirmedSettings = settings;
   let loadFailed = false;
   let advancedPreferenceLoaded = false;
@@ -133,12 +135,13 @@
   let pendingRuleDeletion = null;
   const ruleRowData = new WeakMap();
   const quote = quotesApi.random();
-  const mutationControls = [layoutRepairInput, darkThemeInput, advancedModeInput, textScaleSlider,
+  const mutationControls = [layoutRepairInput, darkThemeInput, ...designInputs, advancedModeInput, textScaleSlider,
     lineHeightSlider, letterSpacingSlider, resetReadabilityButton, hostnameInput,
     subdomainsInput, exportButton, importButton, importFile,
     ...basicTextScaleInputs, ...basicLineHeightInputs, ...basicLetterSpacingInputs];
   const preferences = globalThis.LexendPreferences.createClient(extension, {
     theme: settings.theme,
+    design: settings.design,
     onChange(value, loaded, readError) {
       settings = value;
       if (loaded) {
@@ -345,8 +348,10 @@
 
   const renderInterfaceStyle = () => {
     globalThis.LexendTheme.apply(settings.theme);
+    globalThis.LexendTheme.applyDesign(settings.design);
     darkThemeInput.checked = settings.theme === "dark";
     appearanceState.textContent = darkThemeInput.checked ? "On" : "Off";
+    designInputs.forEach((input) => { input.checked = input.value === settings.design; });
   };
 
   const deletionPrompts = [
@@ -620,7 +625,7 @@
     if (importSaveStatus && importSaveStatus.state !== "saved") {
       setSaveState(importSaveStatus.state, importSaveStatus.message);
     } else if (failures.length) {
-      const labels = { theme: "appearance", textScale: "text size", lineHeight: "line height",
+      const labels = { theme: "appearance", design: "design", textScale: "text size", lineHeight: "line height",
         letterSpacing: "letter spacing", layoutRepair: "all-sites layout repair", enabled: "on/off setting", scope: "scope", siteRules: "site rules" };
       const fields = [...new Set(failures.flatMap((failure) => failure.keys)
         .map((key) => labels[key] ?? "site rule"))].join(", ");
@@ -722,6 +727,10 @@
       theme: darkThemeInput.checked ? "dark" : "light"
     });
   });
+
+  designInputs.forEach((input) => input.addEventListener("change", () => {
+    if (input.checked && settings.design !== input.value) save({ design: input.value });
+  }));
 
   const basicControlGroups = [
     { inputs: basicTextScaleInputs, key: "textScale" },
@@ -914,9 +923,11 @@
     if (key === "textScale") return `${value}%`;
     if (key === "letterSpacing") return `${value}em`;
     if (key === "lineHeight" && value === 0) return "Default";
+    if (key === "design") return designNames[value];
     return String(value);
   };
-  const importKeys = { enabled: "Global switch", scope: "Global scope", theme: "Theme",
+  const designNames = { signal: "Signal", paper: "Paper", wide: "Wide" };
+  const importKeys = { enabled: "Global switch", scope: "Global scope", theme: "Theme", design: "Design",
     layoutRepair: "Layout repair", textScale: "Text size", lineHeight: "Line height", letterSpacing: "Letter spacing" };
   const ruleDescription = (rule) => `${ruleSource(rule)}: activation ${rule.enabled === null ? "inherit" : rule.enabled ? "active" : "paused"}, scope ${rule.scope === null ? "inherit" : importValue("scope", rule.scope)}, layout repair ${rule.layoutRepair == null ? "inherit" : rule.layoutRepair ? "on" : "off"}`;
 
@@ -961,6 +972,8 @@
       if (selection !== importSelection) return;
       const payload = JSON.parse(text);
       const imported = settingsApi.validateImport(payload);
+      // Backups from before interface designs existed keep the current design.
+      if (!Object.hasOwn(payload.settings, "design")) imported.design = confirmedSettings.design;
       showImportPreview(settingsApi.previewImport(confirmedSettings, imported));
     } catch (error) {
       if (selection === importSelection) importError.textContent = error.code ? error.message : "Choose a valid Lexend settings file.";

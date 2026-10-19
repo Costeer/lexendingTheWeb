@@ -6,7 +6,7 @@
   const createTracker = ({ mutate, getSettings, getConfirmedSettings = getSettings, onChange = () => {} }) => {
     const api = globalThis.LexendSettings;
     const entries = new Set();
-    const fields = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
+    const fields = ["enabled", "layoutRepair", "scope", "theme", "design", "textScale", "lineHeight", "letterSpacing", "siteRules"];
     const ruleKey = (operation) => {
       const rule = operation.rule ?? operation;
       const normalized = api.normalizeSettings({ siteRules: [{ ...rule, enabled: false }] }).siteRules[0];
