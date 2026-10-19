@@ -162,8 +162,10 @@ try {
   await wait("getComputedStyle(document.querySelector('#rem')).fontFamily.includes('Lexend for the Web')", "Installed content script must style the fixture");
   report.installedExtension = true;
   const websiteTab = await driver.getWindowHandle();
-  const origin = await findExtensionOrigin(script);
-  assert(origin, "Installed font URLs identify the extension's real origin");
+  const origin = await findExtensionOrigin({ driver, browserName, extensionDirectory, addonId: report.installation?.addonId });
+  assert(origin, "The browser identifies the installed extension's origin");
+  assert.equal(await script(() => [...document.querySelectorAll("style")].some((style) => /-extension:\/\//.test(style.textContent))), false,
+    "Page-readable styles never reveal the extension URL");
   await driver.switchTo().newWindow("tab");
   const optionsTab = await driver.getWindowHandle();
   await navigateExtension(`${origin}options.html`);

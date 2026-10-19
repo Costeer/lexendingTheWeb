@@ -5,7 +5,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   installed-browsers:
@@ -20,14 +20,16 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --ipc=host
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:ui
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: release-interface-regressions
@@ -39,16 +41,21 @@ jobs:
   release:
     needs: [interfaces, installed-browsers]
     runs-on: ubuntu-24.04
+    # Only publication writes to the repository. Test jobs, dependency
+    # installation and the browser container keep a read-only token.
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm audit --audit-level=high
       - name: Verify tag and package version

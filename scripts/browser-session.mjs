@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { Builder } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
@@ -63,10 +65,21 @@ export function createBrowserCalls(getDriver, browserName) {
   return { script, wait, extensionCall, navigateExtension, mutate };
 }
 
-export const findExtensionOrigin = (script) => script(() => {
-  const css = [...document.querySelectorAll("style")].map((style) => style.textContent);
-  for (const sheet of document.adoptedStyleSheets) {
-    try { css.push([...sheet.cssRules].map((rule) => rule.cssText).join("\n")); } catch {}
+// Pages deliberately cannot see the extension URL: bundled fonts load through
+// FontFace objects and Chrome serves them only at dynamic URLs. Resolve the
+// installed origin from the browser itself instead of from page content.
+export async function findExtensionOrigin({ driver, browserName, extensionDirectory, addonId }) {
+  if (browserName === "firefox") {
+    await driver.setContext(firefox.Context.CHROME);
+    try {
+      return await driver.executeScript(function (addonId) {
+        const policy = (addonId && WebExtensionPolicy.getByID(addonId))
+          || WebExtensionPolicy.getActiveExtensions().find((candidate) => candidate.name === "Lexend for the Web");
+        return policy?.getURL("") ?? null;
+      }, addonId ?? null);
+    } finally { await driver.setContext(firefox.Context.CONTENT); }
   }
-  return css.join("\n").match(/(?:chrome|moz)-extension:\/\/[^/"\s]+\//)?.[0];
-});
+  // Chrome identifies an unpacked extension by the SHA-256 of its real path.
+  const hex = createHash("sha256").update(await realpath(extensionDirectory)).digest("hex").slice(0, 32);
+  return `chrome-extension://${[...hex].map((digit) => "abcdefghijklmnop"[parseInt(digit, 16)]).join("")}/`;
+}

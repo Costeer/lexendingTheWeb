@@ -433,9 +433,7 @@
     pendingRuleDeletion = { row, domain, status, button, rule, originalContent, confirmButton };
   };
 
-  const ruleSource = (rule) => rule
-    ? `${rule.hostname} (${rule.includeSubdomains ? "including subdomains" : "exact host"})`
-    : "global setting";
+  const ruleSource = settingsApi.describeRuleSource;
 
   const sourceExplanation = (hostname) => {
     const effective = settingsApi.resolveSite(settings, hostname);

@@ -49,7 +49,7 @@ test('incoming counter detects a new branch and rejects restored expensive text 
             return result;
           };
         });
-        for (const name of ['settings', 'adaptive-controls', 'adaptive-layout']) {
+        for (const name of ['settings', 'adaptive-controls', 'adaptive-layout', 'refresh-scheduler']) {
           await page.addScriptTag({ content: await readFile(new URL(`src/${name}.js`, root), 'utf8') });
         }
         await page.addScriptTag({ content: instrumentContent(runtime) });

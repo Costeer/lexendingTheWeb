@@ -4,7 +4,7 @@
   const api = globalThis.LexendSettings;
   const messageType = "LEXEND_SETTINGS_MUTATE";
   const connectionName = "lexend-settings";
-  const preferenceKeys = new Set(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
+  const preferenceKeys = new Set(api.preferenceKeys);
   const legacyKeys = ["disabledSites", "spacing", "uiStyle"];
   const requireSnapshot = (value) => {
     const normalized = api.normalizeSettings(value);
@@ -108,8 +108,8 @@
           // Validate the representation this profile can actually write. A
           // compact-capable model can still exceed the compatible array quota.
           // Existing oversized rules remain untouched by unrelated edits.
-          const rulesFit = api.storedRuleBytes(encoded) <= 8192;
-          if (rulesChanged && (!rulesFit || next.siteRules.length > 250)) {
+          const rulesFit = api.storedRuleBytes(encoded) <= api.MAX_SITE_RULE_BYTES;
+          if (rulesChanged && (!rulesFit || next.siteRules.length > api.MAX_SITE_RULES)) {
             throw api.settingsError("RULE_CAPACITY", "There isn't room for these site rules. Remove some rules before adding or importing more.");
           }
           const patch = Object.fromEntries(Object.entries(encoded).filter(([key, value]) => (
@@ -118,8 +118,12 @@
           if (Object.keys(patch).length) await storage.set(patch);
           // Once the canonical keys are stored, old keys are harmless. Cleanup
           // failure must not make a successful write look like a failed mutation.
+          // Each sync remove() counts against the write quota, so only remove
+          // keys that this snapshot actually contains.
           const canonicalRules = Object.hasOwn(encoded, "siteRules") && rulesFit;
-          try { await storage.remove?.(canonicalRules ? legacyKeys : legacyKeys.filter((key) => key !== "disabledSites")); } catch {}
+          const staleKeys = legacyKeys.filter((key) => Object.hasOwn(raw, key)
+            && (canonicalRules || key !== "disabledSites"));
+          if (staleKeys.length) try { await storage.remove?.(staleKeys); } catch {}
           return next;
         };
         const result = queue.then(write, write);

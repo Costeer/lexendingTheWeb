@@ -93,7 +93,8 @@
     masterState.textContent = settings.enabled ? "On" : "Off";
     enabledInput.disabled = !preferences.loaded;
     siteLayoutRepair.disabled = !preferences.loaded || site?.status !== "ready" || settings.layoutRepair || layoutRepairSaving;
-    toggleSiteButton.disabled = !preferences.loaded || site?.status !== "ready";
+    // Site toggles never change the master switch; they wait until it is on.
+    toggleSiteButton.disabled = !preferences.loaded || site?.status !== "ready" || !settings.enabled;
     useInheritedSite.disabled = !preferences.loaded || site?.status !== "ready";
     scopeFieldset.disabled = !preferences.loaded || !settings.enabled;
     spacingFieldset.disabled = !preferences.loaded || !settings.enabled;
@@ -112,9 +113,7 @@
     spacingPreviewText.style.letterSpacing = `${settings.letterSpacing}em`;
   };
 
-  const ruleSource = (rule) => rule
-    ? `${rule.hostname} (${rule.includeSubdomains ? "including subdomains" : "exact host"})`
-    : "global setting";
+  const ruleSource = settingsApi.describeRuleSource;
 
   const renderSite = () => {
     const supported = Boolean(site?.supported);
@@ -145,7 +144,7 @@
       && (!effective.active || typeof site.state.layoutRepair !== "boolean" || site.state.layoutRepair === effective.layoutRepair);
     if (!settings.enabled && confirmed) {
       siteStatusText.textContent = "Off";
-      siteMessage.textContent = "Lexend is paused everywhere.";
+      siteMessage.textContent = "Lexend is paused everywhere. Turn it on to pause or resume this site.";
     } else {
       const status = !confirmed ? "Updating on " : effective.active ? "Active on " : "Paused on ";
       const hostname = document.createElement("strong");
@@ -311,7 +310,7 @@
   });
 
   toggleSiteButton.addEventListener("click", () => {
-    if (!site?.supported || site.status !== "ready") return;
+    if (!site?.supported || site.status !== "ready" || !settings.enabled) return;
     mutate({ type: "toggleSite", hostname: site.hostname });
   });
 

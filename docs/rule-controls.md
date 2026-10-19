@@ -3,7 +3,9 @@
 Popup scope and spacing controls change global preferences. The current-site
 explanation names the matching rules that supply enablement and scope; these can
 come from different rules. Turning Lexend off globally pauses every site, even
-when a site rule is enabled.
+when a site rule is enabled. While the master switch is off, **Pause here**,
+**Resume here** and the keyboard shortcut are unavailable. They never turn the
+master switch back on, which would also resume every site without a pause rule.
 
 In Settings → Site rules, open **Edit rule** to change enablement, scope, layout
 repair or whether the rule includes subdomains. Each value can inherit independently. Removing an

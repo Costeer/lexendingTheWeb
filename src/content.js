@@ -3,11 +3,23 @@
 
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
+  // The page-world bridge (shadow-discovery.js) hints through an event type
+  // that pages cannot know. It offers the type before any page script runs; a
+  // runtime that starts after the bridge asks for that offer instead.
+  let onBridgeHint = () => {};
+  const acceptBridgeOffer = (event) => {
+    const type = event.relatedTarget?.getAttribute?.("data-channel");
+    if (typeof type !== "string" || !/^lexend-[a-z0-9]{8,}$/.test(type)) return;
+    document.removeEventListener("lexend-bridge-offer", acceptBridgeOffer, true);
+    event.preventDefault();
+    document.addEventListener(type, (hint) => onBridgeHint(hint), true);
+  };
+  document.addEventListener("lexend-bridge-offer", acceptBridgeOffer, true);
+  document.dispatchEvent(new Event("lexend-bridge-request", { cancelable: true }));
   const STYLE_ID = "lexend-the-web-styles";
-  const FONT_STYLE_ID = "lexend-the-web-fonts";
   const SYMBOLS_FAMILY = "Lexend Nerd Symbols";
   const TRANSITION_STYLE_ID = "lexend-the-web-transitions";
-  const ownStyleIds = [STYLE_ID, FONT_STYLE_ID, TRANSITION_STYLE_ID];
+  const ownStyleIds = [STYLE_ID, TRANSITION_STYLE_ID];
   const styledRoots = new Set();
   let settings = settingsApi.normalizeSettings();
   let settingsReadGeneration = 0;
@@ -51,20 +63,31 @@
   const settledFontFaces = new WeakSet();
   const settledBundledFaces = new Set();
   const bundledFaceKey = (face) => [face.family.replace(/["']/g, ""), face.style, face.weight, face.stretch, face.unicodeRange].join(";");
-  let refreshTimer = null;
-  let refreshUrgent = false;
   let refreshRevision = 0;
   let refreshing = false;
   let repairFrame = null;
   let pendingRepair = null;
   let repairSynchronously = false;
-  let nextRefreshTime = 0;
-  let refreshRequired = false;
-  const pendingAriaChanges = new Map();
-  const pendingStyleChanges = new Map();
-  const pendingStateChanges = new Map();
-  let pendingRegions = null;
-  let queuedGlobalRefresh = false;
+  // Timing, coalescing and the page-event trigger policy live in
+  // refresh-scheduler.js. Hooks resolve lazily: they run only after startup.
+  const scheduler = globalThis.LexendRefreshScheduler.create({
+    canQueue: () => !refreshing && settingsLoaded && isActive(),
+    isStarting: () => initializing,
+    onQueued: (transient) => {
+      if (pendingRepair === null) return;
+      if (repairFrame !== null) cancelAnimationFrame(repairFrame);
+      repairFrame = null;
+      repairSynchronously = true;
+      if (!transient) pendingRepair = null;
+    },
+    styleSignature: (element, cssText) => authorStyleSignature(element, cssText),
+    refresh: () => refresh(true),
+    refreshRegions: (roots) => refreshChangedRegions(roots),
+    resumeRepair: () => {
+      repairSynchronously = false;
+      pendingRepair?.();
+    }
+  });
   let authorStylesheetSnapshot = null;
   let nativeStateSnapshot = null;
   let retainedTypography = new WeakSet();
@@ -97,6 +120,7 @@
   let warnedRefreshError = null;
   let revealedAutoContent = new WeakSet();
   const knownAutoContent = new Map();
+  const paintClassifiedText = new WeakSet();
   let initialFrameHeight = window === window.top ? null : innerHeight;
   let requestedFrameHeight = null;
   const resizedFrames = new Map();
@@ -252,18 +276,18 @@
   const isBackgroundSender = (sender) => {
     if (sender?.id !== extension.runtime.id) return false;
     try {
-      const senderUrl = new URL(sender.url), extensionUrl = new URL(extension.runtime.getURL(""));
+      // Chrome 119 reports only the origin for messages from the extension
+      // service worker; current Chrome and Firefox also include its URL.
+      const senderUrl = new URL(sender.url ?? sender.origin), extensionUrl = new URL(extension.runtime.getURL(""));
       return senderUrl.protocol === extensionUrl.protocol && senderUrl.host === extensionUrl.host;
     } catch { return false; }
   };
   const receiveRuntimeFrameRequirement = (message, sender) => {
-    if (sender?.id !== extension.runtime.id || !Number.isInteger(message.sourceFrameId) || message.sourceFrameId <= 0) return;
-    let sourceUrl, senderUrl;
+    if (!isBackgroundSender(sender) || !Number.isInteger(message.sourceFrameId) || message.sourceFrameId <= 0) return;
+    let sourceUrl;
     try {
       sourceUrl = new URL(message.frameUrl);
-      senderUrl = new URL(sender.url);
-      if (!["http:", "https:"].includes(sourceUrl.protocol) || senderUrl.protocol !== new URL(extension.runtime.getURL("")).protocol
-          || senderUrl.host !== new URL(extension.runtime.getURL("")).host) return;
+      if (!["http:", "https:"].includes(sourceUrl.protocol)) return;
       sourceUrl.hash = "";
     } catch { return; }
     const matches = [...document.querySelectorAll("iframe")].filter((frame) => {
@@ -303,37 +327,35 @@
     return "";
   };
 
-  const getFontFaceCss = () => fontFaces.flatMap(({ file, range }) =>
-    fontWeightRanges.map((weight) => `
-    @font-face {
-      font-family: "Lexend for the Web";
-      src: url("${extension.runtime.getURL(`assets/fonts/${file}`)}") format("woff2-variations");
-      font-style: normal;
-      font-weight: ${weight};
-      font-display: swap;
-      unicode-range: ${range};
-    }
-  `)
-  ).join("\n") + `
-    @font-face {
-      font-family: "${SYMBOLS_FAMILY}";
-      src: url("${extension.runtime.getURL("assets/fonts/nerd-fonts-symbols.woff2")}") format("woff2");
-      font-style: normal;
-      font-weight: 100 900;
-      font-display: swap;
-      unicode-range: U+23FB-23FE,U+2630,U+2665,U+26A1,U+276C-2771,U+2B58,U+E000-F8FF,U+F0000-FFFFD,U+100000-10FFFD;
-    }
-  `;
+  // Bundled faces are FontFace objects rather than an injected @font-face
+  // stylesheet. Pages can read every stylesheet, and an extension URL there
+  // identifies Lexend (in Firefox it also carries a stable per-install UUID
+  // that could link one user across sites). A FontFace exposes no source URL.
+  // The same objects stay registered while active: re-adding faces emits
+  // loadingdone even for cached files, which would schedule new baselines.
+  let bundledFonts = null;
+  const bundledFontFaces = () => bundledFonts ??= [
+    ...fontFaces.flatMap(({ file, range }) => fontWeightRanges.map((weight) => new FontFace("Lexend for the Web",
+      `url("${extension.runtime.getURL(`assets/fonts/${file}`)}") format("woff2-variations")`,
+      { style: "normal", weight, display: "swap", unicodeRange: range }))),
+    new FontFace(SYMBOLS_FAMILY, `url("${extension.runtime.getURL("assets/fonts/nerd-fonts-symbols.woff2")}") format("woff2")`, {
+      style: "normal", weight: "100 900", display: "swap",
+      unicodeRange: "U+23FB-23FE,U+2630,U+2665,U+26A1,U+276C-2771,U+2B58,U+E000-F8FF,U+F0000-FFFFD,U+100000-10FFFD"
+    })
+  ];
+  const installFonts = () => {
+    if (!document.fonts?.add || protection.editorDocument()) return;
+    for (const face of bundledFontFaces()) if (!document.fonts.has(face)) document.fonts.add(face);
+  };
+  const removeFonts = () => {
+    if (bundledFonts && document.fonts?.delete) for (const face of bundledFonts) document.fonts.delete(face);
+  };
 
   const createCss = (effective) => {
     if (!effective.active) return "";
-    const converted = (prefix = "") => `
-      font-family: var(--lexend-${prefix}family) !important;
-      font-size: var(--lexend-${prefix}size) !important;
-      line-height: var(--lexend-${prefix}line) !important;
-      letter-spacing: var(--lexend-${prefix}spacing) !important;
-    `;
-    const preserved = (prefix = "") => `
+    // Converted and protected text read the same variables. Only their values
+    // differ: protected elements carry the author's own family and metrics.
+    const typography = (prefix = "") => `
       font-family: var(--lexend-${prefix}family) !important;
       font-size: var(--lexend-${prefix}size) !important;
       line-height: var(--lexend-${prefix}line) !important;
@@ -343,12 +365,12 @@
       [${FONT_ATTRIBUTE}] { font-family: var(--lexend-family) !important; }
       [data-lexend-before='font']::before { font-family: var(--lexend-before-family) !important; }
       [data-lexend-after='font']::after { font-family: var(--lexend-after-family) !important; }
-      [${TEXT_ATTRIBUTE}] { ${converted()} }
-      [${PROTECTED_ATTRIBUTE}] { ${preserved()} }
-      [data-lexend-before='text']::before { ${converted("before-")} }
-      [data-lexend-after='text']::after { ${converted("after-")} }
-      [data-lexend-before='protected']::before { ${preserved("before-")} }
-      [data-lexend-after='protected']::after { ${preserved("after-")} }
+      [${TEXT_ATTRIBUTE}] { ${typography()} }
+      [${PROTECTED_ATTRIBUTE}] { ${typography()} }
+      [data-lexend-before='text']::before { ${typography("before-")} }
+      [data-lexend-after='text']::after { ${typography("after-")} }
+      [data-lexend-before='protected']::before { ${typography("before-")} }
+      [data-lexend-after='protected']::after { ${typography("after-")} }
       [data-lexend-hide-fade-before]::before, [data-lexend-hide-fade-after]::after { display: none !important; }
       [data-lexend-fit-pseudo-before]::before { margin-left: var(--lexend-layout-before-margin-left) !important; }
       [data-lexend-fit-pseudo-after]::after { margin-left: var(--lexend-layout-after-margin-left) !important; }
@@ -358,9 +380,9 @@
         ::slotted([${FONT_ATTRIBUTE}]) { font-family: var(--lexend-family) !important; }
         ::slotted([data-lexend-before='font'])::before { font-family: var(--lexend-before-family) !important; }
         ::slotted([data-lexend-after='font'])::after { font-family: var(--lexend-after-family) !important; }
-        ::slotted([${TEXT_ATTRIBUTE}]), ::slotted([${PROTECTED_ATTRIBUTE}]) { ${converted()} }
-        ::slotted([data-lexend-before='text'])::before, ::slotted([data-lexend-before='protected'])::before { ${converted("before-")} }
-        ::slotted([data-lexend-after='text'])::after, ::slotted([data-lexend-after='protected'])::after { ${converted("after-")} }
+        ::slotted([${TEXT_ATTRIBUTE}]), ::slotted([${PROTECTED_ATTRIBUTE}]) { ${typography()} }
+        ::slotted([data-lexend-before='text'])::before, ::slotted([data-lexend-before='protected'])::before { ${typography("before-")} }
+        ::slotted([data-lexend-after='text'])::after, ::slotted([data-lexend-after='protected'])::after { ${typography("after-")} }
       }
     `;
   };
@@ -807,9 +829,14 @@
       const inScope = effective.scope === "all" || !isHeading(element);
       const text = ownTextContent(element);
       const mixedGlyphProse = containsPrivateGlyph(text) && !onlyPrivateGlyphs(text);
-      const protectedText = semanticProtection || codeFont.test(family)
-        || (!mixedGlyphProse && protectedFont(family)) || onlyPrivateGlyphs(text)
-        || isImageReplacementText(element, style, styleFor) || hasEmptyPaintClip(element, style, styleFor) || !inScope;
+      const fontProtected = semanticProtection || codeFont.test(family)
+        || (!mixedGlyphProse && protectedFont(family)) || onlyPrivateGlyphs(text);
+      const paintHidden = !fontProtected
+        && (isImageReplacementText(element, style, styleFor) || hasEmptyPaintClip(element, style, styleFor));
+      // Remember labels whose conversion follows their paint state, such as
+      // skip links revealed by :focus. Focus can then remeasure only for them.
+      if (paintHidden) paintClassifiedText.add(element);
+      const protectedText = fontProtected || paintHidden || !inScope;
       const target = !protectedText && inScope && (Boolean(text.trim()) || isTextControl(element));
       const pseudos = [];
       // Generated text can be the only label, or an icon whose family would
@@ -942,22 +969,10 @@
       }));
     });
   };
-  const installFontStyle = (root) => {
-    if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
-    // Font declarations stay enabled while measuring author typography.
-    // Disabling/re-enabling @font-face repeatedly emits loadingdone events
-    // even with cached files, which would perpetually schedule new baselines.
-    let fontStyle = root.querySelector(`#${FONT_STYLE_ID}`);
-    if (!fontStyle) {
-      fontStyle = document.createElement("style");
-      fontStyle.id = FONT_STYLE_ID;
-      fontStyle.textContent = getFontFaceCss();
-      root.append(fontStyle);
-    }
-  };
   const applyToRoot = (root) => {
     if (protection.editorOwned(root instanceof ShadowRoot ? root.host : root)) return;
-    installFontStyle(root);
+    // Document faces also serve every shadow tree in this document.
+    installFonts();
     let style = root.querySelector(`#${STYLE_ID}`);
     if (!style) {
       style = document.createElement("style");
@@ -1167,17 +1182,6 @@
     }
     return refreshError;
   };
-  const budgetRefresh = (duration, regional = false) => {
-    // Count synchronous work in both phases, excluding time spent waiting for
-    // a rendering frame or coalescing author changes.
-    // A cheaper regional pass still consumes the same share of a busy stream.
-    const finished = performance.now();
-    nextRefreshTime = finished + (regional || duration > 50 ? duration * 4 : 0);
-  };
-  const clearPendingRegions = () => {
-    pendingRegions = null;
-    queuedGlobalRefresh = false;
-  };
   // CSS containment does not isolate selectors. Only a closed layout surface
   // inside an open shadow tree can qualify, and any unobservable stylesheet
   // change must first return the page to the normal full capture.
@@ -1350,23 +1354,19 @@
             ? child.checkVisibility({ contentVisibilityAuto: true }) : !skipped;
           if (painted) revealedAutoContent.add(target);
         }
+      } else if (!isLayoutRepairActive()) {
+        // Entries hold strong references and are only pruned above. Release
+        // them as soon as repair turns off so removed content can be collected.
+        knownAutoContent.clear();
       }
       notifyFrameRequirement();
     }
-    // Large pages can spend hundreds of milliseconds in a full repair. Give
-    // the site four times that duration to handle input and paint before the
-    // next automatic pass. Incoming text receives its font independently.
-    budgetRefresh(duration + performance.now() - completionStarted, regional);
+    // Incoming text receives its font independently of this budget.
+    scheduler.budget(duration + performance.now() - completionStarted, regional);
     notifyState();
   };
   const refresh = (preserveHidden = false, priorDuration = 0) => {
-    refreshTimer = null;
-    refreshUrgent = false;
-    refreshRequired = false;
-    pendingAriaChanges.clear();
-    pendingStyleChanges.clear();
-    pendingStateChanges.clear();
-    clearPendingRegions();
+    scheduler.claim();
     authorStylesheetSnapshot = null;
     nativeStateSnapshot = null;
     if (refreshing || !document.documentElement) return;
@@ -1407,6 +1407,7 @@
       if (!isActive() || protection.editorDocument()) {
         if (layoutRetained) layout?.dispose();
         for (const root of styledRoots) for (const id of ownStyleIds) root.querySelector(`#${id}`)?.remove();
+        removeFonts();
         styledRoots.clear(); knownAutoContent.clear();
         return;
       }
@@ -1436,7 +1437,7 @@
     repairSynchronously = false;
     if (error || !deferred) { completeRefresh(error, true, duration); return; }
     refreshRevision++;
-    budgetRefresh(duration);
+    scheduler.budget(duration);
     pendingRepair = () => {
       pendingRepair = null;
       repairFrame = null;
@@ -1655,13 +1656,7 @@
     const eligible = () => isLayoutRepairActive() && document.getAnimations && document.getAnimations().length === 0
       && authorStylesheetsUnchanged() && nativeStateUnchanged() && roots.every(canRefreshRegion);
     if (!eligible()) { refresh(true, performance.now() - started); return; }
-    refreshTimer = null;
-    refreshUrgent = false;
-    refreshRequired = false;
-    pendingAriaChanges.clear();
-    pendingStyleChanges.clear();
-    pendingStateChanges.clear();
-    clearPendingRegions();
+    scheduler.claim();
     const witness = createRegionalMutationWitness(roots);
     regionalMutationWitness = witness;
     let error;
@@ -1700,80 +1695,7 @@
     if (error) { refresh(true, performance.now() - started); return; }
     completeRefresh(null, true, performance.now() - started, true);
   };
-  const runQueuedRefresh = () => {
-    // Responsive navigation can temporarily hide and reveal the same links
-    // across separate observer deliveries while measuring them. Restoring
-    // typography restarts that measurement, so refreshing an unchanged final
-    // state would create a feedback loop even with a refresh cooldown. Theme
-    // observers can likewise add/remove inline variables in separate tasks.
-    const changed = !refreshRequired && ([...pendingAriaChanges].some(([element, value]) =>
-      element.isConnected && element.getAttribute("aria-hidden") !== value)
-      || [...pendingStyleChanges].some(([element, value]) => element.isConnected
-        && authorStyleSignature(element, element.getAttribute("style")) !== value)
-      || [...pendingStateChanges].some(([element, names]) => element.isConnected
-        && [...names].some(([name, value]) => element.getAttribute(name) !== value)));
-    if (refreshRequired || changed) {
-      if (!changed && !queuedGlobalRefresh && pendingRegions?.size) refreshChangedRegions([...pendingRegions]);
-      else refresh(true);
-      return;
-    }
-    refreshTimer = null;
-    refreshUrgent = false;
-    pendingAriaChanges.clear();
-    pendingStyleChanges.clear();
-    pendingStateChanges.clear();
-    clearPendingRegions();
-    // A reverted temporary style/accessibility change leaves the saved native
-    // baseline valid. Finish its suspended repair without another conversion.
-    repairSynchronously = false;
-    pendingRepair?.();
-  };
-  const queueRefresh = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null, regions = null) => {
-    urgent = urgent === true;
-    if (refreshing || !settingsLoaded || !isActive()) return;
-    if (pendingRepair !== null) {
-      if (repairFrame !== null) cancelAnimationFrame(repairFrame);
-      repairFrame = null;
-      repairSynchronously = true;
-      // Content/geometry changes invalidate the baseline outright. Temporary
-      // author styles can settle back before the queued deadline instead.
-      if (!ariaChanges && !styleChanges && !stateChanges) pendingRepair = null;
-    }
-    if (regions && !queuedGlobalRefresh && !ariaChanges && !styleChanges && !stateChanges) {
-      pendingRegions ??= new Set();
-      for (const root of regions) pendingRegions.add(root);
-    } else {
-      queuedGlobalRefresh = true;
-      pendingRegions = null;
-    }
-    if (ariaChanges) {
-      for (const mutation of ariaChanges) {
-        if (!pendingAriaChanges.has(mutation.target)) pendingAriaChanges.set(mutation.target, mutation.oldValue);
-      }
-    }
-    if (styleChanges) {
-      for (const [element, value] of styleChanges) {
-        if (!pendingStyleChanges.has(element)) pendingStyleChanges.set(element, value);
-      }
-    }
-    if (stateChanges) for (const mutation of stateChanges) {
-      let names = pendingStateChanges.get(mutation.target);
-      if (!names) pendingStateChanges.set(mutation.target, names = new Map());
-      if (!names.has(mutation.attributeName)) names.set(mutation.attributeName, mutation.oldValue);
-    }
-    if (!ariaChanges && !styleChanges && !stateChanges) refreshRequired = true;
-    // Parser mutations still receive their fonts immediately, but cannot
-    // start native capture before the startup preload has settled or timed out.
-    if (initializing) return;
-    if (refreshTimer !== null) {
-      if (!urgent || refreshUrgent) return;
-      clearTimeout(refreshTimer);
-    }
-    // Fonts have already been applied to incoming text. Keep layout repairs
-    // on a fixed deadline so a continuous feed cannot starve or flood them.
-    refreshUrgent = urgent;
-    refreshTimer = setTimeout(runQueuedRefresh, Math.max(urgent ? 0 : 100, nextRefreshTime - performance.now()));
-  };
+  const queueRefresh = (...args) => scheduler.queue(...args);
   const invalidateAutoContent = (urgent = false, ariaChanges = null, styleChanges = null, stateChanges = null) => {
     revealedAutoContent = new WeakSet();
     queueRefresh(urgent === true, ariaChanges, styleChanges, stateChanges);
@@ -1781,7 +1703,7 @@
 
   const pageState = () => ({
     ready: settingsLoaded && settingsLoadError === null,
-    pending: initializing || restoringChanges !== null || refreshing || refreshTimer !== null || pendingRepair !== null,
+    pending: initializing || restoringChanges !== null || refreshing || scheduler.pending || pendingRepair !== null,
     refreshRevision,
     healthy: settingsLoaded && settingsLoadError === null && lastRefreshError === null,
     error: settingsLoadError ?? lastRefreshError,
@@ -1814,8 +1736,7 @@
       return;
     }
     revealedAutoContent = new WeakSet();
-    if (refreshTimer !== null) clearTimeout(refreshTimer);
-    refreshTimer = null;
+    scheduler.cancel();
     if (deferLayout && effective.active) {
       applyIncomingFonts(new Set(document.documentElement ? [document.documentElement] : []), false);
       observeRoots();
@@ -1958,7 +1879,7 @@
     // markers in the newly editable subtree. This also removes owned shadow
     // styles. Other classification/state changes retain the coalesced path.
     if (enteringEditor) {
-      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      scheduler.cancel();
       refresh();
       return;
     }
@@ -1998,99 +1919,91 @@
       }
       notifyState();
     });
-    document.addEventListener("lexend-design-mode", () => {
-      const editing = protection.editorDocument();
-      if (editing === editingDocument) return;
-      editingDocument = editing;
-      if (!settingsLoaded || !isActive()) return;
-      if (refreshTimer !== null) clearTimeout(refreshTimer);
-      // The native setter bridge dispatches synchronously, so existing owned
-      // typography is restored before the page serializes its new editor.
-      refresh();
-    }, true);
     // The page-world bridge is only a discovery hint, never authority. Ignore
-    // payloads and validate the actual open root; spoofed known/no-root hints
-    // do not trigger traversal, typography reads, or a repair.
-    document.addEventListener("lexend-open-shadow-root", (event) => {
+    // payloads and validate the actual state: a hint for a known or missing
+    // root, or an unchanged editing mode, does no traversal or reads.
+    onBridgeHint = (event) => {
+      if (event.target === document) {
+        const editing = protection.editorDocument();
+        if (editing === editingDocument) return;
+        editingDocument = editing;
+        if (!settingsLoaded || !isActive()) return;
+        scheduler.cancel();
+        // The native setter bridge dispatches synchronously, so existing owned
+        // typography is restored before the page serializes its new editor.
+        refresh();
+        return;
+      }
       if (!isActive()) return;
       const host = event.composedPath()[0];
       if (!(host instanceof Element) || host.ownerDocument !== document || !host.isConnected
           || !host.shadowRoot || styledRoots.has(host.shadowRoot) || protection.editorOwned(host)) return;
       applyIncomingFonts(new Set([host]));
       queueRefresh();
-    }, true);
-    window.addEventListener("resize", invalidateAutoContent, { passive: true });
-    document.addEventListener("focusin", (event) => {
-      if (!isActive() || protection.editorOwned(event.target)) return;
-      queueRefresh();
-      requestAnimationFrame(() => {
-        if (isLayoutRepairActive()) globalThis.LexendControls?.revealFocused?.(event.target);
-      });
-    }, true);
-    document.addEventListener("focusout", (event) => {
-      if (isActive() && !protection.editorOwned(event.target)) queueRefresh();
-    }, true);
-    document.addEventListener("toggle", (event) => {
-      if (!isActive() || !(event.target instanceof Element) || protection.editorOwned(event.target)) return;
-      // details.open is observed and coalesced; popovers have no open attribute.
-      if (event.target.matches("[popover]") && event.oldState !== event.newState) invalidateAutoContent();
-    }, true);
-    const remeasureRevealedLabels = (event) => {
-      if (event.type === "transitionend"
-          && !/^(transform|translate|left|right|top|bottom|inset.*|width|height)$/.test(event.propertyName)) return;
-      const target = event.target;
-      if (!isActive() || !(target instanceof Element) || protection.editorOwned(target)) return;
-      // The mutation that starts a drawer/rail animation can be measured while
-      // its labels are still outside the viewport. Reclassify once movement
-      // finishes; ordinary font/color transitions do not schedule this work.
-      const labels = target.matches(`[${PROTECTED_ATTRIBUTE}]`) ? [target] : [];
-      labels.push(...target.querySelectorAll(`[${PROTECTED_ATTRIBUTE}]`));
-      if (labels.some((element) => directText(element)
-          && getComputedStyle(element).backgroundImage.includes("url("))) queueRefresh();
     };
-    document.addEventListener("transitionend", remeasureRevealedLabels, true);
-    document.addEventListener("animationend", remeasureRevealedLabels, true);
-    document.addEventListener("contentvisibilityautostatechange", (event) => {
-      if (!(event.target instanceof Element)) return;
-      if (!isActive()) return;
-      knownAutoContent.set(event.target, event.skipped);
-      if (event.skipped !== false || revealedAutoContent.has(event.target)) return;
-      // Offscreen automatic-containment subtrees have no usable geometry.
-      // Capture their native layout once the browser paints them. Remember
-      // the target until author content, settings or the viewport changes so
-      // temporary baseline restoration cannot create a loop.
-      revealedAutoContent.add(event.target);
-      queueRefresh();
-    }, true);
-    document.addEventListener("load", (event) => {
-      if (!ownStyleIds.includes(event.target?.id)) invalidateAutoContent();
-    }, true);
-    document.fonts?.addEventListener("loadingdone", (event) => {
-      // Chromium can emit another loadingdone for a cached face when restored
-      // typography stops using it and conversion requests it again. Its glyph
-      // metrics did not change; refreshing that face repeatedly creates a loop.
-      let newMetrics = false;
-      let authorMetrics = false;
-      for (const face of event.fontfaces) {
-        const family = face.family.replace(/["']/g, "");
-        if (family === "Lexend for the Web" || family === SYMBOLS_FAMILY) {
-          // CSS cascade updates can recreate FontFace wrapper identities for
-          // the same immutable bundled source. Its subset and weight identify
-          // those cached metrics across stylesheet activation changes.
-          const key = bundledFaceKey(face);
-          if (settledBundledFaces.has(key)) continue;
-          settledBundledFaces.add(key);
-        } else {
-          if (settledFontFaces.has(face)) continue;
-          settledFontFaces.add(face);
-          authorMetrics = true;
+    // Which page events refresh, in which mode, is documented and decided in
+    // refresh-scheduler.js. These hooks supply only content-specific knowledge.
+    globalThis.LexendRefreshScheduler.listen({
+      isActive, isLayoutRepairActive, editorOwned: (element) => protection.editorOwned(element),
+      queue: () => queueRefresh(),
+      invalidate: (urgent) => invalidateAutoContent(urgent),
+      revealFocused: (target) => globalThis.LexendControls?.revealFocused?.(target),
+      isOwnStyle: (element) => ownStyleIds.includes(element.id),
+      // Focus changes typography only by revealing or hiding a paint-classified
+      // label: the focused element, an ancestor or a descendant.
+      labelRevealedByFocus: (event) => {
+        const target = event.composedPath()[0];
+        if (!(target instanceof Element)) return false;
+        for (let current = target; current; current = composedParent(current)) {
+          if (paintClassifiedText.has(current)) return true;
         }
-        newMetrics = true;
+        for (const element of target.querySelectorAll(`[${TEXT_ATTRIBUTE}],[${PROTECTED_ATTRIBUTE}],[${FONT_ATTRIBUTE}]`)) {
+          if (paintClassifiedText.has(element)) return true;
+        }
+        return false;
+      },
+      labelRevealedByMovement: (target) => {
+        const labels = target.matches(`[${PROTECTED_ATTRIBUTE}]`) ? [target] : [];
+        labels.push(...target.querySelectorAll(`[${PROTECTED_ATTRIBUTE}]`));
+        return labels.some((element) => directText(element)
+          && getComputedStyle(element).backgroundImage.includes("url("));
+      },
+      autoContentRevealed: (target, skipped) => {
+        knownAutoContent.set(target, skipped);
+        if (skipped !== false || revealedAutoContent.has(target)) return false;
+        // Offscreen automatic-containment subtrees have no usable geometry.
+        // Capture their native layout once the browser paints them. Remember
+        // the target until author content, settings or the viewport changes so
+        // temporary baseline restoration cannot create a loop.
+        revealedAutoContent.add(target);
+        return true;
+      },
+      fontMetricsChanged: (faces) => {
+        // Chromium can emit another loadingdone for a cached face when restored
+        // typography stops using it and conversion requests it again. Its glyph
+        // metrics did not change; refreshing that face repeatedly creates a loop.
+        let newMetrics = false;
+        let authorMetrics = false;
+        for (const face of faces) {
+          const family = face.family.replace(/["']/g, "");
+          if (family === "Lexend for the Web" || family === SYMBOLS_FAMILY) {
+            // Subset and weight identify the cached metrics of an immutable
+            // bundled source, independent of FontFace wrapper identity.
+            const key = bundledFaceKey(face);
+            if (settledBundledFaces.has(key)) continue;
+            settledBundledFaces.add(key);
+          } else {
+            if (settledFontFaces.has(face)) continue;
+            settledFontFaces.add(face);
+            authorMetrics = true;
+          }
+          newMetrics = true;
+        }
+        // A pending repair will measure the converted layout with the newly
+        // decoded bundled glyphs. Its native baseline is still valid. Author
+        // fonts change that baseline too and require a fresh capture.
+        return newMetrics && (authorMetrics || !initializing && pendingRepair === null);
       }
-      // A pending repair will measure the converted layout with the newly
-      // decoded bundled glyphs. Its native baseline is still valid. Author
-      // fonts change that baseline too and require a fresh capture.
-      if (newMetrics && (authorMetrics || !initializing && pendingRepair === null)) invalidateAutoContent(true);
     });
     let confirmed;
     try {
@@ -2116,7 +2029,7 @@
       // Request both reading weights before the first native layout capture.
       // Incoming typography is already visible; bound the wait so failed or
       // slow fonts cannot hold the first repair indefinitely.
-      installFontStyle(document.documentElement);
+      installFonts();
       const sample = "A" + (document.body?.textContent ?? "").slice(0, 4000);
       let timer;
       const loaded = Promise.all([400, 700].map((weight) =>
@@ -2170,7 +2083,7 @@
 
   start().finally(() => {
     initializing = false;
-    if (refreshRequired || pendingAriaChanges.size || pendingStyleChanges.size || pendingStateChanges.size) queueRefresh(true);
+    if (scheduler.hasQueuedWork) queueRefresh(true);
     notifyState();
   });
 })();

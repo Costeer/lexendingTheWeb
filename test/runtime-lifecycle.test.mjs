@@ -31,7 +31,7 @@ const prepare = async (html, { before, inspect = false, layoutRepair = true } = 
     globalThis.__state = () => { let result; runtime.forEach((fn) => fn({ type: "LEXEND_GET_STATE" }, null, (value) => { result = value; })); return result; };
   }, layoutRepair);
   await before?.(page);
-  for (const name of ["shadow-discovery", "settings", "adaptive-controls", "adaptive-layout", "content"]) {
+  for (const name of ["shadow-discovery", "settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) {
     let source = await readFile(resolve(`src/${name}.js`), "utf8");
     if (inspect && name === "content") source = instrumentContent(source);
     if (inspect && name === "adaptive-layout") {
@@ -368,5 +368,82 @@ test("default-off repair still reclassifies CSS focus-revealed typography", asyn
     assert.equal(await page.evaluate(() => __state().layoutRepair), false);
     assert.deepEqual(await page.evaluate(() => __layoutCalls), { capture: 0, repair: 0 });
     assert.equal(await page.locator('#skip').getAttribute('data-lexend-layout-repair'), null);
+  } finally { await page.close(); }
+});
+
+test("default-off repair converts only for typography changes and releases automatic containment targets", async () => {
+  const page = await prepare(`<style>section{content-visibility:auto;contain-intrinsic-size:auto 400px}</style>
+    <link id="theme" rel="stylesheet" href="data:text/css,"><p id="reading">Reading content</p>
+    <input id="first" aria-label="First"><input id="second" aria-label="Second">
+    <img id="picture" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><main id="feed"></main>`, { layoutRepair: null, inspect: true });
+  const refreshes = () => page.evaluate(() => __probe.calls.refresh?.count ?? 0);
+  const quiet = async () => { await page.waitForTimeout(300); await settled(page); };
+  try {
+    const initial = await refreshes();
+    await page.locator('#first').focus();
+    await page.locator('#second').focus();
+    await page.locator('#second').evaluate((element) => element.blur());
+    await page.locator('#picture').evaluate((image) => new Promise((resolve) => {
+      image.addEventListener('load', resolve, { once: true });
+      image.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    }));
+    await quiet();
+    assert.equal(await refreshes(), initial, 'ordinary focus and image loads keep the existing conversion');
+
+    // An unobserved href change reaches the runtime only through its load event.
+    await page.locator('#theme').evaluate((link) => new Promise((resolve) => {
+      link.addEventListener('load', resolve, { once: true });
+      link.href = 'data:text/css,%23reading{font-size:30px}';
+    }));
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#reading')).fontSize === '33px');
+    await settled(page);
+    assert.ok(await refreshes() > initial, 'a stylesheet load remeasures author typography');
+
+    await page.evaluate(async () => {
+      const feed = document.querySelector('#feed');
+      for (let round = 0; round < 3; round++) {
+        const sections = Array.from({ length: 5 }, (_, index) => Object.assign(document.createElement('section'),
+          { textContent: `Round ${round}, item ${index}` }));
+        feed.replaceChildren(...sections);
+        for (const section of sections) {
+          section.scrollIntoView();
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }
+      }
+      feed.replaceChildren();
+    });
+    await quiet();
+    const { knownAuto, detachedAuto } = await page.evaluate(() => __collections());
+    assert.deepEqual({ knownAuto, detachedAuto }, { knownAuto: 0, detachedAuto: 0 }, 'removed contained sections are not retained');
+    assert.deepEqual(await page.evaluate(() => __layoutCalls), { capture: 0, repair: 0 });
+  } finally { await page.close(); }
+});
+
+test("the page-world bridge looks native and its discovery hints stay private", async () => {
+  const page = await prepare('<p id="reading">Reading content</p><div id="late"></div>', { layoutRepair: null });
+  try {
+    assert.deepEqual(await page.evaluate(() => {
+      const attach = Element.prototype.attachShadow;
+      const setter = Object.getOwnPropertyDescriptor(Document.prototype, "designMode").set;
+      const source = (fn) => Function.prototype.toString.call(fn);
+      return [source(attach), source(setter), source(Function.prototype.toString), setter.name,
+        Object.hasOwn(attach, "prototype"), Reflect.ownKeys(attach).join()];
+    }), ["function attachShadow() { [native code] }", "function set designMode() { [native code] }",
+      "function toString() { [native code] }", "set designMode", false, "length,name"]);
+    // Real page scripts start after the document_start exchange, as they do here.
+    await page.evaluate(() => {
+      globalThis.__heard = [];
+      for (const type of ["lexend-open-shadow-root", "lexend-design-mode", "lexend-bridge-offer"]) {
+        addEventListener(type, (event) => __heard.push(event.type), true);
+      }
+      document.dispatchEvent(new Event("lexend-bridge-request", { cancelable: true }));
+      document.querySelector("#late").attachShadow({ mode: "open" }).innerHTML = "<span>Late readable words</span>";
+    });
+    await page.waitForFunction(() => /Lexend/.test(getComputedStyle(document.querySelector("#late").shadowRoot.querySelector("span")).fontFamily));
+    await page.evaluate(() => { document.designMode = "on"; });
+    assert.equal(await page.locator("#reading").getAttribute("data-lexend-text"), null, "the private designMode hint still restores markup synchronously");
+    await page.evaluate(() => { document.designMode = "off"; });
+    await settled(page);
+    assert.deepEqual(await page.evaluate(() => __heard), [], "pages can neither observe nor request bridge hints");
   } finally { await page.close(); }
 });

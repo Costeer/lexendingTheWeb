@@ -73,7 +73,7 @@ const prepare = async (page, { delayed = false, html = fixture } = {}) => {
   });
   if (!delayed) await page.evaluate(() => __initialFontLoad);
   else await page.waitForFunction(() => document.fonts.status === "loading");
-  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) {
     await page.addScriptTag({ path: resolve(process.env.LEXEND_TEST_SOURCE ?? ".", `src/${name}.js`) });
   }
   return { requests, releaseFont };

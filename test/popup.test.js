@@ -168,9 +168,25 @@ test("global pause waits for the page to confirm before claiming it is off", asy
   await page.get("#retry-page").emit("click");
   assert.equal(page.get("#master-state").textContent, "Off");
   assert.equal(page.get("#site-status-text").textContent, "Off");
-  assert.equal(page.get("#site-message").textContent, "Lexend is paused everywhere.");
+  assert.equal(page.get("#site-message").textContent, "Lexend is paused everywhere. Turn it on to pause or resume this site.");
   assert.equal(page.get("#retry-page").hidden, true);
   assert.equal(page.writes.length, 0, "Checking the page only reads its confirmed state");
+});
+
+test("site toggle is unavailable while the master switch is off and never resumes every site", async () => {
+  const page = await openPopup({ initial: { enabled: false, siteRules: [{ hostname: "other.example", enabled: false }] }, state: () => ({
+    hostname: "example.com", scope: "body", active: false, ready: true, healthy: true, pending: false
+  }) });
+  assert.equal(page.get("#toggle-site").disabled, true);
+  page.get("#toggle-site").emit("click");
+  await tick();
+  assert.equal(page.writes.length, 0);
+  assert.equal(page.stored().enabled, false);
+
+  page.get("#enabled").checked = true;
+  page.get("#enabled").emit("change");
+  await tick();
+  assert.equal(page.get("#toggle-site").disabled, false, "turning the master switch on re-enables site controls");
 });
 
 test("popup identifies independent matching sources beside global controls and removes exact overrides", async () => {

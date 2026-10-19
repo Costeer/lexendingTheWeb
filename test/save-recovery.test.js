@@ -269,19 +269,18 @@ test("partial Undo supersedes only restored fields and all rule identities", asy
   assert.deepEqual(h.settings().siteRules, []);
 });
 
-test("superseding part of a non-splittable toggle retires the complete operation", async () => {
-  for (const restored of ["enabled", "siteRules"]) {
-    const h = harness();
-    h.remote({ enabled: false });
-    await assert.rejects(h.tracker.mutate({ type: "toggleSite", hostname: "example.com" }));
-    assert.equal(h.tracker.state.failures[0].keys.length, 2);
-    h.tracker.supersede([restored]);
-    assert.equal(h.tracker.state.failures.length, 0);
-    h.allow();
-    await h.tracker.retry();
-    assert.equal(h.operations.length, 1);
-    assert.equal(h.settings().enabled, false);
-  }
+test("a failed toggle owns only its rule, and superseding the rule collection retires it", async () => {
+  const h = harness();
+  await assert.rejects(h.tracker.mutate({ type: "toggleSite", hostname: "example.com" }));
+  assert.deepEqual(h.tracker.state.failures[0].keys, ["rule:example.com:false"]);
+  h.tracker.supersede(["enabled"]);
+  assert.equal(h.tracker.state.failures.length, 1, "the master switch is not part of a site toggle");
+  h.tracker.supersede(["siteRules"]);
+  assert.equal(h.tracker.state.failures.length, 0);
+  h.allow();
+  await h.tracker.retry();
+  assert.equal(h.operations.length, 1);
+  assert.deepEqual(h.settings().siteRules, []);
 });
 
 test("invalid supersession validates every field before changing retry ownership", async () => {

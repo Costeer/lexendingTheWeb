@@ -18,14 +18,15 @@ jobs:
     env:
       LEXEND_STRESS_CYCLES: ${{ github.event_name == 'schedule' && '100' || '12' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm audit --audit-level=high
       - run: npm test
@@ -33,7 +34,7 @@ jobs:
       - run: npm run package
       - run: npm run test:packages
       - run: npm run lint:firefox
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: browser-packages
           path: dist/releases/*.zip
@@ -43,15 +44,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - name: Select a baseline predating the changes
         id: baseline
@@ -65,7 +67,7 @@ jobs:
         env:
           PERFORMANCE_BASE: ${{ steps.baseline.outputs.commit }}
         run: npm run test:performance -- --base "$PERFORMANCE_BASE"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: performance-regressions
@@ -81,14 +83,16 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --ipc=host
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:ui
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: interface-regressions

@@ -89,6 +89,7 @@ test("typography preserves protected content and refreshes atomic inherited base
     await page.addScriptTag({ path: resolve("src/settings.js") });
     await page.addScriptTag({ path: resolve("src/adaptive-controls.js") });
     await page.addScriptTag({ path: resolve("src/adaptive-layout.js") });
+    await page.addScriptTag({ path: resolve("src/refresh-scheduler.js") });
     await page.evaluate(() => {
       const create = globalThis.LexendLayout.create;
       globalThis.LexendLayout = {create: (options) => {
@@ -363,7 +364,7 @@ test("already focused repaired panel actions remain visible after typography set
       globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       globalThis.__focusedBounds=()=>{const p=document.querySelector('.panel'),a=document.querySelector('#action'),r=p.getBoundingClientRect(),q=a.getBoundingClientRect();return{repair:p.dataset.lexendLayoutRepair,paneTop:r.top,paneBottom:r.bottom,actionTop:q.top,actionBottom:q.bottom,scrollTop:p.scrollTop,scrollY,focused:document.activeElement===a};};
     });
-    for(const name of ["settings","adaptive-controls","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    for(const name of ["settings","adaptive-controls","adaptive-layout","refresh-scheduler","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
     await page.waitForFunction(()=>/bounded-panel|reachable-scroll/.test(document.querySelector('.panel').dataset.lexendLayoutRepair??""));
     await page.evaluate(()=>{window.scrollTo(0,1500);document.querySelector('#action').focus();});
     await page.waitForTimeout(150);
@@ -413,7 +414,7 @@ test("small cross-origin announcements resize by measured demand and restore", a
         globalThis.chrome={runtime:{id:"frame-test",getURL:p=>`http://frame.test/${p}`,sendMessage:async message=>{if(message.type==="LEXEND_FRAME_REQUIREMENT"){__frameDemandCount++;await __relayFrameRequirement(message.requirement);}else if(message.type==="LEXEND_RECHECK_FRAME_REQUIREMENTS")await __relayFrameRecheck();},onMessage:{addListener:f=>__runtime.push(f)}},storage:{sync:{get:async()=>__settings},onChanged:{addListener:f=>__listeners.push(f)}}};
         globalThis.__update=values=>{Object.assign(__settings,values);const changes=Object.fromEntries(Object.entries(values).map(([key,newValue])=>[key,{newValue}]));__listeners.forEach(fn=>fn(changes,"sync"));};
       });
-      for(const path of ["settings","adaptive-controls","adaptive-layout","content"])await target.addScriptTag({path:resolve(`src/${path}.js`)});
+      for(const path of ["settings","adaptive-controls","adaptive-layout","refresh-scheduler","content"])await target.addScriptTag({path:resolve(`src/${path}.js`)});
     };
     await install(page);
     const child=page.frames().find(frame=>frame.url().startsWith("http://frame.test"));
@@ -712,7 +713,7 @@ test("newly painted automatic content gets a fresh layout baseline without refre
    document.addEventListener('contentvisibilityautostatechange',e=>{if(e.target.id==='lazy'&&!e.skipped)__reveals++;},true);
    globalThis.chrome={runtime:{getURL:p=>`http://lazy.test/${p}`,sendMessage:async()=>{},onMessage:{addListener:()=>{}}},storage:{sync:{get:async()=>({enabled:true,layoutRepair:true,scope:'all',textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:f=>__listeners.push(f)}}};
   });
-  for(const name of ['settings','adaptive-controls','adaptive-layout'])await page.addScriptTag({path:resolve(`src/${name}.js`)});
+  for(const name of ['settings','adaptive-controls','adaptive-layout','refresh-scheduler'])await page.addScriptTag({path:resolve(`src/${name}.js`)});
   await page.evaluate(()=>{const create=LexendLayout.create;globalThis.LexendLayout={create:options=>{const controller=create(options);return{...controller,capture:(...args)=>{__captureCount++;return controller.capture(...args);}};}};});
   await page.addScriptTag({path:resolve('src/content.js')});
   await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(250);
@@ -774,7 +775,7 @@ test("slotted typography overrides inner important rules and loads exact Latin s
       globalThis.__metrics=id=>{const css=getComputedStyle(document.getElementById(id));return{family:css.fontFamily,size:parseFloat(css.fontSize),line:parseFloat(css.lineHeight),spacing:css.letterSpacing};};
     });
     const before = await page.evaluate(() => ({title:__metrics("title"),body:__metrics("body"),code:__metrics("code"),fallback:document.querySelector("#fallback").textContent}));
-    for (const name of ["settings","adaptive-controls","adaptive-layout","content"]) await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    for (const name of ["settings","adaptive-controls","adaptive-layout","refresh-scheduler","content"]) await page.addScriptTag({path:resolve(`src/${name}.js`)});
     await page.waitForFunction(() => /Lexend/.test(__metrics("title").family));
     await page.evaluate(() => document.fonts.ready);
     const assertScaled = async (id, size, line) => {
@@ -821,7 +822,7 @@ test("incoming feed text outruns coalesced animation updates and exposes pending
       globalThis.chrome={runtime:{getURL:path=>`http://feed.test/${path}`,sendMessage:async()=>{},onMessage:{addListener:listener=>__runtime.push(listener)}},storage:{sync:{get:async()=>({enabled:true,layoutRepair:true,scope:"all",textScale:110,lineHeight:1.6,letterSpacing:.02})},onChanged:{addListener:()=>{}}}};
       globalThis.__state=()=>{let state;__runtime.forEach(listener=>listener({type:"LEXEND_GET_STATE"},null,value=>state=value));return state;};
     });
-    for(const name of ["settings","adaptive-controls","adaptive-layout","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    for(const name of ["settings","adaptive-controls","adaptive-layout","refresh-scheduler","content"])await page.addScriptTag({path:resolve(`src/${name}.js`)});
     await page.waitForFunction(()=>document.querySelector("#feed p").hasAttribute("data-lexend-text")&&__state().pending===false);
     await page.evaluate(()=>document.fonts.ready);
     await page.waitForFunction(()=>__state().pending===false);

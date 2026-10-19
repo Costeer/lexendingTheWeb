@@ -65,6 +65,16 @@ test("keyboard shortcut toggles the main page without tab URL access", async () 
   assert.equal(LexendSettings.decodeSettings(writes[1]).siteRules.length, 0);
 });
 
+test("shortcut does nothing while the master switch is off", async () => {
+  const { browser, writes } = createBackground({ stored: { enabled: false } });
+  const titles = [];
+  browser.action.setTitle = async (value) => { titles.push(value); };
+  browser.action.setBadgeText = async (value) => { titles.push(value); };
+  await browser.commands.onCommand.listener("toggle-current-site");
+  assert.equal(writes.length, 0, "a site toggle never turns the master switch back on");
+  assert.deepEqual(titles, [], "the deliberate Off state is not reported as a failure");
+});
+
 test("shortcut leaves settings unchanged when the page has no content script", async () => {
   const { browser, writes } = createBackground({ supported: false });
   await browser.commands.onCommand.listener("toggle-current-site");

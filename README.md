@@ -12,6 +12,8 @@ Open the extension from your browser's toolbar. Choose **Body text** for paragra
 links, labels and controls, or **Body and headings** to include headings too.
 Use **Pause here** to keep the current site's font, or the master switch to turn
 Lexend off everywhere. The shortcut is `Ctrl+Shift+L` (`Command+Shift+L` on macOS).
+While the master switch is off, **Pause here**, **Resume here** and the shortcut are
+unavailable; turn Lexend on first, so resuming one site never resumes every site.
 
 Open **Settings** with the gear button to adjust text size, line height and letter
 spacing. The preview offers **Reading**, **Compare** and **Glyphs** views. **Try your

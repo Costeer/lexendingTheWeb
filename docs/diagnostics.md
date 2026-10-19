@@ -15,7 +15,9 @@ URLs, hostnames, page text, custom preview text and raw user-agent strings.
 Errors are recorded only as present or absent, without their messages.
 
 The popup can include page status because the website stays active underneath
-it. About, restricted pages and pages that do not respond show page status as
+it. About is itself the active tab, so it reports the most recently used other
+tab in the same window and marks that status with `"source": "recent-tab"`.
+Restricted pages and pages that do not respond show page status as
 unavailable. This does not mean the page is working correctly. Browser privacy
 settings may also limit the reported browser version.
 
