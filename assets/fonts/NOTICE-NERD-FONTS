@@ -1,42 +1,12 @@
-# Bundled Nerd Fonts symbols
+Bundled Nerd Fonts symbols — source and attribution
 
-Lexend for the Web includes a symbols-only font from
-[Nerd Fonts v3.5.1](https://github.com/ryanoasis/nerd-fonts/releases/tag/v3.5.1).
-It supplies missing icons when a site's own fonts cannot display them.
+SymbolsNerdFont-Regular.ttf from Nerd Fonts v3.5.1 supplies missing icon glyphs.
+Upstream: https://github.com/ryanoasis/nerd-fonts/releases/tag/v3.5.1
+License: LICENSE-NERD-FONTS in this directory.
 
-The extension puts this fallback after the site's original fonts in a separate
-CSS font family. A site's own private-use icon mappings take precedence. Code,
-elements excluded from conversion, and ordinary text that has not been
-converted keep their original font families.
-
-## Source and conversion
-
-The source file is `SymbolsNerdFont-Regular.ttf` from the
-[v3.5.1 Symbols Only archive](https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/NerdFontsSymbolsOnly.tar.xz).
-It was converted to `nerd-fonts-symbols.woff2` with FontTools 4.66.1 and
-Brotli 1.2.0. The conversion keeps all 10,624 encoded glyphs, the original font
-names, and the copyright metadata.
-
-The archive's license is included in [LICENSE-NERD-FONTS](LICENSE-NERD-FONTS).
-
-With Nix installed, run this from the repository root:
-
-```sh
-mkdir -p dist
-nix-build scripts/build-nerd-font.nix --out-link dist/nerd-font
-```
-
-The [build](../../scripts/build-nerd-font.nix) pins Nixpkgs, the source archive,
-FontTools 4.66.1, and Brotli 1.2.0. It fixes the conversion timestamp and checks
-that the result matches the bundled font byte for byte. The font and its
-license are written to `dist/nerd-font/`.
-
-## Icon sources and attribution
-
-Nerd Fonts combines symbols from the projects below. Its Symbols Only font
-provides those symbols as a fallback, including for use with fontconfig,
-without requiring each text font to be patched. The table retains the icon
-sources, versions, and licenses listed in the upstream release.
+The included WOFF2 preserves the upstream font names, glyphs and copyright
+metadata. The following icon sources, versions and licenses are retained from
+that release:
 
 | Icon set name          | upstream                                              | version         | license     |
 |------------------------|-------------------------------------------------------|-----------------|-------------|

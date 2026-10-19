@@ -3,6 +3,7 @@
 
   const extension = globalThis.browser ?? globalThis.chrome;
   const settingsApi = globalThis.LexendSettings;
+  let themeRevision = 0;
   const applyTheme = (value) => {
     globalThis.LexendTheme.apply(settingsApi.normalizeSettings(value).theme);
   };
@@ -82,14 +83,17 @@
 
   extension?.storage?.onChanged?.addListener((changes, areaName) => {
     if (areaName === "sync" && Object.hasOwn(changes, "theme")) {
+      themeRevision += 1;
       applyTheme({ theme: changes.theme.newValue });
     }
   });
 
   const start = async () => {
+    const revision = themeRevision;
     try {
       if (extension?.storage?.sync) {
-        applyTheme(await extension.storage.sync.get(null));
+        const saved = await extension.storage.sync.get(["theme"]);
+        if (themeRevision === revision) applyTheme(saved);
       }
     } catch (error) {
       console.error("Lexend for the Web could not load the interface theme.", error);

@@ -118,7 +118,7 @@
                         </label>
                     </div>
                     <p class="helper">
-                        Applies
+                        Global settings apply on every site,
                         <span class="lexend-emphasis"
                             >only while Lexend is on.</span
                         >
@@ -161,6 +161,9 @@
                                         value="120"
                                     /><span>Larger</span></label
                                 >
+                                <label id="custom-text-scale-choice" class="custom-choice" hidden><input
+                                    id="custom-text-scale" type="radio" name="basicTextScale" value="custom" data-custom="true"
+                                /><span id="custom-text-scale-label">Custom</span></label>
                             </div>
                         </fieldset>
 
@@ -188,6 +191,9 @@
                                         value="2"
                                     /><span>Loose</span></label
                                 >
+                                <label id="custom-line-height-choice" class="custom-choice" hidden><input
+                                    id="custom-line-height" type="radio" name="basicLineHeight" value="custom" data-custom="true"
+                                /><span id="custom-line-height-label">Custom</span></label>
                             </div>
                         </fieldset>
 
@@ -215,9 +221,14 @@
                                         value="0.08"
                                     /><span>Spacious</span></label
                                 >
+                                <label id="custom-letter-spacing-choice" class="custom-choice" hidden><input
+                                    id="custom-letter-spacing" type="radio" name="basicLetterSpacing" value="custom" data-custom="true"
+                                /><span id="custom-letter-spacing-label">Custom</span></label>
                             </div>
                         </fieldset>
                     </div>
+
+                    <button id="adjust-custom-values" class="inline-link custom-settings-link" type="button" hidden>Adjust custom values in Advanced</button>
 
                     <div
                         id="advanced-readability"
@@ -257,7 +268,7 @@
                                 id="line-height"
                                 type="range"
                                 min="0"
-                                max="29"
+                                max="141"
                                 step="1"
                                 value="0"
                             />
@@ -280,7 +291,7 @@
                                 type="range"
                                 min="0"
                                 max="0.2"
-                                step="0.005"
+                                step="0.001"
                                 value="0"
                             />
                             <span class="slider-limits" aria-hidden="true"
@@ -288,6 +299,11 @@
                             >
                         </label>
                     </div>
+                </div>
+
+                <div class="layout-repair-setting">
+                    <label><input id="layout-repair" type="checkbox" aria-describedby="layout-repair-help" /> <span>Enable layout repair on all sites</span></label>
+                    <p id="layout-repair-help">Otherwise, enable it for individual sites from the popup or site rules.</p>
                 </div>
 
                 <div class="readability-preview">
@@ -353,7 +369,7 @@
                 <div class="section-heading">
                     <h2 id="rules-title">Site rules</h2>
                     <p class="helper">
-                        Exact-host rules take priority over subdomain rules.
+                        Exact-host rules take priority. Each value then inherits from the most specific matching rule, followed by global settings. The global On/Off switch always applies. Layout repair is optional per site; the all-sites layout repair setting takes priority.
                     </p>
                 </div>
 
@@ -499,6 +515,19 @@
                             class="field-error"
                             role="alert"
                         ></p>
+                        <section id="import-preview" class="import-preview" aria-labelledby="import-preview-title" hidden>
+                            <h4 id="import-preview-title" tabindex="-1">Review replacement</h4>
+                            <p id="import-preview-description">This file replaces your saved settings and site rules. Check every change before applying.</p>
+                            <ul id="import-preview-list"></ul>
+                            <div class="button-row">
+                                <button id="apply-import" class="primary-button" type="button">Apply import</button>
+                                <button id="cancel-import" class="secondary-button" type="button">Cancel</button>
+                            </div>
+                        </section>
+                        <div id="import-undo" class="import-undo" hidden>
+                            <p id="import-undo-message" role="status">Settings imported. Undo restores values that have not changed since this import; later edits are kept.</p>
+                            <button id="undo-import" class="secondary-button" type="button">Undo import</button>
+                        </div>
                     </article>
 
                     <article class="tool-card">
@@ -557,6 +586,7 @@
 
         <script src="src/settings.js"></script>
         <script src="src/preferences.js"></script>
+        <script src="src/save-recovery.js"></script>
         <script src="src/quotes.js"></script>
         <script src="options.js"></script>
     </body>

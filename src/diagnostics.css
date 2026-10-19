@@ -1,0 +1,19 @@
+.popup-diagnostics {
+  padding: 0 16px 12px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.popup-diagnostics button {
+  min-height: 44px;
+  color: var(--ink);
+}
+
+.popup-diagnostics p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.popup-diagnostics [role="status"]:not(:empty) {
+  margin-top: 8px;
+}

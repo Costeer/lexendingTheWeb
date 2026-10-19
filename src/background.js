@@ -25,11 +25,12 @@
     tabRevisions.set(tabId, revision);
     return revision;
   };
+  const isConfirmedActive = (state) => Boolean(state?.ready && state.healthy && !state.pending && state.active);
   const refreshTab = async (tabId) => {
     const revision = advanceTab(tabId);
     try {
       const state = await extension.tabs.sendMessage(tabId, { type: "LEXEND_GET_STATE" }, { frameId: 0 });
-      if (tabRevisions.get(tabId) === revision) await setTabState(tabId, Boolean(state?.ready && state.active));
+      if (tabRevisions.get(tabId) === revision) await setTabState(tabId, isConfirmedActive(state));
     } catch {
       if (tabRevisions.get(tabId) === revision) await setTabState(tabId, false);
     }
@@ -138,6 +139,19 @@
   });
 
   extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === "LEXEND_RECHECK_FRAME_REQUIREMENTS") {
+      if (sender.id !== extension.runtime.id || !Number.isInteger(sender.tab?.id)
+          || !Number.isInteger(sender.frameId) || sender.frameId < 0) return undefined;
+      try {
+        if (!["http:", "https:", "about:", "blob:"].includes(new URL(sender.url).protocol)) return undefined;
+      } catch { return undefined; }
+      // Activation only: opted-in children resend their measured requirement;
+      // paused/default-off children ignore this before reading any geometry.
+      extension.tabs.sendMessage(sender.tab.id, {
+        type: "LEXEND_RECHECK_FRAME_REQUIREMENT"
+      }).then(() => sendResponse({ relayed: true }), () => sendResponse({ relayed: false }));
+      return true;
+    }
     if (message?.type === "LEXEND_FRAME_REQUIREMENT") {
       // Runtime sender metadata identifies the actual extension/frame. Page
       // postMessage events can lose their source in an isolated content world.
@@ -175,7 +189,7 @@
     }
     if (message?.type === "LEXEND_STATE" && sender.frameId === 0) {
       advanceTab(sender.tab?.id);
-      setTabState(sender.tab?.id, Boolean(message.active));
+      setTabState(sender.tab?.id, isConfirmedActive(message));
     }
   });
 
@@ -195,7 +209,7 @@
   });
 
   extension.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "sync" && (changes.enabled || changes.siteRules)) {
+    if (areaName === "sync" && (changes.enabled || changes.layoutRepair || changes.siteRules || changes.disabledSites)) {
       updateAllTabs().catch(() => {});
     }
   });

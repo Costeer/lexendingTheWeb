@@ -12,7 +12,7 @@ const prepare = async (page, html, { settings = {}, beforeStart, settle = true, 
   await page.setContent(html);
   await page.evaluate((settings) => {
     const storage = [], runtime = [];
-    globalThis.__settings = { enabled: true, scope: "all", textScale: 100, ...settings };
+    globalThis.__settings = { enabled: true, scope: "all", layoutRepair: true, textScale: 100, ...settings };
     globalThis.chrome = {
       runtime: { getURL: (path) => `http://performance.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
       storage: { sync: { get: async () => __settings }, onChanged: { addListener: (fn) => storage.push(fn) } }
@@ -363,7 +363,7 @@ test("large pages reuse measurements, preserve protected branches, and rest whil
     <pre id="editor">${Array.from({ length: 500 }, (_, i) => `<span>const value${i} = ${i};</span>\n`).join("")}</pre>`);
     await page.evaluate(() => {
       document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<p style="font-size:1.5em">Protected shadow text</p>';
-      globalThis.__settings = { enabled: false, scope: "all", textScale: 120 };
+      globalThis.__settings = { enabled: false, scope: "all", layoutRepair: true, textScale: 120 };
       const storage = [], runtime = [];
       globalThis.chrome = {
         runtime: { getURL: (path) => `http://performance.test/${path}`, sendMessage: async () => {}, onMessage: { addListener: (fn) => runtime.push(fn) } },
@@ -461,10 +461,15 @@ test("conversation style feedback settles across cooldowns while fonts, streamin
     const page = await browser.newPage();
     await prepare(page, conversationHtml(), { settings: { textScale: 120 }, settle: false });
     await page.evaluate(() => document.fonts.ready);
-    // Do not wait for pending=false first: the broken implementation never
-    // settles. Observe several real cooldowns, including a delayed restart.
-    await page.waitForTimeout(1500);
-    const before = await page.evaluate(() => __state());
+    // A late startup font can queue a legitimate refresh behind the cooldown.
+    // Bound the wait: the broken feedback loop never settles and must fail.
+    // Sample readiness and revision together before observing idle cooldowns.
+    const handle = await page.waitForFunction(() => {
+      const state = __state();
+      return state?.healthy && !state.pending && document.fonts.status === "loaded" ? state : false;
+    }, null, { timeout: 10000 });
+    const before = await handle.jsonValue();
+    await handle.dispose();
     await page.waitForTimeout(4000);
     const after = await page.evaluate(() => __state());
     assert.equal(after.pending, false, "author restoration must not perpetually queue full-page work");

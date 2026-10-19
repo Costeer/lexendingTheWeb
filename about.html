@@ -141,6 +141,14 @@
               </span>
             </span>
           </a>
+          <div class="about-block about-diagnostics">
+            <h3>Build and diagnostics</h3>
+            <p id="build-version">Loading build identity…</p>
+            <p class="about-fingerprint"><span>Source fingerprint</span><code id="build-fingerprint"></code></p>
+            <p class="helper" id="diagnostics-help">Save a local report with the build, browser version, general preferences, and current tab status when available. Website addresses, site rules, and page content are excluded. Nothing is sent automatically.</p>
+            <button type="button" class="secondary-button" id="export-diagnostics" data-diagnostics-export data-diagnostics-status="diagnostics-status" aria-describedby="diagnostics-help">Save diagnostics</button>
+            <p id="diagnostics-status" role="status" aria-live="polite"></p>
+          </div>
         </section>
       </main>
     </div>
@@ -160,6 +168,8 @@
     <span id="support-confetti" class="support-confetti" aria-hidden="true"></span>
 
     <script src="src/settings.js"></script>
+    <script src="src/diagnostics.js"></script>
+    <script src="src/diagnostics-ui.js"></script>
     <script src="about.js"></script>
   </body>
 </html>

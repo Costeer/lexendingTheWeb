@@ -751,3 +751,35 @@ fieldset:disabled {
     overflow-wrap: anywhere;
   }
 }
+
+:root .site-strip-copy { min-width: 0; }
+/* A standalone retry stretches across the mobile flex panel. The shared
+   link highlight's negative margins would make it wider than the viewport. */
+:root .panel > .text-link { margin-inline: 0; }
+:root .site-strip .site-message {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+:root .site-strip > .text-link { align-self: start; flex-shrink: 0; }
+:root .site-strip #use-inherited-site { margin-top: 8px; font-size: 12px; }
+:root .segments .custom-choice { grid-column: 1 / -1; border-left: 0; }
+:root .segments .custom-choice span { border-top: 1px solid var(--ui-border); }
+#adjust-custom-spacing { margin-top: 12px; font-size: 13px; }
+
+.site-layout-control {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.site-layout-control input { flex: none; margin: 3px 0 0; accent-color: var(--accent); }
+.site-layout-control:has(input:disabled) { cursor: default; }

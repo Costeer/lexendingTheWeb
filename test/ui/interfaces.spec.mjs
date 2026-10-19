@@ -1,4 +1,5 @@
-import { test, expect, openInterface, scanAccessibility } from "./fixtures.mjs";
+import { test, expect, openInterface, scanAccessibility, assertViewportLayout, containFullPageScreenshot } from "./fixtures.mjs";
+import { readFile } from "node:fs/promises";
 
 for (const section of ["readability", "rules", "appearance", "tools"]) {
   test(`${section} settings remain accessible and visually stable`, async ({ page }, testInfo) => {
@@ -42,10 +43,54 @@ test("About remains accessible and visually stable", async ({ page }, testInfo) 
   await expect(page).toHaveScreenshot("about.png", { fullPage: true });
 });
 
+for (const surface of ["about", "popup"]) test(`${surface} saves private diagnostics only on request with realistic active-tab state`, async ({ page }, testInfo) => {
+  await openInterface(page, `${surface}.html`);
+  await page.evaluate((surface) => {
+    globalThis.__diagnosticQueries = 0;
+    browser.tabs.query = async () => {
+      __diagnosticQueries++;
+      return [{ id: 7, url: surface === "about" ? location.href : "https://private-diagnostic-sentinel.example/secret" }];
+    };
+    browser.tabs.sendMessage = async () => {
+      if (surface === "about") throw new Error("No content script in the active About tab");
+      return {
+      ready: true, pending: false, active: true, healthy: false, refreshRevision: 7, scope: "all",
+      hostname: "private-diagnostic-sentinel.example", text: "private-diagnostic-sentinel page text",
+      error: "private-diagnostic-sentinel runtime error"
+      };
+    };
+    browser.storage.sync.get = async () => ({
+      enabled: true, scope: "all", theme: "dark", textScale: 125, lineHeight: 1.7, letterSpacing: .05,
+      siteRules: [{ hostname: "private-diagnostic-sentinel.example", enabled: false }],
+      previewText: "private-diagnostic-sentinel preview"
+    });
+  }, surface);
+  expect(await page.evaluate(() => __diagnosticQueries)).toBe(0);
+  const requested = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save diagnostics" }).click();
+  const download = await requested;
+  expect(download.suggestedFilename()).toBe("lexend-the-web-diagnostics.json");
+  const serialized = await readFile(await download.path(), "utf8");
+  expect(serialized).not.toMatch(/private-diagnostic-sentinel|siteRules|hostname|previewText/);
+  const report = JSON.parse(serialized);
+  expect(report.build.sourceHash).toBe("0123456789abcdef".repeat(4));
+  expect(report.settings).toEqual({ status: "available", enabled: true, layoutRepair: false, scope: "all", theme: "dark",
+    textScale: 125, lineHeight: 1.7, letterSpacing: .05 });
+  expect(report.runtime).toEqual(surface === "about" ? { status: "unavailable" } : {
+    status: "available", ready: true, pending: false, healthy: false, active: true,
+    refreshRevision: 7, scope: "all", hasError: true });
+  expect(await page.evaluate(() => __diagnosticQueries)).toBe(1);
+  await expect(page.locator(surface === "about" ? "#diagnostics-status" : "#popup-diagnostics-status"))
+    .toHaveText("Diagnostics saved locally. Nothing was sent.");
+  await testInfo.attach("diagnostic-export", { body: serialized, contentType: "application/json" });
+});
+
 test("popup remains accessible and visually stable", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.use.isMobile ? 320 : 360, height: 800 });
   await openInterface(page, "popup.html");
   await expect(page.locator("#site-strip")).toBeVisible();
   await scanAccessibility(page, testInfo);
+  if (testInfo.project.use.isMobile) await containFullPageScreenshot(page, testInfo);
   await expect(page).toHaveScreenshot("popup.png", { fullPage: true });
+  await assertViewportLayout(page, testInfo);
 });

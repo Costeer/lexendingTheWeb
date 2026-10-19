@@ -26,7 +26,7 @@ function createBackground({ stored = {}, supported = true } = {}) {
       async sendMessage(tabId, message, options) {
         messages.push({ tabId, message, options });
         if (!supported) throw new Error("No content script");
-        return { ready: true, active: true, hostname: "example.com" };
+        return { ready: true, healthy: true, pending: false, active: true, hostname: "example.com" };
       },
       onUpdated: event(),
       onRemoved: event()
@@ -58,11 +58,11 @@ test("keyboard shortcut toggles the main page without tab URL access", async () 
   await browser.commands.onCommand.listener("toggle-current-site");
   assert.equal(messages[0].tabId, 42);
   assert.equal(messages[0].options.frameId, 0);
-  assert.equal(writes[0].siteRules[0].hostname, "example.com");
-  assert.equal(writes[0].siteRules[0].enabled, false);
+  assert.equal(LexendSettings.decodeSettings(writes[0]).siteRules[0].hostname, "example.com");
+  assert.equal(LexendSettings.decodeSettings(writes[0]).siteRules[0].enabled, false);
 
   await browser.commands.onCommand.listener("toggle-current-site");
-  assert.equal(writes[1].siteRules.length, 0);
+  assert.equal(LexendSettings.decodeSettings(writes[1]).siteRules.length, 0);
 });
 
 test("shortcut leaves settings unchanged when the page has no content script", async () => {
@@ -74,11 +74,11 @@ test("shortcut leaves settings unchanged when the page has no content script", a
 test("toolbar state ignores messages from subframes", () => {
   const { browser, icons } = createBackground();
   browser.runtime.onMessage.listener(
-    { type: "LEXEND_STATE", active: false }, { tab: { id: 42 }, frameId: 7 }
+    { type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: false }, { tab: { id: 42 }, frameId: 7 }
   );
   assert.equal(icons.length, 0);
   browser.runtime.onMessage.listener(
-    { type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 }
+    { type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, { tab: { id: 42 }, frameId: 0 }
   );
   assert.equal(icons.length, 1);
   assert.equal(icons[0].tabId, 42);
@@ -113,15 +113,15 @@ test("toolbar refresh requests the main frame's state", async () => {
 test("repeated toolbar states avoid duplicate browser API calls and closed tabs release their state", async () => {
   const { browser, icons } = createBackground();
   const sender = { tab: { id: 42 }, frameId: 0 };
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
   assert.equal(icons.length, 1);
   browser.tabs.onUpdated.listener(42, { status: "loading" });
   browser.tabs.onUpdated.listener(42, { url: "https://example.com/next" });
   assert.equal(icons.length, 2);
   assert.equal(icons.at(-1).path["16"], "assets/icons/icon-off-16.png");
   browser.tabs.onRemoved.listener(42);
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: false }, sender);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: false }, sender);
   assert.equal(icons.length, 3);
 });
 
@@ -134,15 +134,15 @@ test("a failed toolbar update can retry the same state", async () => {
     return setIcon(value);
   };
   const sender = { tab: { id: 42 }, frameId: 0 };
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
   await new Promise((resolve) => setImmediate(resolve));
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, sender);
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
   assert.equal(icons.length, 1);
 });
 
 test("single-page URL updates reconcile the toolbar with the main frame", async () => {
   const { browser, icons, messages } = createBackground();
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 });
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, { tab: { id: 42 }, frameId: 0 });
   browser.tabs.onUpdated.listener(42, { url: "https://example.com/route" });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(messages.at(-1).options.frameId, 0);
@@ -154,14 +154,14 @@ test("stale toolbar queries cannot override a newer document state or a closed t
   let respond;
   browser.tabs.sendMessage = () => new Promise((resolve) => { respond = resolve; });
   browser.tabs.onUpdated.listener(42, { url: "https://example.com/first" });
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 });
-  respond({ ready: true, active: false });
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, { tab: { id: 42 }, frameId: 0 });
+  respond({ ready: true, healthy: true, pending: false, active: false });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(icons.at(-1).path[16], "assets/icons/icon-16.png");
   const count = icons.length;
   browser.tabs.onUpdated.listener(42, { status: "complete" });
   browser.tabs.onRemoved.listener(42);
-  respond({ ready: true, active: false });
+  respond({ ready: true, healthy: true, pending: false, active: false });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(icons.length, count);
 });
@@ -211,7 +211,48 @@ test("shortcut capacity failures show a toolbar error without dropping any rules
   assert.equal(writes.length, 0);
   assert.equal(badges.at(-1).text, "!");
   assert.match(titles.at(-1).title, /room/);
-  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", active: true }, { tab: { id: 42 }, frameId: 0 });
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, { tab: { id: 42 }, frameId: 0 });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(badges.at(-1).text, "");
+});
+
+
+test("toolbar only marks healthy settled responders active", async () => {
+  const { browser, icons } = createBackground();
+  const sender = { tab: { id: 42 }, frameId: 0 };
+  for (const state of [{ ready: false }, { healthy: false }, { pending: true }]) {
+    browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
+    browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true, ...state }, sender);
+    assert.equal(icons.at(-1).path[16], "assets/icons/icon-off-16.png");
+  }
+  browser.runtime.onMessage.listener({ type: "LEXEND_STATE", ready: true, healthy: true, pending: false, active: true }, sender);
+  assert.equal(icons.at(-1).path[16], "assets/icons/icon-16.png");
+});
+
+test("frame recheck relays only authenticated tab content senders without settings writes", async () => {
+  const { browser, messages, writes } = createBackground();
+  const request = { type: "LEXEND_RECHECK_FRAME_REQUIREMENTS", requirement: { requiredHeight: 9999 } };
+  const sender = { id: browser.runtime.id, tab: { id: 42 }, frameId: 0, url: "https://parent.example/page" };
+  for (const invalid of [
+    { ...sender, id: "other-extension" },
+    { ...sender, tab: undefined },
+    { ...sender, tab: { id: "42" } },
+    { ...sender, frameId: -1 },
+    { ...sender, frameId: undefined },
+    { ...sender, url: "extension://test/options.html" },
+    { ...sender, url: "invalid" }
+  ]) {
+    assert.equal(browser.runtime.onMessage.listener(request, invalid, () => assert.fail("Untrusted recheck cannot relay")), undefined);
+  }
+  assert.equal(messages.length, 0);
+  const response = await new Promise(resolve => {
+    assert.equal(browser.runtime.onMessage.listener(request, sender, resolve), true);
+  });
+  assert.equal(response.relayed, true);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].tabId, 42);
+  assert.equal(messages[0].options, undefined);
+  assert.equal(messages[0].message.type, "LEXEND_RECHECK_FRAME_REQUIREMENT");
+  assert.deepEqual(Object.keys(messages[0].message), ["type"], "no page-supplied geometry is forwarded");
+  assert.equal(writes.length, 0, "negotiation never records site rules");
 });

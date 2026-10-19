@@ -1,195 +1,64 @@
 # Lexend for the Web
 
-A Chrome and Firefox extension that lets you read websites in
-[Lexend](https://www.lexend.com/). Choose which text to change, adjust the size
-and spacing, and pause it on sites where you prefer the original font.
+Read websites in [Lexend](https://www.lexend.com/). Choose which text to change,
+adjust its size and spacing, and pause the extension on sites where you prefer
+the original font.
 
-This is an unofficial project, with no affiliation with or endorsement from
-the creators of Lexend.
+This is an unofficial project, unaffiliated with and not endorsed by Lexend's creators.
 
 ## Using Lexend
 
-Open the extension from your browser's toolbar. Choose **Body text** to change
-paragraphs, links, labels, and controls, or **Body and headings** to include
-headings too. The spacing options let you add more room between letters.
+Open the extension from your browser's toolbar. Choose **Body text** for paragraphs,
+links, labels and controls, or **Body and headings** to include headings too.
+Use **Pause here** to keep the current site's font, or the master switch to turn
+Lexend off everywhere. The shortcut is `Ctrl+Shift+L` (`Command+Shift+L` on macOS).
 
-The popup and settings page use the Lexend interface, with light and dark themes.
+Open **Settings** with the gear button to adjust text size, line height and letter
+spacing. The preview offers **Reading**, **Compare** and **Glyphs** views. **Try your
+own text** lets you preview a sample without saving or sending it.
 
-Use **Pause here** to keep the current site's font. Use the switch at the top
-of the popup to turn Lexend off everywhere. You can also pause or resume the
-current site with `Ctrl+Shift+L` (`Command+Shift+L` on macOS).
+Layout repair is off by default. Enable **Layout repair on this site** in the popup
+when text needs more room, or **Enable layout repair on all sites** in Settings.
+The all-sites switch leaves your saved site choices intact. See
+[layout adjustments](docs/adaptive-layout.md) for what repair can change.
 
-Open **Settings** with the gear button to adjust text size, line height, and
-letter spacing. The preview offers **Reading**, **Compare**, and **Glyphs** views.
-Compare puts a system font at default settings beside Lexend with your settings;
-Glyphs shows similar letterforms, numbers, accents, and three font weights.
-Use **Try your own text** to preview a sample without saving or sending it.
+Search and edit saved site rules in Settings. Each rule can cover one hostname
+or include its subdomains. Settings sync when browser sync is enabled. You can
+export a JSON backup, preview an import, and conditionally undo an import while
+Settings stays open. See [site rules and backup recovery](docs/rule-controls.md).
 
-You can also search and edit saved site rules, or add a rule
-that covers a domain and its subdomains. A rule for `example.com` covers only
-that hostname unless you select **Include subdomains**; with that option, it
-also covers addresses such as `news.example.com`.
+Code, math, SVG artwork and common icon fonts keep their original fonts. Missing
+icons can use the included Nerd Fonts symbols. Browser settings and extension
+stores restrict extensions; the popup tells you when Lexend cannot change a page.
 
-Settings sync through your browser when browser sync is enabled. Use the
-import and export controls in Settings to save or restore a JSON backup.
+## Installation
 
-## On the page
+Download the appropriate archive from [Releases](https://github.com/Costeer/lexendingTheWeb/releases)
+and extract it. For Chrome, open `chrome://extensions`, turn on **Developer mode**,
+choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
+For a temporary Firefox installation, open `about:debugging#/runtime/this-firefox`,
+choose **Load Temporary Add-on**, and select the extracted `manifest.json`.
+Firefox removes temporary installations when the browser closes.
 
-When text no longer fits, Lexend makes room by letting boxes grow, labels wrap,
-or panels scroll. Pause it on a site to return to that site's styles. There's a
-short guide to [layout adjustments](docs/adaptive-layout.md).
+After replacing an installed folder, reload the extension from your browser's
+extension manager and reopen its popup and Settings.
 
-Code, math, SVG artwork, and common icon fonts keep their original fonts.
-Missing icons can use the included Nerd Fonts symbols. Browser settings and
-extension stores are off limits to extensions; the popup will tell you when
-Lexend can't change a page.
+## Privacy and support
 
-## Privacy
+Fonts are included with the extension. Page text stays in your browser. There
+are no analytics or trackers. Preferences and site rules use your browser's
+synchronized extension storage; the developer does not receive them.
+Read the [privacy policy](PRIVACY.md), also available in [HTML](docs/privacy.html).
 
-The fonts are included with the extension. Page text stays in your browser,
-and the extension has no analytics or trackers. Your preferences and site
-rules are saved in your browser's synchronized extension storage; the
-developer does not receive them.
-
-Read the [privacy policy](PRIVACY.md) for the full details. The same policy is
-available in [HTML](docs/privacy.html) for hosting as a standalone page.
-
-## Build and test
-
-You'll need Node.js 22 or newer. Install the dependencies and Chromium for the
-browser tests, then run the tests and repository checks:
-
-```sh
-npm ci
-npx playwright install chromium
-npm test
-npm run check
-npm run build
-```
-
-Browser-ready files are written to `dist/chrome` and `dist/firefox`.
-The build prints their absolute paths. If you are working in a separate Git
-worktree, use the folders printed by that worktree's build. Another checkout's
-`dist` folder can contain an older extension even when both have the same version.
-
-### Installed-browser regression tests
-
-```sh
-npm run package
-npm run test:browser -- chrome
-npm run test:browser -- firefox
-```
-
-These tests install the built extension into an isolated browser profile and
-exercise real synchronized storage, the background worker, document-start
-content scripts, typography, exclusions, shadow-root recovery, related frames,
-keyboard deletion, imports, and responsive settings and popup layouts. Chrome
-also checks forced colors and reduced motion. Selenium Manager downloads matching
-browser/driver binaries as needed; its usage statistics are disabled by the test
-runner. Results and screenshots are written to `dist/browser-tests/`.
-The tests open desktop browser windows. On a Linux server without a desktop,
-prefix each browser command with `xvfb-run -a`; CI does this automatically so
-pointer/hover media queries match the desktop interface.
-
-CI runs both browsers on pull requests and checks dependency advisories. The
-narrow-window tests cover responsive layout, not Firefox Android's browser chrome;
-the Android add-on still needs device testing before release.
-
-### Additional regression checks
-
-For runtime changes, compare the working tree against its previous revision:
-
-```sh
-npm run test:performance -- --base HEAD
-```
-
-Use the PR base (for example `--base origin/main`) if the changes are already
-committed. This runs serial Chromium workloads, fails on measured regressions,
-and saves raw results and comparison thresholds to `dist/performance/report.json`.
-Run it after builds and separately from other tests. See the
-[performance guide](docs/performance.md#empirical-regression-gate) for metrics,
-tolerances, limitations, and the workflow for models making changes.
-
-`npm test` also runs reproducible generated settings/rule cases, cached-page
-restoration checks, and a 12-cycle dynamic feed stress test. CI repeats the full
-suite nightly at 03:17 UTC, with 100 stress cycles. To run the longer test locally:
-
-```sh
-LEXEND_STRESS_CYCLES=100 node --test test/typography-stress.test.mjs
-```
-
-After packaging, `npm run test:packages` checks both ZIPs against their build
-folders and validates runtime references, linked assets, and font licenses.
-The installed Chrome suite loads the extracted release ZIP and also restarts
-the browser with the same profile to check saved preferences and site pauses.
-Both installed browsers test back/forward navigation after preferences change.
-
-The interface suite runs axe accessibility scans, keyboard deletion checks,
-asset/error checks, and screenshot comparisons in light and dark themes at
-desktop and mobile widths. It loads built interface files with simulated browser
-APIs; the installed-browser suite exercises real extension APIs separately.
-Run it with `npm run test:ui`. It creates an isolated build in
-`dist/ui-tests/build`, without deleting release packages or browser results.
-Reports, failure screenshots and traces are saved under `dist/ui-tests/`.
-
-Screenshot baselines in `test/ui/snapshots/` were generated using the same pinned
-Playwright Ubuntu image as CI. For matching results on another OS, use Docker:
-
-```sh
-docker run --rm --ipc=host \
-  -e CI=true -v "$PWD:/work" -w /work \
-  mcr.microsoft.com/playwright:v1.63.0-noble \
-  bash -lc 'npm ci && npm run test:ui'
-```
-
-For an intentional visual change, use `npm run test:ui:update` in that same
-container, inspect the changed PNGs, and commit them with the change. Normal CI
-runs fail for missing or changed baselines and never update them automatically.
-When upgrading Playwright, update both pinned dependencies, both workflow image
-references, this Docker command, and the reviewed baselines together. Pull
-requests and releases must pass the interface suite; failure reports are uploaded
-as GitHub Actions artifacts.
-
-### Load in Chrome
-
-1. Run `npm run build`.
-2. Open `chrome://extensions`.
-3. Turn on **Developer mode**.
-4. Choose **Load unpacked** and select `dist/chrome`.
-
-After rebuilding, click **Reload** on this extension in `chrome://extensions`,
-then close and reopen its settings and popup. Refreshing just the settings tab
-does not reload the background worker or apply manifest changes.
-
-### Load in Firefox
-
-1. Run `npm run build`.
-2. Open `about:debugging#/runtime/this-firefox`.
-3. Choose **Load Temporary Add-on**.
-4. Select `dist/firefox/manifest.json`.
-
-After rebuilding, use the add-on's **Reload** button in `about:debugging` and
-reopen settings so the interface and background scripts come from the same build.
-
-## Package
-
-```sh
-npm run package
-```
-
-This builds both extensions and creates their ZIP files in `dist/releases`.
-
-Before submitting a release, run `npm run verify:chrome`,
-`npm run verify:firefox` (including Mozilla's `addons-linter`), and both
-installed-browser regression suites from the exact commit being submitted.
-Check navigation and rule deletion with a keyboard and screen reader. Also
-smoke-test the popup and settings on a real Firefox Android device; desktop
-narrow-window tests do not cover Android's extension surface.
+If something looks wrong, pause Lexend on that site and
+[report the problem](https://github.com/Costeer/lexendingTheWeb/issues).
+You can [save local diagnostics](docs/diagnostics.md) to help identify your
+installed version and settings. Review the file before sharing it.
 
 ## For website authors
 
-Add `data-lexend-ignore` to an element to keep its original typography,
-including all of its children:
+Add `data-lexend-ignore` to an element to keep its original typography and that
+of its children:
 
 ```html
 <section data-lexend-ignore>Keep this section's fonts and spacing.</section>
@@ -197,8 +66,7 @@ including all of its children:
 
 ## License
 
-Source code is released under the [MIT License](LICENSE). Lexend is distributed
-under the [SIL Open Font License 1.1](assets/fonts/LICENSE).
-The bundled Nerd Fonts symbols fallback includes its
-[license](assets/fonts/LICENSE-NERD-FONTS) and
-[source and glyph attributions](assets/fonts/README-NERD-FONTS.md).
+Source code uses the [MIT License](LICENSE). Lexend uses the
+[SIL Open Font License 1.1](assets/fonts/LICENSE). Bundled Nerd Fonts symbols
+include their [license](assets/fonts/LICENSE-NERD-FONTS) and
+[attributions](assets/fonts/NOTICE-NERD-FONTS).
