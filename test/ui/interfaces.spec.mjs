@@ -47,12 +47,15 @@ for (const surface of ["about", "popup"]) test(`${surface} saves private diagnos
   await openInterface(page, `${surface}.html`);
   await page.evaluate((surface) => {
     globalThis.__diagnosticQueries = 0;
+    const site = { url: "https://private-diagnostic-sentinel.example/secret" };
+    // About is a tab of its own; the popup belongs to no tab.
+    browser.tabs.getCurrent = async () => surface === "about" ? { id: 7 } : undefined;
     browser.tabs.query = async () => {
       __diagnosticQueries++;
-      return [{ id: 7, url: surface === "about" ? location.href : "https://private-diagnostic-sentinel.example/secret" }];
+      return surface === "about" ? [{ id: 7, url: location.href, lastAccessed: 2 }, { id: 8, ...site, lastAccessed: 1 }] : [{ id: 7, ...site }];
     };
-    browser.tabs.sendMessage = async () => {
-      if (surface === "about") throw new Error("No content script in the active About tab");
+    browser.tabs.sendMessage = async (tabId) => {
+      if (tabId !== (surface === "about" ? 8 : 7)) throw new Error("No content script in an extension page");
       return {
       ready: true, pending: false, active: true, healthy: false, refreshRevision: 7, scope: "all",
       hostname: "private-diagnostic-sentinel.example", text: "private-diagnostic-sentinel page text",
@@ -76,9 +79,8 @@ for (const surface of ["about", "popup"]) test(`${surface} saves private diagnos
   expect(report.build.sourceHash).toBe("0123456789abcdef".repeat(4));
   expect(report.settings).toEqual({ status: "available", enabled: true, layoutRepair: false, scope: "all", theme: "dark",
     textScale: 125, lineHeight: 1.7, letterSpacing: .05 });
-  expect(report.runtime).toEqual(surface === "about" ? { status: "unavailable" } : {
-    status: "available", ready: true, pending: false, healthy: false, active: true,
-    refreshRevision: 7, scope: "all", hasError: true });
+  expect(report.runtime).toEqual({ status: "available", ...(surface === "about" ? { source: "recent-tab" } : {}),
+    ready: true, pending: false, healthy: false, active: true, refreshRevision: 7, scope: "all", hasError: true });
   expect(await page.evaluate(() => __diagnosticQueries)).toBe(1);
   await expect(page.locator(surface === "about" ? "#diagnostics-status" : "#popup-diagnostics-status"))
     .toHaveText("Diagnostics saved locally. Nothing was sent.");

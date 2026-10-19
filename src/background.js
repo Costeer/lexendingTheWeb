@@ -109,6 +109,9 @@
     try {
       await store.mutate({ type: "toggleSite", hostname: state.hostname });
     } catch (error) {
+      // While the master switch is off there is no site state to toggle.
+      // That is the user's chosen state, not a failure to flag on the tab.
+      if (error.code === "GLOBAL_OFF") return;
       await showTabError(tab.id, error);
       throw error;
     }

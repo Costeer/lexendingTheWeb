@@ -4,6 +4,7 @@
   "version": "0.5.1",
   "description": "Make websites easier to read with Lexend.",
   "homepage_url": "https://github.com/Costeer/lexendingTheWeb",
+  "minimum_chrome_version": "119",
   "permissions": [
     "storage"
   ],
@@ -49,6 +50,7 @@
         "src/settings.js",
         "src/adaptive-controls.js",
         "src/adaptive-layout.js",
+        "src/refresh-scheduler.js",
         "src/content.js"
       ],
       "run_at": "document_start",
@@ -81,7 +83,8 @@
       ],
       "matches": [
         "<all_urls>"
-      ]
+      ],
+      "use_dynamic_url": true
     }
   ]
 }

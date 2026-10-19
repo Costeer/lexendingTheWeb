@@ -26,6 +26,11 @@ test("browser manifests describe the same extension", async () => {
   }
 
   assert.deepEqual(chrome.permissions, ["storage"]);
+  // MAIN-world content scripts need Chrome 111 and match_origin_as_fallback
+  // needs 119. Dynamic resource URLs are ignored before Chrome 130.
+  assert.equal(chrome.minimum_chrome_version, "119");
+  assert.ok(chrome.web_accessible_resources.every((entry) => entry.use_dynamic_url === true),
+    "sites must not probe bundled fonts at a static extension URL");
   assert.equal(chrome.options_ui.page, "options.html");
   assert.equal(chrome.commands["toggle-current-site"].suggested_key.default,
     "Ctrl+Shift+L");
@@ -454,10 +459,13 @@ test("site toggles remove redundant overrides and preserve per-site scope", () =
   assert.equal(settingsApi.getDirectRule(settings, "docs.example.com").enabled, null);
   assert.equal(settingsApi.getDirectRule(settings, "docs.example.com").scope, "all");
 
-  const resumed = settingsApi.toggleSite({ ...settings, enabled: false }, "docs.example.com");
-  assert.equal(resumed.enabled, true);
-  assert.equal(settingsApi.resolveSite(resumed, "docs.example.com").active, true);
-  assert.equal(settingsApi.resolveSite(resumed, "other.example.com").active, false);
+  // The master switch owns every site while it is off. A site toggle must not
+  // resume it (and with it every unpaused site), nor rewrite the site's rule.
+  const masterOff = { ...settings, enabled: false };
+  assert.throws(() => settingsApi.toggleSite(masterOff, "docs.example.com"), { code: "GLOBAL_OFF" });
+  assert.throws(() => settingsApi.toggleSite({ enabled: false }, "unruled.example"), { code: "GLOBAL_OFF" });
+  assert.equal(settingsApi.resolveSite(masterOff, "docs.example.com").active, false);
+  assert.equal(settingsApi.resolveSite(masterOff, "unruled.example").active, false);
 
   const paused = settingsApi.toggleSite({}, "example.org");
   assert.deepEqual(settingsApi.toggleSite(paused, "example.org").siteRules, []);

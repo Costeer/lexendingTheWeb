@@ -112,6 +112,7 @@ const createContext = browser => browser.newContext().then(async context => {
   await context.addInitScript({ path: resolve("src/settings.js") });
   await context.addInitScript({ path: resolve("src/adaptive-controls.js") });
   await context.addInitScript({ path: resolve("src/adaptive-layout.js") });
+  await context.addInitScript({ path: resolve("src/refresh-scheduler.js") });
   return context;
 });
 

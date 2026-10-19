@@ -11,10 +11,12 @@
     lineHeight: 0,
     letterSpacing: 0
   });
+  // chrome.storage.sync allows 8192 bytes per item, including the key.
   const MAX_SITE_RULE_BYTES = 8192;
+  const MAX_SITE_RULES = 250;
   const ruleStoragePrefix = "@1\n";
   const repairRuleStoragePrefix = "@2\n";
-  const preferenceKeys = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"];
+  const preferenceKeys = Object.freeze(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
   const ruleKey = (rule) => `${rule.hostname}\n${rule.includeSubdomains}`;
   const sameRule = (left, right) => left.enabled === right.enabled && left.scope === right.scope && left.layoutRepair === right.layoutRepair;
   const legacySpacingValues = Object.freeze({
@@ -205,7 +207,7 @@
   ).length;
   const validateCapacity = (value) => {
     const settings = normalizeSettings(value);
-    if (settings.siteRules.length > 250
+    if (settings.siteRules.length > MAX_SITE_RULES
         || ruleStorageBytes(settings) > MAX_SITE_RULE_BYTES) {
       throw settingsError("RULE_CAPACITY", "There isn't room for these site rules. Remove some rules before adding or importing more.");
     }
@@ -439,18 +441,31 @@
 
   const toggleSite = (value, hostname) => {
     const settings = normalizeSettings(value);
+    // The master switch pauses every site. Resuming one site must never turn
+    // Lexend back on everywhere else, so site toggles wait for the switch.
+    if (!settings.enabled) {
+      throw settingsError("GLOBAL_OFF", "Lexend is off everywhere. Turn it on before pausing or resuming a site.");
+    }
     const effective = resolveSite(settings, hostname);
     const inherited = resolveSite(removeSiteRule(settings, hostname), hostname);
-    const enabled = settings.enabled ? !effective.siteEnabled : true;
-    return setSiteRule({ ...settings, enabled: true }, {
+    const enabled = !effective.siteEnabled;
+    return setSiteRule(settings, {
       hostname,
       includeSubdomains: false,
       enabled: enabled === inherited.siteEnabled ? null : enabled
     });
   };
 
+  const describeRuleSource = (rule) => rule
+    ? `${rule.hostname} (${rule.includeSubdomains ? "including subdomains" : "exact host"})`
+    : "global setting";
+
   globalThis.LexendSettings = Object.freeze({
+    MAX_SITE_RULE_BYTES,
+    MAX_SITE_RULES,
     defaults,
+    describeRuleSource,
+    preferenceKeys,
     decodeSettings: normalizeSettings,
     encodeSettings,
     encodeSettingsForStorage,

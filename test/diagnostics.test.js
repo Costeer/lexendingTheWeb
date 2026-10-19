@@ -43,6 +43,28 @@ test("diagnostics exports an allowlist and never page data, URLs, rules, raw UA 
   assert(JSON.stringify(report).length < 1024);
 });
 
+test("a tab-based About page reports the most recently used other tab, never itself", async () => {
+  const messages = [];
+  const report = await collect({ buildIdentity, navigator: {}, extension: { tabs: {
+    async getCurrent() { return { id: 9 }; },
+    async query(filter) {
+      assert.deepEqual(filter, { currentWindow: true });
+      return [{ id: 9, lastAccessed: 300 }, { id: 4, lastAccessed: 200, url: "https://private.example" }, { id: 5, lastAccessed: 100 }];
+    },
+    async sendMessage(tabId) { messages.push(tabId); return { ready: true, pending: false, healthy: true, active: true }; }
+  } } });
+  assert.deepEqual(messages, [4]);
+  assert.deepEqual(report.runtime, { status: "available", source: "recent-tab", ready: true, pending: false, healthy: true, active: true, hasError: false });
+  assert.doesNotMatch(JSON.stringify(report), /private/);
+
+  const popup = await collect({ buildIdentity, navigator: {}, extension: { tabs: {
+    async getCurrent() { return undefined; },
+    async query(filter) { assert.deepEqual(filter, { active: true, currentWindow: true }); return [{ id: 4 }]; },
+    async sendMessage() { return { ready: true }; }
+  } } });
+  assert.deepEqual(popup.runtime, { status: "available", ready: true, hasError: false }, "the popup reports the page it was opened over");
+});
+
 test("browser API reports actual Firefox version without returning arbitrary metadata", async () => {
   const report = await collect({ buildIdentity, extension: {
     runtime: { getBrowserInfo: async () => ({ name: "Firefox", version: "145.0.1", vendor: "private.example", buildID: "secret" }) }

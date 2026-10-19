@@ -1,7 +1,6 @@
 (() => {
   "use strict";
 
-  const settingKeys = Object.freeze(["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing"]);
   const numericVersion = (value) => typeof value === "string" && /^\d{1,5}(?:\.\d{1,10}){0,3}$/.test(value) ? value : null;
   const sanitizeBuildIdentity = (value) => {
     if (value?.schemaVersion !== 1 || !numericVersion(value.version)
@@ -23,6 +22,8 @@
   const settingsSnapshot = async (extension) => {
     try {
       if (!extension?.storage?.sync?.get) return { status: "unavailable" };
+      // Read the shared list lazily: loading this helper must touch nothing.
+      const settingKeys = globalThis.LexendSettings.preferenceKeys;
       const saved = await bounded(() => extension.storage.sync.get([...settingKeys, "spacing"]));
       const selected = Object.fromEntries([...settingKeys, "spacing"].map((key) => [key, saved?.[key]]));
       const normalized = globalThis.LexendSettings.normalizeSettings(selected);
@@ -31,14 +32,30 @@
       return { status: "unavailable" };
     }
   };
+  // The popup reports the page it was opened over. A tab-based extension page,
+  // such as About, is itself the active tab; it reports the most recently used
+  // other tab in its window instead, and says so in the report.
+  const diagnosticTab = async (extension) => {
+    const current = typeof extension.tabs.getCurrent === "function"
+      ? await bounded(() => extension.tabs.getCurrent()) : undefined;
+    if (!Number.isInteger(current?.id)) {
+      const [tab] = await bounded(() => extension.tabs.query({ active: true, currentWindow: true }));
+      return { tab, source: null };
+    }
+    const tabs = await bounded(() => extension.tabs.query({ currentWindow: true }));
+    const [tab] = (Array.isArray(tabs) ? tabs : [])
+      .filter((candidate) => Number.isInteger(candidate?.id) && candidate.id !== current.id)
+      .sort((left, right) => (Number(right.lastAccessed) || 0) - (Number(left.lastAccessed) || 0));
+    return { tab, source: "recent-tab" };
+  };
   const runtimeSnapshot = async (extension) => {
     try {
       if (!extension?.tabs?.query || !extension.tabs.sendMessage) return { status: "unavailable" };
-      const [tab] = await bounded(() => extension.tabs.query({ active: true, currentWindow: true }));
+      const { tab, source } = await diagnosticTab(extension);
       if (!Number.isInteger(tab?.id)) return { status: "unavailable" };
       const state = await bounded(() => extension.tabs.sendMessage(tab.id, { type: "LEXEND_GET_STATE" }, { frameId: 0 }));
       if (!state || typeof state.ready !== "boolean") return { status: "unavailable" };
-      const result = { status: "available" };
+      const result = { status: "available", ...(source ? { source } : {}) };
       for (const key of ["ready", "pending", "healthy", "active", "layoutRepair"]) {
         if (typeof state[key] === "boolean") result[key] = state[key];
       }

@@ -126,7 +126,17 @@ try {
       const query = prototype.querySelectorAll;
       prototype.querySelectorAll = function (...args) { scans++; return Reflect.apply(query, this, args); };
     }
-    document.addEventListener("lexend-open-shadow-root", (event) => { hints++; if (event.isTrusted) trustedHints++; }, true);
+    // Hints use a per-document type that pages never see. This isolated probe
+    // observes the same pre-page-script offer that the runtime accepts.
+    let hintType = null;
+    document.addEventListener("lexend-bridge-offer", (event) => {
+      if (hintType !== null) return;
+      hintType = event.relatedTarget?.getAttribute("data-channel") ?? null;
+      if (hintType !== null) document.addEventListener(hintType, (hint) => {
+        if (hint.target === document) return;
+        hints++; if (hint.isTrusted) trustedHints++;
+      }, true);
+    }, true);
     document.addEventListener("lexend-test-probe-request", (event) => {
       if (event.detail === "attach") document.getElementById("isolated-host").attachShadow({ mode: "open" });
       document.dispatchEvent(new CustomEvent("lexend-test-probe-response", { detail: JSON.stringify({ isolatedAttachCalls, reads, scans, hints, trustedHints }) }));
@@ -160,8 +170,8 @@ try {
   await wait("getComputedStyle(document.querySelector('#prose')).fontFamily.includes('Lexend')", "Installed extension applies initial typography");
   report.installedExtension = true;
   websiteTab = await driver.getWindowHandle();
-  origin = await findExtensionOrigin(script);
-  assert(origin, "Installed font resource reveals extension origin");
+  origin = await findExtensionOrigin({ driver, browserName, extensionDirectory, addonId: report.installation?.addonId });
+  assert(origin, "The browser identifies the installed extension's origin");
   await driver.switchTo().newWindow("tab");
   optionsTab = await driver.getWindowHandle();
   await navigateExtension(`${origin}options.html`);

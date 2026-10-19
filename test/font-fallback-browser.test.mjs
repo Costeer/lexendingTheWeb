@@ -50,7 +50,7 @@ test("bundled symbols render missing icons while site glyphs win and pause resto
       pseudo: getComputedStyle(document.getElementById("generated"), "::before").fontFamily,
       shadow: getComputedStyle(document.getElementById("host").shadowRoot.getElementById("shadow-icon")).fontFamily
     }));
-    for (const path of ["src/settings.js", "src/adaptive-controls.js", "src/adaptive-layout.js", "src/content.js"]) {
+    for (const path of ["src/settings.js", "src/adaptive-controls.js", "src/adaptive-layout.js", "src/refresh-scheduler.js", "src/content.js"]) {
       await page.addScriptTag({ path: resolve(path) });
     }
     assert.equal(requests.some((url) => url.endsWith("nerd-fonts-symbols.woff2")), false, "paused extension does not fetch symbols");

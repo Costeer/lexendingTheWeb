@@ -21,6 +21,7 @@ const fixture = (initial = {}, { quota = false, silentWrites = false } = {}) => 
   let failRead = false;
   let failWrite = false;
   let failCleanup = false;
+  const removals = [];
   const storage = { ...memory.storage,
     async get() { if (failRead) throw new Error("Read failed"); return memory.storage.get(); },
     async set(patch) {
@@ -31,6 +32,7 @@ const fixture = (initial = {}, { quota = false, silentWrites = false } = {}) => 
       await memory.storage.set(patch);
     },
     async remove(keys) {
+      removals.push([...keys]);
       if (failCleanup) throw new Error("Cleanup interrupted");
       await memory.storage.remove(keys);
     }
@@ -40,7 +42,7 @@ const fixture = (initial = {}, { quota = false, silentWrites = false } = {}) => 
     storage: { sync: storage, onChanged: memory.onChanged },
     runtime: { sendMessage: ({ operation }) => mutationResponse(() => store.mutate(operation)) }
   };
-  return { store, extension, storage, writes: memory.writes, saved: memory.saved,
+  return { store, extension, storage, writes: memory.writes, removals, saved: memory.saved,
     failRead(value) { failRead = value; }, failWrite(value) { failWrite = value; },
     failCleanup(value) { failCleanup = value; },
     emit: memory.emit };
@@ -55,6 +57,21 @@ test("old-reader controls retain the exact published and audit-baseline source i
     assert.equal(oldFixture.files[path].sha256, expected);
     assert.equal(createHash("sha256").update(oldFixture.files[path].source).digest("hex"), expected);
   }
+});
+
+test("legacy cleanup issues sync removals only for keys that exist", async () => {
+  const current = fixture({ theme: "light" });
+  await current.store.mutate({ type: "patch", changes: { textScale: 120 } });
+  await current.store.mutate({ type: "addRule", rule: { hostname: "new.example", enabled: false } });
+  assert.deepEqual(current.removals, [], "canonical profiles spend no write quota on cleanup");
+
+  const legacy = fixture({ spacing: "wide", uiStyle: "classic", disabledSites: ["old.example"] });
+  await legacy.store.mutate({ type: "patch", changes: { theme: "dark" } });
+  await legacy.store.mutate({ type: "patch", changes: { textScale: 110 } });
+  assert.deepEqual(legacy.removals, [["spacing", "uiStyle"]], "the compatible pause list stays until rules need the canonical key");
+  await legacy.store.mutate({ type: "addRule", rule: { hostname: "new.example", includeSubdomains: true, enabled: false } });
+  assert.deepEqual(legacy.removals, [["spacing", "uiStyle"], ["disabledSites"]]);
+  assert.equal(Object.hasOwn(legacy.saved(), "disabledSites"), false);
 });
 
 test("default rule writes remain readable by the actual old reader and survive its unrelated writes", async () => {
@@ -114,6 +131,9 @@ test("large legacy pause edits stay compatible and rich changes reject before an
     assert.deepEqual(f.saved(), initial);
     assert.equal(f.writes.length, 0);
   }
+  await assert.rejects(f.store.mutate({ type: "toggleSite", hostname: disabledSites[0] }), { code: "GLOBAL_OFF" });
+  assert.deepEqual(f.saved(), initial, "a site toggle never resumes the master switch");
+  await f.store.mutate({ type: "patch", changes: { enabled: true } });
   await f.store.mutate({ type: "toggleSite", hostname: disabledSites[0] });
   assert.equal(f.saved().enabled, true);
   assert.equal(f.saved().disabledSites.length, 249);

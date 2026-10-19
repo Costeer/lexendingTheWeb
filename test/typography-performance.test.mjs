@@ -24,7 +24,7 @@ const prepare = async (page, html, { settings = {}, beforeStart, settle = true, 
     };
     globalThis.__state = () => { let state; runtime.forEach((fn) => fn({ type: "LEXEND_GET_STATE" }, null, (value) => { state = value; })); return state; };
   }, settings);
-  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+  for (const name of ["settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) {
     if (name === "content") await beforeStart?.(page);
     const path = resolve(process.env.LEXEND_TEST_SOURCE ?? ".", `src/${name}.js`);
     if (inspect && name === "content") await page.addScriptTag({ content: instrumentContent(await readFile(path, "utf8")) });
@@ -388,7 +388,7 @@ test("large pages reuse measurements, preserve protected branches, and rest whil
       Element.prototype.getBoundingClientRect = function () { __boxReads++; return nativeBox.call(this); };
     });
     const original = await page.evaluate(() => __protected());
-    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) await page.addScriptTag({ path: resolve(`src/${name}.js`) });
+    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) await page.addScriptTag({ path: resolve(`src/${name}.js`) });
     await page.evaluate(() => __update({ enabled: true }));
     await page.evaluate(() => document.fonts.ready);
     await page.waitForFunction(() => __state()?.healthy && !__state().pending);

@@ -64,7 +64,7 @@ const runtimeReading = async (kind) => {
       });
       globalThis.__original = document.body.innerHTML;
     });
-    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) {
       await page.addScriptTag({ content: name === "adaptive-layout" ? variant(kind)
         : await readFile(new URL(`../src/${name}.js`, import.meta.url), "utf8") });
     }

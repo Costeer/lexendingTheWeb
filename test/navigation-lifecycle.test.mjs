@@ -46,7 +46,7 @@ test("initialization and synthetic persisted-pageshow handling ignore stale read
         return result;
       };
     });
-    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+    for (const name of ["settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) {
       await page.addScriptTag({ path: resolve(`src/${name}.js`) });
     }
     await page.waitForFunction(() => typeof finishRead === "function");
@@ -184,7 +184,7 @@ test("startup reconciles complete saved snapshots with events and stays passive 
           return result;
         };
       }, scenario);
-      for (const name of ["settings", "adaptive-controls", "adaptive-layout", "content"]) {
+      for (const name of ["settings", "adaptive-controls", "adaptive-layout", "refresh-scheduler", "content"]) {
         await page.addScriptTag({ path: resolve(`src/${name}.js`) });
       }
       assert.equal(await page.evaluate(() => state().ready), false);

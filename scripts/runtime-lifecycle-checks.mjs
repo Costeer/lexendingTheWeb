@@ -99,17 +99,71 @@ export async function runLifecycleChecks({ driver, script, wait, check, setSetti
         mode: document.designMode,
         size: getComputedStyle(document.querySelector('#prose')).fontSize,
         markers: document.querySelectorAll('[data-lexend-text],[data-lexend-protected],[data-lexend-layout-repair],[data-lexend-original-typography]').length,
-        sheets: document.querySelectorAll('#lexend-the-web-styles,#lexend-the-web-fonts,#lexend-the-web-transitions').length
+        sheets: document.querySelectorAll('#lexend-the-web-styles,#lexend-the-web-transitions').length,
+        fonts: [...document.fonts].filter((face) => /Lexend/.test(face.family)).length
       };
     });
     assert.equal(result.mode, 'on');
     assert.equal(result.size, '20px');
     assert.equal(result.markers, 0);
     assert.equal(result.sheets, 0);
+    assert.equal(result.fonts, 0, 'editing documents also release the bundled faces');
     const original = await script(() => document.body.outerHTML);
     await setSettings({ textScale: 120 });
     assert.equal(await script(() => document.body.outerHTML), original);
     await script(() => { document.designMode = 'off'; });
     await wait("getComputedStyle(document.querySelector('#prose')).fontSize === '24px'", 'Leaving document editing resumes conversion');
+  });
+  await check('pages cannot recognise the extension from its hooks, errors, events, styles or loads', async () => {
+    // WebDriver scripts can run outside the page realm (Firefox uses a
+    // Marionette sandbox with its own globals and functions). Every probe
+    // below therefore runs as an ordinary page script.
+    const inPage = (probe) => script((source) => {
+      const element = document.createElement('script');
+      element.textContent = `document.documentElement.dataset.recognition = JSON.stringify((${source})());`;
+      document.documentElement.append(element);
+      element.remove();
+      const value = document.documentElement.dataset.recognition;
+      delete document.documentElement.dataset.recognition;
+      return JSON.parse(value ?? 'null');
+    }, probe.toString());
+    // Page scripts start after the document_start bridge exchange.
+    await inPage(() => {
+      window.__recognitionHeard = [];
+      for (const type of ['lexend-open-shadow-root', 'lexend-design-mode', 'lexend-bridge-offer']) {
+        addEventListener(type, (event) => __recognitionHeard.push(event.type), true);
+      }
+      document.dispatchEvent(new Event('lexend-bridge-request', { cancelable: true }));
+      const host = document.createElement('div');
+      host.id = 'recognition-host';
+      document.body.append(host);
+      host.attachShadow({ mode: 'open' }).innerHTML = '<p>Recognition probe text</p>';
+      return true;
+    });
+    await wait("/Lexend/.test(getComputedStyle(document.querySelector('#recognition-host').shadowRoot.querySelector('p')).fontFamily)", 'Private hints still discover the root');
+    const result = await inPage(() => {
+      const source = (fn) => Function.prototype.toString.call(fn);
+      const host = document.querySelector('#recognition-host');
+      const setter = Object.getOwnPropertyDescriptor(Document.prototype, 'designMode').set;
+      const idSetter = Object.getOwnPropertyDescriptor(Element.prototype, 'id').set;
+      const stack = (run) => { try { run(); } catch (error) { return String(error.stack); } return 'no error'; };
+      const css = [...document.querySelectorAll('style')].map((style) => style.textContent)
+        .concat([...document.styleSheets].map((sheet) => { try { return [...sheet.cssRules].map((rule) => rule.cssText).join(' '); } catch { return ''; } }));
+      const visible = { stacks: [stack(() => host.attachShadow({ mode: 'open' })), stack(() => Function.prototype.toString.call({})),
+        stack(() => setter.call({}, 'on'))], css, loads: performance.getEntriesByType('resource').map((entry) => entry.name) };
+      host.remove();
+      // Expected strings come from untouched natives in this same engine.
+      const expected = [source(Element.prototype.getAttribute).replace('getAttribute', 'attachShadow'),
+        source(idSetter).replace(/(function (?:set )?)id\(/, '$1designMode('), source(Element.prototype.getAttribute).replace('getAttribute', 'toString')];
+      return { sources: [source(Element.prototype.attachShadow), source(setter), source(Function.prototype.toString)], expected,
+        setterName: setter.name, expectedSetterName: idSetter.name.replace(/id$/, 'designMode'), prototype: Object.hasOwn(Element.prototype.attachShadow, 'prototype'), heard: __recognitionHeard,
+        leaks: Object.entries(visible).filter(([, texts]) => texts.some((text) => /-extension:\/\//.test(text))).map(([name]) => name) };
+    });
+    assert.deepEqual(result.sources, result.expected);
+    assert.equal(result.setterName, result.expectedSetterName);
+    assert.equal(result.prototype, false);
+    assert.deepEqual(result.heard, [], 'Bridge hints and the channel exchange are not observable by page scripts');
+    assert.deepEqual(result.leaks, [], 'No page-visible stack, stylesheet or resource load names the extension URL');
+    return result;
   });
 }

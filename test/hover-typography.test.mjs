@@ -59,7 +59,7 @@ test("hover rerenders retain converted typography before paint and preserve new 
       action.addEventListener("mouseenter",()=>rerender(true));
       action.addEventListener("mouseleave",()=>rerender(false));
     });
-    for (const name of ["settings","adaptive-controls","adaptive-layout","content"]) await page.addScriptTag({path:resolve(`src/${name}.js`)});
+    for (const name of ["settings","adaptive-controls","adaptive-layout","refresh-scheduler","content"]) await page.addScriptTag({path:resolve(`src/${name}.js`)});
     await page.waitForFunction(()=>__state()?.healthy&&!__state().pending);
     await page.evaluate(()=>document.fonts.ready);
     await page.waitForTimeout(150);

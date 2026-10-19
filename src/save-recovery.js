@@ -6,7 +6,7 @@
   const createTracker = ({ mutate, getSettings, getConfirmedSettings = getSettings, onChange = () => {} }) => {
     const api = globalThis.LexendSettings;
     const entries = new Set();
-    const fields = ["enabled", "layoutRepair", "scope", "theme", "textScale", "lineHeight", "letterSpacing", "siteRules"];
+    const fields = [...api.preferenceKeys, "siteRules"];
     const ruleKey = (operation) => {
       const rule = operation.rule ?? operation;
       const normalized = api.normalizeSettings({ siteRules: [{ ...rule, enabled: false }] }).siteRules[0];
@@ -20,7 +20,8 @@
       if (operation.type === "updateRule") return [ruleKey(operation), ruleKey({
         ...operation, includeSubdomains: operation.changes?.includeSubdomains ?? operation.includeSubdomains
       })];
-      if (operation.type === "toggleSite") return [...(getSettings().enabled ? [] : ["enabled"]), ruleKey(operation)];
+      // Rule operations own only their rule. A toggle requires the master
+      // switch but never changes it.
       return [ruleKey(operation)];
     };
     const overlaps = (a, b) => a === b
@@ -48,7 +49,7 @@
       const entry = { operation, keys, keyCount: keys.size, baseline, pending: true, error: null };
       if (operation.type === "toggleSite") {
         const settings = getSettings();
-        entry.target = previousTarget ?? (settings.enabled ? !api.resolveSite(settings, operation.hostname).siteEnabled : true);
+        entry.target = previousTarget ?? !api.resolveSite(settings, operation.hostname).siteEnabled;
       }
       entries.add(entry);
       emit();
