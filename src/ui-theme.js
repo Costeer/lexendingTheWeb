@@ -4,7 +4,7 @@
   const themeKey = "lexend-ui-theme";
   const designKey = "lexend-ui-design";
   // Keep in sync with LexendSettings.designs; this script runs before it loads.
-  const designs = Object.freeze(["signal", "paper", "wide"]);
+  const designs = Object.freeze(["signal", "paper"]);
 
   const remember = (key, value) => {
     try {

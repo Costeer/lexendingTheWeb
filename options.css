@@ -1,13 +1,8 @@
 :root {
   --row-h: calc(var(--target) + 84px);
-  --card-border-width: 1px;
   background: var(--surface-sunken);
   /* Keep settings and About aligned when a panel needs a scrollbar. */
   scrollbar-gutter: stable;
-}
-
-:root[data-design="wide"] {
-  --card-border-width: 2px;
 }
 
 body {
@@ -367,7 +362,7 @@ main {
 .layout-repair-setting {
   margin: 28px 0;
   padding: 16px 18px;
-  border: var(--card-border-width) solid var(--line);
+  border: var(--divider);
   border-radius: var(--radius-card);
   background: var(--surface);
 }
@@ -724,7 +719,7 @@ textarea::placeholder {
   align-self: start;
   min-height: 60px;
   padding: 12px 12px 12px 16px;
-  border: var(--card-border-width) solid var(--line);
+  border: var(--divider);
   border-radius: var(--radius-card);
   background: var(--surface);
 }
@@ -1138,7 +1133,7 @@ textarea::placeholder {
 .tool-card {
   min-width: 0;
   padding: 20px;
-  border: var(--card-border-width) solid var(--line);
+  border: var(--divider);
   border-radius: var(--radius-card);
 }
 
@@ -1322,13 +1317,6 @@ textarea::placeholder {
 /* Keep the folded corner clear of the label. */
 :root[data-design="paper"] .preview-quote-frame .preview-font-label {
   padding-right: 18px;
-}
-
-/* Wide: a heavy red bar marks the Lexend sample. */
-:root[data-design="wide"] .preview-quote-frame {
-  border-top-width: var(--line-width);
-  border-top-color: var(--line-strong);
-  border-left: 12px solid var(--accent);
 }
 
 @media (forced-colors: active) {

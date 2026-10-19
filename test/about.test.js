@@ -52,14 +52,16 @@ test("About loads the saved theme and follows only synced theme changes", async 
 });
 
 test("About loads the saved design and follows synced design changes independently of theme", async () => {
-  const { root, cache, onChanged } = await openAbout(async () => ({ theme: "dark", design: "wide" }));
-  assert.equal(root.dataset.design, "wide");
-  onChanged({ design: { newValue: "paper" } }, "local");
-  assert.equal(root.dataset.design, "wide");
-  onChanged({ theme: { newValue: "light" } }, "sync");
-  assert.equal(root.dataset.design, "wide", "a theme change leaves the design alone");
-  onChanged({ design: { newValue: "paper" } }, "sync");
+  const { root, cache, onChanged } = await openAbout(async () => ({ theme: "dark", design: "paper" }));
   assert.equal(root.dataset.design, "paper");
+  onChanged({ design: { newValue: "signal" } }, "local");
+  assert.equal(root.dataset.design, "paper");
+  onChanged({ theme: { newValue: "light" } }, "sync");
+  assert.equal(root.dataset.design, "paper", "a theme change leaves the design alone");
+  onChanged({ design: { newValue: "signal" } }, "sync");
+  assert.equal(root.dataset.design, "signal");
+  assert.equal(cache.get("lexend-ui-design"), "signal");
+  onChanged({ design: { newValue: "paper" } }, "sync");
   assert.equal(cache.get("lexend-ui-design"), "paper");
   onChanged({ design: {} }, "sync");
   assert.equal(root.dataset.design, "signal");
@@ -69,7 +71,7 @@ test("About keeps the cached design while loading and after a failed read", asyn
   const failed = await openAbout(async () => { throw new Error("Storage unavailable"); }, { cachedDesign: "paper" });
   assert.equal(failed.root.dataset.design, "paper");
   let resolveSettings;
-  const page = await openAbout(() => new Promise((resolve) => { resolveSettings = resolve; }), { cachedDesign: "wide" });
+  const page = await openAbout(() => new Promise((resolve) => { resolveSettings = resolve; }), { cachedDesign: "signal" });
   page.onChanged({ design: { newValue: "paper" } }, "sync");
   resolveSettings({ design: "signal" });
   await new Promise((resolve) => setImmediate(resolve));

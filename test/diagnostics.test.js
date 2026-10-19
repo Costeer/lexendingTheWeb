@@ -17,7 +17,7 @@ test("diagnostics exports an allowlist and never page data, URLs, rules, raw UA 
     extension: {
       storage: { sync: { async get(keys) {
         calls.push(["settings", keys]);
-        return { enabled: false, scope: "all", theme: "dark", design: "wide", textScale: 999, lineHeight: 1.5,
+        return { enabled: false, scope: "all", theme: "dark", design: "paper", textScale: 999, lineHeight: 1.5,
           letterSpacing: .03, siteRules: [{ hostname: privateValue }], disabledSites: [privateValue], text: privateValue };
       } } },
       tabs: {
@@ -33,7 +33,7 @@ test("diagnostics exports an allowlist and never page data, URLs, rules, raw UA 
   assert.deepEqual(report, {
     schemaVersion: 1, build: buildIdentity,
     browser: { name: "Chromium", version: "150.0.0.0", source: "user-agent" },
-    settings: { status: "available", enabled: false, layoutRepair: false, scope: "all", theme: "dark", design: "wide", textScale: 140, lineHeight: 1.5, letterSpacing: .03 },
+    settings: { status: "available", enabled: false, layoutRepair: false, scope: "all", theme: "dark", design: "paper", textScale: 140, lineHeight: 1.5, letterSpacing: .03 },
     runtime: { status: "available", ready: true, pending: false, healthy: false, active: true, layoutRepair: true, refreshRevision: 45, scope: "body", hasError: true }
   });
   assert.doesNotMatch(JSON.stringify(report), /private|https:|siteRules|disabledSites|textContent|hostname|gitPath|arbitraryCounter/);

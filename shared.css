@@ -41,7 +41,9 @@
   --on-accent: #FFFFFF;
 }
 
-/* Signal: square poster frames, tracked bold labels. The original identity. */
+/* Signal: square poster frames and tracked bold labels, set large and a
+   little wide for reading. Body text sits just above regular on Lexend's
+   weight axis, and dividers stay visible against both surfaces. */
 :root:not([data-design]),
 [data-design="signal"] {
   --radius-control: 0px;
@@ -50,23 +52,23 @@
   --thumb-radius: 0px;
   --line-width: 2px;
   --frame-width: 6px;
-  --target: 42px;
-  --fs-small: 13px;
-  --fs-control: 14px;
-  --fs-body: 15px;
-  --fs-read: 16px;
-  --fs-heading: 28px;
-  --fs-wordmark: 18px;
-  --lh-body: 1.6;
-  --wght-body: 400;
-  --wght-label: 600;
-  --wght-strong: 600;
-  --wght-heading: 700;
-  --wght-selected: 650;
-  --track-body: 0em;
-  --track-label: .08em;
-  --track-heading: .01em;
-  --track-selected: .08em;
+  --target: 48px;
+  --fs-small: 14px;
+  --fs-control: 15px;
+  --fs-body: 16px;
+  --fs-read: 17px;
+  --fs-heading: 30px;
+  --fs-wordmark: 19px;
+  --lh-body: 1.65;
+  --wght-body: 430;
+  --wght-label: 650;
+  --wght-strong: 620;
+  --wght-heading: 750;
+  --wght-selected: 680;
+  --track-body: .02em;
+  --track-label: .09em;
+  --track-heading: .02em;
+  --track-selected: .06em;
   --ink: #000000;
   --ink-soft: #000000;
   --surface: #FFFFFF;
@@ -74,7 +76,7 @@
   --accent-tint: #FFEDED;
   --accent-text: #B80000;
   --line-strong: #000000;
-  --line: #D4D4D4;
+  --line: #8A8A8A;
 }
 
 :root[data-theme="dark"]:not([data-design]),
@@ -87,7 +89,7 @@
   --accent-tint: #3A1616;
   --accent-text: #FF7070;
   --line-strong: #D0D0D0;
-  --line: #3C3C3C;
+  --line: #6E6E6E;
 }
 
 /* Paper: rounded, warm reading surfaces. Off-white paper and near-black ink
@@ -136,54 +138,6 @@
   --accent-text: #FF8A7A;
   --line-strong: #978C7C;
   --line: #3A342C;
-}
-
-/* Wide: larger type with expanded tracking, after Lexend's wider styles,
-   heavier strokes from the weight axis, thick outlines and large targets. */
-[data-design="wide"] {
-  --radius-control: 6px;
-  --radius-card: 8px;
-  --radius-pill: 8px;
-  --thumb-radius: 4px;
-  --line-width: 3px;
-  --frame-width: 4px;
-  --target: 52px;
-  --fs-small: 15px;
-  --fs-control: 16px;
-  --fs-body: 17px;
-  --fs-read: 18px;
-  --fs-heading: 32px;
-  --fs-wordmark: 20px;
-  --lh-body: 1.75;
-  --wght-body: 450;
-  --wght-label: 650;
-  --wght-strong: 650;
-  --wght-heading: 750;
-  --wght-selected: 700;
-  --track-body: .03em;
-  --track-label: .1em;
-  --track-heading: .03em;
-  --track-selected: .06em;
-  --ink: #000000;
-  --ink-soft: #000000;
-  --surface: #FFFFFF;
-  --surface-sunken: #F0F0F0;
-  --accent-tint: #FFE8E8;
-  --accent-text: #B00000;
-  --line-strong: #000000;
-  --line: #595959;
-}
-
-:root[data-theme="dark"][data-design="wide"],
-:root[data-theme="dark"] [data-design="wide"] {
-  --ink: #FFFFFF;
-  --ink-soft: #FFFFFF;
-  --surface: #050505;
-  --surface-sunken: #1A1A1A;
-  --accent-tint: #451010;
-  --accent-text: #FF7A7A;
-  --line-strong: #FFFFFF;
-  --line: #A6A6A6;
 }
 
 :root {
@@ -281,7 +235,7 @@ input[type="checkbox"] {
   color: var(--on-accent);
   background: var(--accent);
   font-size: var(--fs-wordmark);
-  font-weight: 450;
+  font-weight: 500;
   line-height: 1;
   letter-spacing: 0;
   text-decoration: none;
@@ -291,8 +245,10 @@ input[type="checkbox"] {
     font-weight 460ms var(--motion-ease);
 }
 
+/* The word also moves along Lexend's weight axis as it opens. */
 .lexend-wordmark:is(:hover, :focus-visible) {
   width: calc(7.07em + 24px);
+  font-weight: 700;
 }
 
 .lxnd-word {
@@ -332,19 +288,6 @@ input[type="checkbox"] {
 
 .lexend-wordmark .lxnd-letter:hover {
   transform: translateY(-2px) scale(1.12);
-}
-
-/* Paper and Wide move along Lexend's weight axis as the wordmark opens. */
-:root[data-design="paper"] .lexend-wordmark:is(:hover, :focus-visible) {
-  font-weight: 650;
-}
-
-:root[data-design="wide"] .lexend-wordmark {
-  font-weight: 600;
-}
-
-:root[data-design="wide"] .lexend-wordmark:is(:hover, :focus-visible) {
-  font-weight: 800;
 }
 
 /* Segmented presets: one selection layer slides beneath equal, stationary
@@ -484,39 +427,41 @@ input[type="checkbox"] {
   --segment-radius: min(var(--radius-pill), var(--radius-card));
 }
 
-/* Wide gives each preset a full row with a radio ring wherever space is
-   narrow: always in the popup, and on the stacked settings layout. */
+/* Signal gives each preset a full row with a radio ring wherever space is
+   narrow: always in the popup, and on the stacked settings layout. Full rows
+   keep the full control size and selected tracking. */
 @media not all and (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group) {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group)::before {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group)::before {
     inset: 0 0 auto 0;
     width: 100%;
     height: calc(100% / 3);
     transform: translateY(calc(var(--segment-index) * 100%));
   }
 
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group) label + label:not(.custom-choice) {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) label + label:not(.custom-choice) {
     border-left: 0;
     border-top: var(--divider);
   }
 
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group) label:has(input:checked) + label {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) label:has(input:checked) + label {
     border-top-color: transparent;
   }
 
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group) label span {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) label span {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     gap: 14px;
     padding: 8px 16px;
+    font-size: var(--fs-control);
     text-align: start;
   }
 
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group) label span::before {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) label span::before {
     flex: none;
     width: 20px;
     height: 20px;
@@ -526,7 +471,11 @@ input[type="checkbox"] {
     transition: box-shadow 220ms var(--motion-ease);
   }
 
-  :root[data-design="wide"] :is(.segments, .control-grid .segment-group) input:checked + span::before {
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) input:checked + span {
+    letter-spacing: var(--track-selected);
+  }
+
+  :root[data-design="signal"] :is(.segments, .control-grid .segment-group) input:checked + span::before {
     box-shadow: inset 0 0 0 4px var(--accent), inset 0 0 0 10px currentColor;
   }
 }

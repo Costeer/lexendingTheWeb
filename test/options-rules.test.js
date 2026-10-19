@@ -68,7 +68,7 @@ async function openSettings({ count = 6, desktop = false, cachedTheme = "light",
     basicLineHeight: [0, 1.5, 2],
     basicLetterSpacing: [0, 0.04, 0.08],
     previewMode: ["reading", "compare", "glyphs"],
-    design: ["signal", "paper", "wide"]
+    design: ["signal", "paper"]
   }).map(([name, values]) => [
     `input[name="${name}"]`,
     values.map((value) => Object.assign(new Element(), { value: String(value) }))
@@ -179,22 +179,22 @@ test("settings retain the dark navigation cache while loading, then honor synced
 test("the design cache paints before loading, then the synced design wins and choices save", async () => {
   let resolveSettings;
   const pending = new Promise((resolve) => { resolveSettings = resolve; });
-  const page = await openSettings({ cachedDesign: "wide", getSettings: () => pending });
+  const page = await openSettings({ cachedDesign: "paper", getSettings: () => pending });
   const designs = page.inputs.get('input[name="design"]');
-  assert.equal(page.root.dataset.design, "wide", "loading keeps the cached design instead of the default");
+  assert.equal(page.root.dataset.design, "paper", "loading keeps the cached design instead of the default");
   assert.ok(designs.every((input) => input.disabled), "designs cannot be chosen before settings load");
-  resolveSettings({ design: "wide" });
+  resolveSettings({ design: "paper" });
   await tick();
-  assert.deepEqual(designs.map((input) => input.checked), [false, false, true]);
-  designs[1].checked = true;
-  designs[1].emit("change");
-  assert.equal(page.root.dataset.design, "paper", "a choice repaints immediately");
-  assert.equal(page.cache.get("lexend-ui-design"), "paper");
+  assert.deepEqual(designs.map((input) => input.checked), [false, true]);
+  designs[0].checked = true;
+  designs[0].emit("change");
+  assert.equal(page.root.dataset.design, "signal", "a choice repaints immediately");
+  assert.equal(page.cache.get("lexend-ui-design"), "signal");
   await tick();
-  assert.equal(page.writes.at(-1).design, "paper");
+  assert.equal(page.writes.at(-1).design, "signal");
   assert.equal(page.writes.at(-1).theme, "light", "a design change keeps the theme");
 
-  const stale = await openSettings({ cachedDesign: "wide", getSettings: async () => ({ design: "unknown" }) });
+  const stale = await openSettings({ cachedDesign: "paper", getSettings: async () => ({ design: "wide" }) });
   assert.equal(stale.root.dataset.design, "signal", "synced settings override the cache and normalize");
   assert.equal(stale.cache.get("lexend-ui-design"), "signal");
 });
@@ -211,8 +211,8 @@ test("backups without a design keep the current design; backups with one disclos
   assert.equal(page.stored().design, "paper");
   assert.equal(page.stored().enabled, false);
 
-  await page.import({ ...page.stored(), design: "wide" });
-  assert.ok(lines().includes("Design: Paper → Wide"));
+  await page.import({ ...page.stored(), design: "signal" });
+  assert.ok(lines().includes("Design: Paper → Signal"));
 });
 
 test("preview modes and custom samples stay local while the comparison baseline stays fixed", async () => {

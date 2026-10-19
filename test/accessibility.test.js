@@ -39,7 +39,7 @@ const designs = globalThis.LexendSettings.designs;
 const cases = designs.flatMap((design) => ["light", "dark"].map((theme) => [design, theme, resolve(design, theme)]));
 
 test("every design declares a complete color palette for both themes", () => {
-  assert.deepEqual([...designs], ["signal", "paper", "wide"]);
+  assert.deepEqual([...designs], ["signal", "paper"]);
   for (const [design, theme, tokens] of cases) {
     for (const name of ["--accent", "--on-accent", "--ink", "--ink-soft", "--surface", "--surface-sunken",
       "--accent-tint", "--accent-text", "--line-strong", "--line"]) {

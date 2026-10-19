@@ -33,17 +33,9 @@ body.settings-page {
   pointer-events: none;
 }
 
-/* Paper tears into soft scallops; Wide uses a larger, bolder zigzag. */
+/* Paper tears into soft scallops. */
 :root[data-design="paper"] .settings-card::after {
   background: radial-gradient(circle at 12px 0, var(--surface) 11.5px, transparent 12px) 0 0 / 24px 12px repeat-x;
-}
-
-:root[data-design="wide"] .settings-card::after {
-  bottom: -16px;
-  height: 16px;
-  background:
-    linear-gradient(135deg, var(--surface) 25%, transparent 25%) -16px 0 / 32px 32px repeat-x,
-    linear-gradient(225deg, var(--surface) 25%, transparent 25%) -16px 0 / 32px 32px repeat-x;
 }
 
 .page-attribution {
@@ -164,20 +156,15 @@ body.settings-page {
 
   .settings-layout {
     display: grid;
-    grid-template-columns: 230px minmax(0, 1fr);
+    grid-template-columns: 250px minmax(0, 1fr);
     align-items: start;
-    gap: 56px;
+    gap: 52px;
     width: min(1160px, 100%);
     min-height: 560px;
     margin: 0 auto;
   }
 
-  :root[data-design="wide"] .settings-layout {
-    grid-template-columns: 260px minmax(0, 1fr);
-    gap: 48px;
-  }
-
-  .desktop-settings-nav {
+    .desktop-settings-nav {
     position: sticky;
     top: 32px;
     display: grid;
@@ -335,7 +322,7 @@ body.settings-page {
 
   /* Appearance. */
   .settings-layout .design-options {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   /* Backup and shortcut: open sections separated by dividers. */
@@ -366,13 +353,8 @@ body.settings-page {
 
   @media (max-width: 1080px) {
     .settings-layout {
-      grid-template-columns: 200px minmax(0, 1fr);
-      gap: 32px;
-    }
-
-    :root[data-design="wide"] .settings-layout {
-      grid-template-columns: 220px minmax(0, 1fr);
-      gap: 28px;
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 30px;
     }
 
     .settings-layout .rule-list {
@@ -381,10 +363,6 @@ body.settings-page {
 
     .settings-layout .rule-row:last-child:nth-child(odd) {
       grid-column: auto;
-    }
-
-    .settings-layout .design-options {
-      grid-template-columns: minmax(0, 1fr);
     }
   }
 }

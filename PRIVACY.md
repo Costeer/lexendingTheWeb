@@ -19,7 +19,7 @@ Your browser remembers:
 - Whether Lexend is on or off
 - Whether it applies to body text only or headings too
 - Your text size, line height, and letter spacing
-- Your interface design (Signal, Paper, or Wide) and light or dark theme
+- Your interface design (Signal or Paper) and light or dark theme
 - The site rules you create, including hostnames, on/off choices, text scope,
   and whether to include subdomains
 

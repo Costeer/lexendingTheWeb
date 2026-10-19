@@ -95,12 +95,12 @@ test("popup remains accessible and visually stable", async ({ page }, testInfo) 
   await assertViewportLayout(page, testInfo);
 });
 
-for (const design of ["paper", "wide"]) test.describe(`${design} design`, () => {
+test.describe("paper design", () => {
+  const design = "paper";
   test.use({ design });
 
   test(`${design} popup remains accessible, fits and is visually stable`, async ({ page }, testInfo) => {
-    const width = testInfo.project.use.isMobile ? 320 : design === "wide" ? 400 : 360;
-    await page.setViewportSize({ width, height: 800 });
+    await page.setViewportSize({ width: testInfo.project.use.isMobile ? 320 : 360, height: 800 });
     await openInterface(page, "popup.html");
     await expect(page.locator("html")).toHaveAttribute("data-design", design);
     await expect(page.locator("#site-strip")).toBeVisible();
@@ -124,15 +124,17 @@ for (const design of ["paper", "wide"]) test.describe(`${design} design`, () => 
 test("choosing a design restyles settings immediately and saves it for every page", async ({ page }) => {
   await openInterface(page, "options.html?section=appearance-panel");
   await expect(page.locator("html")).toHaveAttribute("data-design", "signal");
-  await page.locator(".design-option", { hasText: "Wide" }).click();
-  await expect(page.locator('input[name="design"][value="wide"]')).toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-design", "wide");
   const radius = () => page.locator(".design-option").first().evaluate((element) => getComputedStyle(element).borderTopLeftRadius);
-  expect(await radius()).toBe("8px");
-  await page.keyboard.press("ArrowLeft");
+  // The fixture reseeds storage on navigation, so check what the popup will read.
+  const saved = () => page.evaluate(async () => [(await browser.storage.sync.get()).design, localStorage.getItem("lexend-ui-design")]);
+  expect(await radius()).toBe("0px");
+  await page.locator(".design-option", { hasText: "Paper" }).click();
+  await expect(page.locator('input[name="design"][value="paper"]')).toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-design", "paper");
   expect(await radius()).toBe("18px");
-  // The fixture reseeds storage on navigation, so check what the popup will read.
-  await expect.poll(() => page.evaluate(async () => (await browser.storage.sync.get()).design)).toBe("paper");
-  expect(await page.evaluate(() => localStorage.getItem("lexend-ui-design"))).toBe("paper");
+  await expect.poll(saved).toEqual(["paper", "paper"]);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator("html")).toHaveAttribute("data-design", "signal");
+  expect(await radius()).toBe("0px");
+  await expect.poll(saved).toEqual(["signal", "signal"]);
 });

@@ -926,7 +926,7 @@
     if (key === "design") return designNames[value];
     return String(value);
   };
-  const designNames = { signal: "Signal", paper: "Paper", wide: "Wide" };
+  const designNames = { signal: "Signal", paper: "Paper" };
   const importKeys = { enabled: "Global switch", scope: "Global scope", theme: "Theme", design: "Design",
     layoutRepair: "Layout repair", textScale: "Text size", lineHeight: "Line height", letterSpacing: "Letter spacing" };
   const ruleDescription = (rule) => `${ruleSource(rule)}: activation ${rule.enabled === null ? "inherit" : rule.enabled ? "active" : "paused"}, scope ${rule.scope === null ? "inherit" : importValue("scope", rule.scope)}, layout repair ${rule.layoutRepair == null ? "inherit" : rule.layoutRepair ? "on" : "off"}`;

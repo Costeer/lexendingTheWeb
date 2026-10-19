@@ -18,7 +18,7 @@
   const preferenceKeys = ["enabled", "layoutRepair", "scope", "theme", "design", "textScale", "lineHeight", "letterSpacing"];
   // Interface designs only restyle extension pages. Keep in sync with src/ui-theme.js.
   // Stored as "design": older versions delete the retired "uiStyle" key on every write.
-  const designs = Object.freeze(["signal", "paper", "wide"]);
+  const designs = Object.freeze(["signal", "paper"]);
   const ruleKey = (rule) => `${rule.hostname}\n${rule.includeSubdomains}`;
   const sameRule = (left, right) => left.enabled === right.enabled && left.scope === right.scope && left.layoutRepair === right.layoutRepair;
   const legacySpacingValues = Object.freeze({

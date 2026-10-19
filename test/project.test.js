@@ -264,13 +264,14 @@ test("designs share the red accent and Lexend while varying shape and spacing", 
 test("designs normalize, and imports accept a missing design but reject unknown ones", () => {
   assert.equal(settingsApi.defaults.design, "signal");
   assert.equal(settingsApi.normalizeSettings({ design: "paper" }).design, "paper");
-  assert.equal(settingsApi.normalizeSettings({ design: "classic" }).design, "signal");
-  const complete = settingsApi.normalizeSettings({ design: "wide" });
+  // Wide was folded into Signal, so a stored "wide" falls back to Signal.
+  for (const retired of ["classic", "wide"]) assert.equal(settingsApi.normalizeSettings({ design: retired }).design, "signal");
+  const complete = settingsApi.normalizeSettings({ design: "paper" });
   const { design, ...older } = complete;
-  assert.equal(design, "wide");
+  assert.equal(design, "paper");
   for (const schemaVersion of [2, 3]) {
     assert.equal(settingsApi.validateImport({ schemaVersion, settings: older }).design, "signal");
-    assert.equal(settingsApi.validateImport({ schemaVersion, settings: complete }).design, "wide");
+    assert.equal(settingsApi.validateImport({ schemaVersion, settings: complete }).design, "paper");
     assert.throws(() => settingsApi.validateImport({ schemaVersion, settings: { ...complete, design: "neon" } }),
       { code: "INVALID_IMPORT", message: /invalid design/ });
   }
@@ -333,8 +334,8 @@ test("preset controls use equal fixed slots with one sliding selection layer", a
   assert.match(sharedCss, /\n:is\(\.segment-group, \.segments\) label span\s*\{[^}]*pointer-events: none;[^}]*transform: scale\(1\);/);
   assert.match(sharedCss, /\n:is\(\.segment-group, \.segments\)::before\s*\{[^}]*opacity: 0;[^}]*transition: transform 220ms/);
   assert.match(sharedCss, /:has\(input:checked\)::before\s*\{\s*opacity: 1;/);
-  // Wide stacks the same equal slots vertically; the layer then slides on Y.
-  assert.match(sharedCss, /:root\[data-design="wide"\] :is\(\.segments, \.control-grid \.segment-group\)::before\s*\{[^}]*transform: translateY\(calc\(var\(--segment-index\) \* 100%\)\);/);
+  // Signal stacks the same equal slots vertically when narrow; the layer then slides on Y.
+  assert.match(sharedCss, /:root\[data-design="signal"\] :is\(\.segments, \.control-grid \.segment-group\)::before\s*\{[^}]*transform: translateY\(calc\(var\(--segment-index\) \* 100%\)\);/);
   for (const css of [optionsCss, desktopCss, popupCss]) {
     assert.doesNotMatch(css, /grid-template-columns: \.9fr 1\.2fr \.9fr;/);
     assert.doesNotMatch(css, /:is\(\.segment-group, \.segments\)::before/, "pages reuse the shared selection layer");

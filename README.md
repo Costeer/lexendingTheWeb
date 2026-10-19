@@ -18,11 +18,11 @@ spacing. The preview offers **Reading**, **Compare** and **Glyphs** views. **Try
 own text** lets you preview a sample without saving or sending it.
 
 **Appearance** changes how the popup and Settings look, without changing websites.
-Choose one of three designs, each in a light or dark theme:
+Choose one of two designs, each in a light or dark theme:
 
-- **Signal**: square red frames and spaced bold labels. The original look.
+- **Signal**: square red frames, spaced bold labels and large, clear text with big
+  targets. Narrow screens list presets one per row.
 - **Paper**: rounded cards on warm off-white paper with softer black ink.
-- **Wide**: larger text with extra letter spacing, heavier strokes and big targets.
 
 Layout repair is off by default. Enable **Layout repair on this site** in the popup
 when text needs more room, or **Enable layout repair on all sites** in Settings.
